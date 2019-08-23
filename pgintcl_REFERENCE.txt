@@ -1,0 +1,1094 @@
+This is pgintcl/REFERENCE, programmer's reference to pgintcl.
+Last updated for pgintcl-3.5.0 on 2013-10-06
+The project home page is: http://sourceforge.net/projects/pgintcl/
+-----------------------------------------------------------------------------
+
+This is a concise reference to pgin.tcl commands in the version indicated
+above.  For more information on the details of the commands, refer to the
+Pgtcl Reference Manual available with the pgtcl-ng project at
+   http://sourceforge.net/projects/pgtclng/
+Pgin.tcl attempts to emulate the command usage and behavior of pgtcl-ng
+wherever possible.
+
+(Note: The syntax ?...? refers to optional values, per the Tcl documentation.)
+
+
+CORE COMMANDS:
+
+pg_conndefaults
+
+  Get the connection parameter defaults.
+
+  Returns:
+    A list of elements. Each element describes one connection parameter
+    in the following form:
+      { OptionName Display-label display-flag display-length default-value }
+    For example, for the "user" parameter: { user Database-User {} 20 yourname }
+
+
+pg_connect -conninfo conninfo
+pg_connect -connlist connlist
+
+  Connects to a database. There are 3 ways to specify the connection
+  information (server host, port, credentials): Using -conninfo and
+  a connection string, using -connlist and a connection list, or using
+  -conninfo and a PostgreSQL connection URI.
+
+  (The older form with separate dbname argument followed by options
+  is not supported.)
+
+  A connection string contains a series of 'option=value' entries,
+  separated by spaces.  Commonly used connection option names are:
+          dbname host port user password
+  Values need to be in single quotes if they contain spaces.
+  Within single quoted values, use \\ for \ and \' for '.
+  Note: pgintcl supports a much more limited set of options, compared
+  to libpq. Use [pg_conndefaults] to see the list.
+
+  A connection list is a Tcl list with alternating option name and option
+  values. This form does not require special quoting or escaping, provided
+  it is a proper Tcl list.
+
+  A PostgreSQL connection URI has the form:
+        postgresql://username:password@hostname:port/dbname
+  The usual URI-escaping needs to be used (RFC 3986), for example if the
+  password contains a : it must be written as %3A. More can be found in
+  the libpq chapter in the PostgreSQL manual, but note pgintcl does not
+  process URI options (param=value pairs after a '?' in the URI).
+
+  Values default to environment variables or built-in defaults.
+  Host defaults to the environment variable PGHOST, or to "localhost"
+  if no PGHOST. (pgtcl-ng defaults to using a Unix Domain Socket
+  in that case, but pgintcl does not support UDS.)
+
+  Returns:
+    A connection handle which is used with all other commands to access the
+    database.
+
+  Notes:
+    No attempt is made to convert connection parameters such as username
+    or database name between character sets. Non-ASCII characters in these
+    parameters may not work properly.
+
+pg_disconnect db
+
+  Disconnect from database. Also destroys any left-over result
+  structures associated with this connection.
+
+  Parameters:
+    db          Connection handle to close
+
+
+pg_select db query arrayName script
+
+  Execute a query and iterate a command script over each result row.
+
+  Parameters:
+    db          Connection handle
+    query       Query to execute, almost always a SELECT
+    arrayName   Name of an array variable. For each row, each column value
+                is assigned to an element of this array with the column
+                name as the index.
+    script      A command script to execute for each row. The script
+                can use break, continue, error, and return.
+
+
+pg_exec db query ?args...?
+
+  Execute SQL and return a result handle.
+  If optional args are supplied, they replace parameters in the query
+  (written as $1, $2, etc. - remember to escape the $ for Tcl). This can
+  be used to insert parameters in SQL without concern for quoting or escaping.
+  It only works with text arguments - it is not binary safe. See also
+  pg_exec_params.
+
+  Parameters:
+    db          Connection handle
+    query       Query to execute
+    args...     Optional argument values to replace $1, $2, etc. in the query.
+
+  Returns:
+    A result handle for use with pg_result. Must be freed when no longer
+    needed.
+
+
+pg_execute ?-oid oidName? ?-array arrayName? db query ?script?
+
+  Execute SQL and optionally iterate a script over the rows.
+  This command can replace both pg_exec and pg_select in many cases.
+  If -array is not given on a Select, a variable is created for
+  each field in the query result.
+  If no proc is supplied, only the first query result row is saved.
+
+  Options:
+    -oid oidName      A variable to receive the OID of an inserted row
+    -array arrayName  An array variable name to store each row into
+
+  Parameters:
+    db          Connection handle
+    query       Query to execute
+    script      Optional command script to execute for each row.
+                The script can use break, continue, error, and return.
+
+  Returns:
+    The number of tuples queried or affected by the command.
+
+
+pg_result result option ?args?
+
+  Get information about a result. The option indicates the desired
+  information, which is returned by the command.
+
+  Parameters:
+    result      A result handle returned by pg_exec, pg_exec_prepared,
+                or pg_exec_params.
+    option      One of the command options listed below.
+    args        option-dependent command arguments.
+
+  Returns:
+    Depends on the command option
+
+  Options:
+    -status          Returns the result status (see notes)
+    -error ?c?       Returns the error message if no code 'c' is provided,
+                        or a error field if a code is provided (see below).
+                        [Before 2.2.0, did not support optional 'c' parameter]
+    -errorField ?c?  Same as -error
+                        [Before 2.2.0, the 'c' parameter was required]
+    -conn            Returns the connection handle for this result
+    -oid             Returns the OID of an inserted tuple
+    -numTuples       Returns the number of tuples in the result
+    -numAttrs        Returns the number of attributes
+    -assign A        Assign the query result data to A(tuple,attribName)
+    -assignbyidx A s Assign results to an array (see the pgtcl-ng docs)
+    -getTuple N      Return a list of values for tuple N
+    -getNull N       Returns a list of NULL flags for tuple N
+    -tupleArray N A  Store the Nth tuple in array A as A(attribName)
+    -attributes      Returns a list of attributes
+    -lAttributes     Returns a list of attributes as {{name type size}...}
+    -lxAttributes    Returns a list of extended information about
+                     attributes as: {{name type size size_modifier
+                        format table_OID table_column}...}
+    -cmdTuples       Returns the number of tuples INSERTed, DELETEd, UPDATEd
+    -cmdStatus       Returns the command status tag.
+    -list            Returns the result set as a list of values.
+    -llist           Returns the result set as a list of tuple data, each
+                     of which is a list of values.
+    -numParams       Returns the number of parameters in a prepared query.
+                     Only for use with a result from pg_describe_prepared.
+    -paramTypes      Returns a list of type OIDs for the parameters in
+                     a prepared query.
+                     Only for use with a result from pg_describe_prepared.
+    -clear           Deallocate the result structure. Returns nothing.
+    -dict            Returns the query results as a Tcl dictionary.
+
+  Notes:
+    Result status from pg_result -status is one of these string values:
+        PGRES_TUPLES_OK PGRES_COMMAND_OK PGRES_FATAL_ERROR
+        PGRES_COPY_OUT PGRES_COPY_IN PGRES_EMPTY_QUERY
+
+    -oid returns 0 if the query was not an INSERT.
+
+    -cmdTuples is an extension that emulates libpq PQcmdTuples.
+        It is intended to return the number of rows affected by an SQL
+        command that modifies rows, and returns an empty string for other
+        commands. However, in PostgreSQL-9.0.0 and higher libpq also returns
+        the number of rows from a SELECT query. Older releases returned
+        an empty string for SELECT.
+        For the most compatibility, you should always use -numTuples after
+        SELECT queries, and -cmdTuples after other data modification queries.
+
+    -cmdStatus is an extension which returns the command status tag.
+        This is the SQL command (for example: "INSERT", "CREATE") possibly
+        followed by additional data (such as the number of rows affected).
+
+    -errorField is an extension to access error message subfields.
+        As of 2.2.0, the error field name or code is optional in -errorField,
+        and can also be supplied to pg_result -error. So -error and
+        -errorField are now equivalent. The optional field name
+        or code can be one of the following:
+
+        Field name:        Alias:    Code:   Notes:
+        SEVERITY                     S       Error severity, e.g. ERROR or FATAL
+        SQLSTATE                     C       5-character SQL State code
+        MESSAGE_PRIMARY    PRIMARY   M       Primary error message
+        MESSAGE_DETAIL     DETAIL    D       Secondary / detailed message
+        MESSAGE_HINT       HINT      H       Hint, or suggestion
+        STATEMENT_POSITION POSITION  P       Decimal integer cursor position
+        CONTEXT                      W       Error context, or call stack-trace
+        SOURCE_FILE        FILE      F       PostgreSQL source code filename
+        SOURCE_LINE        LINE      L       PostgreSQL source code line number
+        SOURCE_FUNCTION    FUNCTION  R       PostgreSQL function name
+        SCHEMA_NAME                  s       Schema name of the effected object
+        TABLE_NAME                   t       Table associated with the error
+        COLUMN_NAME                  c       Column associated with the error
+        DATATYPE_NAME                d       Datatype associated with the error
+        CONSTRAINT_NAME              n       Constraint name
+ 
+        (Aliases were added for compatibility with another implementation.)
+
+        Field names are not case sensitive.
+        Starting with pgtclng-2.1.0 and pgintcl-3.5.0, the single character
+        codes are case sensitive. (In prior releases they worked in either
+        upper or lower case). This change was necessary when the new codes
+        for Schema, Table, Column, Constraint, and Datatype were added.
+
+        If the field name or code is defined, pg_result returns
+        the value of that field (if available), else an empty string.
+        Do not assume that any given error field is available for any specific
+        error. The PostgreSQL server decides which fields to supply for each
+        error condition, and does not necessarily supply the fields that you
+        might expect.
+
+        Note: pg_result -error or -errorField without a code returns the
+        SEVERITY followed by the MESSAGE_PRIMARY as a single string.
+
+    -lxAttributes is an extension. It returns the same information as
+        -lAttributes plus additional information provided by the PostgreSQL
+        server about the result attributes.
+
+    -getNull is an extension. It returns a list with a flag for each column
+        in the tuple. The flag is 1 is the column value is NULL, else 0.
+        This gives you a way to tell if a database result column is NULL,
+        which otherwise looks the same as an empty string.
+
+    -numParams and -paramTypes are extensions (pgin.tcl-3.1.0). They return
+        information about a prepared query, from a result structure returned
+        by pg_describe_prepared. If used on a result structure that comes
+        from any other command, the options return 0 and an empty list
+        respectively.
+
+    -dict is an extension (pgintcl-3.3.0). It only works with Tcl 8.5 or
+        higher, since older versions do not support dictionaries. The returned
+        value is a Tcl dictionary with one entry for each query result row,
+        using the zero-based row number as the key. The value of each entry
+        is a dictionary containing field names as keys, and field values
+        as values. For an example of usage, if 'd' is a dictionary
+        returned by pg_result -dict, [dict get $d 5 name] returns the
+        value of the 'name' column in the 6th result row.
+
+pg_listen ?-pid? db name ?script?
+
+  Listen for PostgreSQL notifications and call a procedure proc, or unlisten.
+  See NOTIFICATIONS below.
+
+  Parameters:
+    -pid        Option indicating notifying PID should be passed to script.
+    db          Connection handle
+    name        Notification condition name to start or stop listening for 
+    script      If provided, command script to call when notification
+                arrives. If not provided, clear current notification
+                listen for condition 'name'.
+                Note PostgreSQL-9.0 documentation refers to the 'name' as
+                a 'channel'.
+                The script should accept an optional 'payload' argument,
+                which will be provided if the SQL NOTIFY command includes
+                a non-empty payload. This requires PostgreSQL-9.0.0 or
+                higher, and pgin.tcl-3.2.0 or higher.
+                If the -pid option is used, the script should also accept
+                a PID argument before the payload argument.
+
+
+pg_escape_string ?db? str
+
+  Escape a string for including in SQL strings. That is, returns str with
+  single quotes doubled up, and possibly backslashes doubled too.
+  See also pg_quote.
+
+  Parameters:
+    db          Optional database connection handle (see notes)
+    str         String to escape
+
+  Returns: 
+    The escaped string.
+
+  Notes:
+    The behavior of pg_escape_string in pgin.tcl (and pgtcl-ng) is not
+    compatible with the behavior in another Pgtcl implementation,
+    where pg_escape_string is now synonymous with pg_quote.
+
+    The optional db argument, if supplied, is used to determine the
+    standard_conforming_strings setting for the database, and that is used
+    to determine if backslashes need to be doubled. If no db argument is
+    given, the setting used is that of the most recent connected database
+    (or the one with a most recently changed standard_conforming_strings
+    setting).
+
+    Libpq-based interfaces also use db to determine the character set
+    encoding, in order to properly handle multibyte sequences and avoid
+    a possible security issue. Pgin.tcl does not have this capability.
+
+
+pg_quote ?db? str
+
+  Escape a string for including in SQL strings, and return it with leading
+  and trailing quotes. These commands are equivalent:
+             set s '[pg_escape_string $str]'
+             set s [pg_quote $str]
+  See also pg_escape_string.
+
+  Parameters:
+    db          Optional database connection handle (see notes)
+    str         String to escape
+
+  Returns: 
+    The escaped string inside single quotes.
+
++  Notes:
+    The optional db argument, if supplied, is used to determine the
+    standard_conforming_strings setting for the database, and that is used
+    to determine if backslashes need to be doubled. If no db argument is
+    given, the setting used is that of the most recent connected database
+    (or the one with a most recently changed standard_conforming_strings
+    setting).
+
+    Libpq-based interfaces also use db to determine the character set
+    encoding, in order to properly handle multibyte sequences and avoid
+    a possible security issue. Pgin.tcl does not have this capability.
+
+
+pg_escape_identifier db str
+
+  Escape and quote a string for use as an SQL identifier (for example, a
+  table or column name).  The return value includes opening and closing 
+  double quotes.
+
+  Parameters:
+    db          Database connection handle (ignored)
+    str         String to escape
+
+  Returns: 
+    The escaped string inside double quotes.
+
+  Notes:
+    The db argument is required, but ignored by Pgin.tcl.
+    Libpq-based interfaces use db to determine the character set
+    encoding, in order to properly handle multibyte sequences and avoid
+    a possible security issue. Pgin.tcl does not have this capability.
+
+
+pg_escape_literal db str
+
+  Escape and quote a string for use as an SQL literal (string constant).
+  The return value includes opening and closing quotes. This is functionally
+  equivalent to pg_quote (see above), but implemented differently, and the
+  result is independent of the setting of standard_conforming_strings.
+
+  Parameters:
+    db          Database connection handle (ignored)
+    str         String to escape
+
+  Returns: 
+    The escaped string inside single quotes.
+
+  Notes:
+    The db argument is required, but ignored by Pgin.tcl.
+    Libpq-based interfaces use db to determine the character set
+    encoding, in order to properly handle multibyte sequences and avoid
+    a possible security issue. Pgin.tcl does not have this capability.
+
+
+pg_escape_bytea ?db? binstr
+
+  Escape a binary string for including in SQL strings, intended for use
+  with bytea (byte array) columns.
+
+  Parameters:
+    db          Optional database connection handle (see notes)
+    binstr      String to escape. This can contain arbitrary binary data.
+
+  Returns:
+    The escaped string. Put it in single quotes when using in SQL.
+
+  Notes:
+    This is slow on large strings. Consider using binary prepared queries
+    instead.
+
+    The optional db argument, if supplied, is used to determine the
+    standard_conforming_strings setting for the database, and that is used
+    to determine if backslashes need to be doubled. If no db argument is
+    given, the setting used is that of the most recent connected database
+    (or the one with a most recently changed standard_conforming_strings
+    setting).
+
+    PostgreSQL-9.0.0 introduced a new hex encoding format, but pgin.tcl
+    always uses the older escape encoding with pg_escape_bytea.
+
+
+pg_unescape_bytea str
+
+  Unescape a string coming back from a PostgreSQL query on a bytea (byte
+  array) column, and return the original binary string.
+
+  Parameters:
+    str      String to unescape. This should be the result of a
+             query on a bytea column; other uses are undefined (see notes)
+
+  Returns:
+    The unescaped binary string.
+
+  Notes:
+    Consider using binary prepared queries instead, for better performance.
+
+    This command does not fully emulate the corresponding libpq function
+    PQunescapeBytea, and will return different results for some strings.
+    But it is designed to return the correct data for all strings which can
+    possibly be returned by a PostgreSQL server in response to a query on a
+    bytea column. So it should act correctly when used in the intended way.
+
+    This command can decode both 'escape' and 'hex' mode encodings, so it
+    will work with PostgreSQL-9.0.0 and new servers even with the default
+    bytea_output='hex' setting. Older versions of pgin.tcl may not properly
+    decode hex mode data, nor will they detect the error.
+
+
+pg_encrypt_password password username
+
+  Encrypts a password for the given username, in the same way that the
+  PostgreSQL server does. This is intended for use with commands like
+  ALTER USER which can take a pre-encrypted password.
+
+  Parameters:
+    password     The password string to encrypt
+    username     The username that goes with the password to encrypt
+
+  Returns:
+    The encrypted password string, which looks like this: "md5..."
+
+-----------------------------------------------------------------------------
+EXTENSIONS:
+
+pgin.tcl has some extended commands and variables.
+These commands do not exist in the original libpgtcl which was bundled with
+PostgreSQL, and may not exist in other implementations of the Pgtcl interface.
+
+
+pg_notice_handler db ?command?
+
+  Query or set a command to handle Notice or Warning messages.
+  If the command is supplied, sets the handler to that command, and
+  returns the previous command. If the command is not supplied,
+  returns the current handler command.  See NOTICES below.
+
+  Parameters:
+    db          Connection handle
+    command     Command to execute on receipt of notice or warning
+
+  Returns:
+    The previous handler command
+
+
+pg_endcopy result
+
+  This must be called after SQL COPY FROM or COPY TO completes.
+  See COPY FROM/TO below.
+
+  Parameters:
+    result      Result handle on which a COPY is done.
+
+
+pg_copy_read result
+
+  Read the next line (record) for SQL COPY TO STDOUT.  Returns the line
+  read, or an empty string when COPY is done.  The returned line does
+  not end in a newline, so you can just split it on tab to get the
+  column values.  With PostgreSQL-7.4 support, you must use this
+  routine for COPY TO STDOUT; reading from the socket no longer works.
+
+  Parameters:
+    result      Result handle on which a COPY is active.
+
+  Returns:
+    The line read from the server, or empty when done.
+
+
+pg_copy_write result line
+
+  Write one line (record) $line for SQL COPY FROM STDIN.
+  The passed argument must not end in a newline.
+  With PostgreSQL-7.4 support, you must use this routine for
+  COPY FROM STDIN; writing to the socket no longer works.
+
+  Parameters:
+    result      Result handle on which a COPY is active.
+    line        One record to write to the server.
+
+$pgtcl::version
+  This variable has the pgin.tcl version number. The existence of
+  this variable can also be used to determine if pgin.tcl has been loaded.
+  Note: This is deprecated in favor of using Tcl's package management.
+  Use [package present pgintcl] to test for pgin.tcl and get its version.
+
+
+pg_callfn db fname result arginfo arg...
+pg_callfn_int db fname arginfo arg...
+
+  These two commands allow access to the PostgreSQL back-end "fast-path"
+  function call interface. This is not intended for routine use.
+  See the INTERNALS document for more information.
+
+
+pg_parameter_status db param
+
+  Fetch the value of a parameter supplied by a PostgreSQL-7.4 or higher
+  backend. Returns the value of the named parameter (or an empty string
+  if no such parameter has been sent by the backend).  The following
+  parameters are commonly sent by the backend:
+      client_encoding DateStyle is_superuser server_encoding
+      server_version session_authorization
+
+  Parameters:
+    db          Connection handle
+    param       Name of the parameter to get the value of
+
+
+pg_exec_params db query res_formats arg_formats arg_types arg...
+
+  Parse SQL statement, bind parameters, and execute statement.
+  This is similar to pg_exec_prepared (see below), but doesn't use a
+  pre-prepared statement, and if you want to binary parameters you
+  must also provide the type OIDs. 
+
+  res_formats is a list (but see note below) describing the query result
+  columns, and arg_formats is a list describing the query parameter formats,
+  as follows. An empty list means all parameters or result columns are text
+  (or, that there are no parameters/result columns).  A single word "TEXT"
+  (or "T"), or "BINARY" (or "B"), indicates the format of all parameters or
+  of all result columns.  Finally, a list of those words indicates the format
+  of each individual parameter or result column. For example:
+        {}             All text format
+        T              All text format
+        T B            One text, one binary format
+        B B B          Three binary format
+
+  Parameters:
+    db          Connection handle
+    query       Query to execute, may contain parameters $1, $2, ...
+    res_formats A list describing results: B* => binary, else text
+    arg_formats A list describing args: B* => Binary, else Text.
+    arg_types   A list of type OIDs for each argument (if Binary).
+    args        Variable number of arguments to bind to the query params.
+  Returns:
+    A result handle, for use with pg_result.
+
+  Notes:
+    There is no support for passing NULL arguments
+
+    If there are any binary format arguments, an arg_type must be specified
+    for each argument, although the value will be ignored for each text
+    format argument.
+
+    libpq does not support mixed Text/Binary result columns in prepared
+    queries. Although pgin.tcl does, this is not recommended because it
+    will not be compatible with libpq-based versions of the pgtcl interface.
+    So the res_formats argument should contain at most a single word.
+
+
+pg_exec_prepared db stmt_name res_formats arg_formats arg...
+
+  Executes a pre-prepared SQL statement with text and/or binary parameters
+  and text and/or binary result columns. Parameter place-holders in the
+  prepared statement are designated $1, $2, etc.
+  This allows binding arguments to SQL statement parameters without
+  quoting problems, and sending and receiving raw binary data.
+
+  The statement must be prepared with the SQL command
+       PREPARE statement_name (args) AS ...
+
+  res_formats is a list (but see note below) describing the query result
+  columns, and arg_formats is a list describing the query parameter formats,
+  as follows. An empty list means all parameters or result columns are text
+  (or, that there are no parameters/result columns).  A single word "TEXT"
+  (or "T"), or "BINARY" (or "B"), indicates the format of all parameters or
+  of all result columns.  Finally, a list of those words indicates the format
+  of each individual parameter or result column. (See pg_exec_params)
+
+  Parameters:
+    db          Connection handle
+    stmt_name   Name of a pre-prepared SQL statement
+    res_formats A list describing results: B* => binary, else text
+    arg_formats A list describing args: B* => Binary, else Text.
+    args        Variable number of arguments to bind to the query params.
+
+  Returns:
+    A result handle, for use with pg_result.
+
+  Notes:
+    There is no support for passing NULL arguments
+
+    libpq does not support mixed Text/Binary result columns in prepared
+    queries. Although pgin.tcl does, this is not recommended because it
+    will not be compatible with libpq-based versions of the pgtcl interface.
+    So the res_formats argument should contain at most a single word.
+
+
+pg_transaction_status db
+
+  Returns the current in-transaction status.
+
+  Parameters:
+    db          Connection handle
+
+  Returns:
+    The status - one of the following strings:
+      IDLE        (Connection is idle, not in a transaction)
+      INTRANS     (Connection is idle, in a valid transaction block)
+      INERROR     (Connection is in a failed transaction block)
+      UNKNOWN     (Connection is bad or in an unknown state)
+
+
+pg_describe_prepared db stmt_name
+
+  Get a result structure with information about a prepared statement.
+
+  Parameters:
+    db          Connection handle
+    stmt_name   The name of an existing prepared statement. (See the SQL
+                PREPARE command.)
+
+  Returns:
+    A result handle for use with pg_result. Must be freed when no longer
+    needed.
+
+  Notes:
+    The returned result structure will have no data rows, only attribute
+    (column) information, and parameter information, and the status will
+    be PGRES_COMMAND_OK if successful. If the prepared statement has
+    parameters, then information about the parameters is available using
+    pg_result -numParams and pg_result -paramTypes.
+
+
+pg_describe_cursor db cursor_name
+
+  Get a result structure with information about a cursor (portal).
+
+  Parameters:
+    db          Connection handle
+    cursor_name The name of an existing cursor. (See the SQL DECLARE
+                command.) Note the PostgreSQL documentation refers to
+                cursors as 'portals'.
+
+  Returns:
+    A result handle for use with pg_result. Must be freed when no longer
+    needed.
+
+  Notes:
+    The result structure will have no data rows, only attribute
+    (column) information, and the status will be PGRES_COMMAND_OK if
+    successful.
+
+
+pg_backend_pid db
+
+  Get the backend process ID (PID).
+
+  Parameters:
+    db          Connection handle
+
+  Returns:
+    A process ID. This is an integer, and uniquely identifies this client
+    connection from all others connected to the same PostgreSQL server.
+
+  Notes:
+    The returned value is a PID on the server, not client.
+
+
+pg_server_version db
+
+  Get the PostgreSQL server software version as an integer.
+
+  Parameters:
+    db          Connection handle
+
+  Returns:
+    An integer representing the PostgreSQL server's version (that is, the
+    version of PostgreSQL running on the server for this connection handle.)
+    This is a representation of the same information in the server_version
+    parameter (see pg_parameter_status). There are two digits allocated
+    to each of the major, minor, and release levels. For example, if 
+    connected to a PostgreSQL-8.2.13 server, the return value is 80213.
+
+-----------------------------------------------------------------------------
+LARGE OBJECTS:
+
+pgin.tcl implements the Large Object commands of libpgtcl.
+
+Remember that these routines must be used inside transactions. Also note
+that you, not PostgreSQL, are responsible for tracking the large objects by
+their OIDs in your database schema tables.  So for example you will
+generally have to pair a database INSERT with a pg_lo_creat, and a database
+DELETE with a pg_lo_unlink.
+
+All of the Large Object commands throw a Tcl error if an error occurs, with
+the exception of pg_lo_read and pg_lo_write, which return -1 on error.
+This is inconsistent, but the read and write commands were already
+documented in the PostgreSQL manual to return -1 on error, so that is how
+pgin.tcl implements them. Error behavior of the other routines was not
+documented; as coded some returned a negative number and some threw an
+error.  The decision to have the pgin.tcl implementation of these commands
+always throw a Tcl error was made because otherwise there is no way to get
+at the error message text. It is possible that future versions of the
+interface will also have pg_lo_read and pg_lo_write throw a Tcl error if an
+error occurs.
+
+
+pg_lo_creat db mode
+
+  Create a large object. Mode should be one of the strings INV_READ,
+  INV_WRITE, or INV_READ|INV_WRITE, although to be honest I do not know
+  what the difference is. As an extension, to be compatible with pg_lo_open,
+  this command also accepts mode of "r", "w", or "rw".
+
+  Parameters:
+    db          Connection handle
+    mode        Mode to create large object: INV_READ|INV_WRITE
+
+  Returns:
+    A large object OID, which you should promptly insert into a table.
+
+
+pg_lo_open db loid mode
+
+  Open a large object and returns a large object file descriptor.
+  Mode can be "r", "w", or "rw" specifying read and/or write. As an
+  extension, to be compatible with pg_lo_creat and libPQ, this command
+  also accepts mode of INV_READ, INV_WRITE, or "INV_READ|INV_WRITE".
+  The $loid usually comes from the return value of pg_lo_creat directly,
+  or indirectly as an oid-type field in a table.
+
+  Parameters:
+    db          Connection handle
+    loid        Large Object ID identifying the large object to open
+    mode        Mode to open large object in: "r", "w", "rw"
+
+  Returns:
+    A large object file descriptor (a lofd) for use with the commands below.
+
+
+pg_lo_close db lofd
+
+  Close a large object opened with pg_lo_open.
+
+  Parameters:
+    db          Connection handle
+    lofd        Large Object file descriptor to close
+
+
+pg_lo_unlink db loid
+
+  Delete a large object.
+
+  Parameters:
+    db          Connection handle
+    loid        Large Object ID identifying the large object to delete
+
+
+pg_lo_read db lofd buf_name maxlen
+
+  Read from a large object.
+
+  Parameters:
+    db          Connection handle
+    lofd        Large Object file descriptor to read from
+    buf_name    Name of the buffer variable to read into
+    maxlen      Maximum number of bytes to read from the large object
+
+  Returns:
+    The number of bytes actually read, 0 on end of large object, -1 on error.
+
+
+pg_lo_write db lofd buf len
+
+  Write to a large object.
+
+  Parameters:
+    db          Connection handle
+    lofd        Large Object file descriptor to write to
+    buf         Buffer containing data to write to the large object
+    len         Maximum number of bytes to write from buf to the large object.
+                (If buf has fewer than len bytes, just write all of buf.)
+
+  Returns:
+    The number of bytes actually written, -1 on error.
+
+
+pg_lo_lseek db lofd offset whence
+pg_lo_lseek64 db lofd offset whence
+
+  Reposition the (virtual) file position pointer in a large object.
+
+  Parameters:
+    db          Connection handle
+    lofd        Large Object file descriptor to position
+    offset      New position, interpreted per "whence"
+    whence      Position mode: SEEK_SET, SEEK_CUR, or SEEK_END specifying
+                that offset is a byte count relative to start of large object,
+                current position, or end of large object respectively.
+
+  Notes:
+    pg_lo_lseek64 is identical to pg_lo_lseek except that the 'offset'
+    parameter can be a larger value than fits in 32 bits. 
+    Use pg_lo_lseek64 with large objects that can exceed 2GB in size.
+    pg_lo_lseek64 only works when connected to a PostgreSQL-9.3.0 or higher
+    server.
+
+
+pg_lo_tell db lofd
+pg_lo_tell64 db lofd
+
+  Get the current large object position pointer.
+
+  Parameters:
+    db          Connection handle
+    lofd        Large Object file descriptor to get position of.
+
+  Returns:
+    The integer (virtual) file offset of the current file position
+    pointer in the large object.
+
+  Notes:
+    pg_lo_tell64 is identical to pg_lo_tell except that the return value
+    can be a larger value than fits in 32 bits. 
+    Use pg_lo_tell64 with large objects that can exceed 2GB in size.
+    pg_lo_tell64 only works when connected to a PostgreSQL-9.3.0 or higher
+    server.
+
+
+pg_lo_import db filename
+
+  Create a new large object, and import the contents of a file into it.
+
+  Parameters:
+    db          Connection handle
+    filename    Pathname of a file to import as a large object
+
+  Returns:
+    A large object OID, which you should promptly insert into a table.
+
+
+pg_lo_export db loid filename
+
+  Export a large object and write its contents into a file.
+
+  Parameters:
+    db          Connection handle
+    loid        Large Object ID identifying the large object to export
+    filename    Pathname of a file to export the large object into
+
+
+pg_lo_truncate db lofd len
+pg_lo_truncate64 db lofd len
+
+  Truncate a large object to a specified size.
+
+  Parameters:
+    db          Connection handle
+    lofd        Large Object file descriptor to get position of.
+    len         New length in bytes for the large object.
+
+  Notes:
+    pg_lo_truncate only works when connected to a PostgreSQL-8.3.0 or
+    higher server.
+    pg_lo_truncate64 is identical to pg_lo_truncate except that the 'len'
+    parameter can be a larger value than fits in 32 bits. 
+    Use pg_lo_truncate64 with large objects that can exceed 2GB in size.
+    pg_lo_truncate64 only works when connected to a PostgreSQL-9.3.0 or higher
+    server.
+
+-----------------------------------------------------------------------------
+NOTICES:
+
+If the backend sends a notice or warning message, the notice handler will
+be executed with the text of the notice as the final parameter. The default
+procedure just prints the message to stderr (like libpq does). You may
+replace this by defining your own procedure and using the command:
+      pg_notice_handler $conn_handle "notice_command ..."
+The actual message will be appended as an additional argument to your
+command.
+
+If you want to suppress notice and warning messages completely, you can set
+the notice handler to an empty string. For example, if you need to
+temporarily suppress notices and warnings, use something like this:
+    set save_handler [pg_notice_handler $conn_handle {}]
+    ... commands with no notice or warning messages reported ...
+    pg_notice_handler $conn_handle $save_handler
+But note that a better way to ignore NOTICE messages is to increase the
+message threshold with: SET CLIENT_MIN_MESSAGES TO WARNING
+
+Don't confuse Notices with Notification.  Notice and warning messages are
+generated by the server in response to a command from the client, but do
+not imply failure of the command so they don't affect the result status.
+An example of a notice is index creation as a result of creating a table
+with a primary key. An example of a warning is if ROLLBACK is issued
+outside a transaction.  By contrast, notifications are messages sent on
+behalf of another database client.
+
+Previous versions of this interface used the following syntax instead:
+      pg_configure $conn_handle notice "notice_command ..."
+This is still supported but deprecated.
+
+-----------------------------------------------------------------------------
+NOTIFICATIONS:
+
+Support for backend notifications differs from pgtcl-ng. With pgtcl-ng, the
+notification will be received as soon as Tcl enters the idle loop, e.g. if
+you use "update". pgtcl-ng does not need to be reading from the backend to
+get a notification. With pgin.tcl, the notification from the backend will
+only be seen while something is being read from the backend; that is,
+during pg_exec, pg_select, or pg_execute processing. After a notification
+is read, it will be delivered the next time Tcl enters the idle loop.
+
+If pg_listen is used without the -pid option, the handler command should
+be declared like this (not counting any additional, fixed arguments
+supplied in the pg_listen command):
+       proc notification_handler {{payload ""}} { ... }
+If pg_listen is used with the -pid option, the handler command should
+be declared like this:
+       proc notification_handler {pid {payload ""}} { ... }
+
+Starting with pgin.tcl-3.4.0, the notification name (called 'channel name' 
+in PostgreSQL-9.0 and up) is treated in the same manner as SQL regarding case
+sensitivity. That is, it is converted to lower case unless it is placed in
+double quotes. Note this means an additional level of quotes, not counting
+those used by the Tcl parser. If the name is in double quotes, the quotes
+are stripped and the case is preserved. This means the following 3 listen /
+notify pairs will work:
+
+  1)   Pgtcl:   pg_listen $db mychannel mycommand
+       SQL: NOTIFY mychannel; or NOTIFY MYCHANNEL; or NOTIFY MyChannel;
+
+  2)   Pgtcl:   pg_listen $db MYCHANNEL mycommand
+       SQL: same notifications as case #1 work.
+
+  3)   Pgtcl:   pg_listen $db {"MyChannel"} ...
+       SQL: NOTIFY "MyChannel";
+
+This will not work, because PostgreSQL will downcase the notification chanel
+name in the NOTIFY command, and it will not match the listening name:
+  4)   Pgtcl:   pg_listen $db {"MyChannel"} ...
+       SQL: NOTIFY MyChannel;
+
+Note: pgtclng has always worked this way, downcasing the name unless it
+was in double quotes. Pgin.tcl-3.3.0 and earlier always preserved case
+on the name, and did not handle quoted names. For maximum compatibility,
+use lower case names with pg_listen and NOTIFY.
+
+-----------------------------------------------------------------------------
+COPY FROM/TO:
+
+Front-end copy is a bulk import or export operation where multiple rows
+are sent between the PostgreSQL back-end and client front-end with minimal
+formatting. This is implemented in PostgreSQL with the following SQL:
+         COPY tablename TO STDOUT;   -- Export table
+         COPY tablename FROM STDIN;  -- Import table
+Each row is transmitted as one line, with columns separated by a delimiter
+which defaults to tab, backslash (\) escaping of control characters, and
+\N used for NULL.
+
+(Note: You never have to use COPY FROM/TO. You can always use the standard
+SQL SELECT and INSERT instead. COPY FROM/TO is said to be more efficient
+for large amounts of data.)
+
+The COPY protocol changed with PostgreSQL-7.4, and it is no longer possible
+to directly read and write to the connection handle as with previous
+versions of pgin.tcl. You must use the routines below to read and write
+records during COPY. This is currently incompatible with libpgtcl.
+
+To copy out a table, first issue "COPY tablename TO STDOUT" using pg_exec.
+The result status will change to PGRES_COPY_OUT. Then use pg_copy_read to
+read each record. Returned records will not end in a newline. Repeat
+pg_copy_read until it returns an empty string, then execute pg_endcopy.
+For example:
+
+        while {[set line [pg_copy_read $result_handle]] != ""} {
+           ... Process record in $line ...
+        }
+        pg_endcopy $result_handle
+
+After pg_endcopy returns, the result status should be PGRES_COMMAND_OK if
+the copy was successful.
+
+To copy in a table, first issue "COPY tablename FROM STDIN" using pg_exec.
+The result status will change to PGRES_COPY_IN. Then use pg_copy_write to
+write each record. Do not append a newline to the record. Repeat
+pg_copy_write until you are done, then execute pg_endcopy. For example:
+        while {... more data to send ...} {
+          pg_copy_write $result_handle $tab_separated_data_line
+        }
+        pg_endcopy $result_handle
+
+After pg_endcopy returns, the result status should be PGRES_COMMAND_OK if
+the copy was successful.
+
+Do not write or expect to read the old COPY delimiter "\.".
+
+-----------------------------------------------------------------------------
+ENCODINGS: (New at pgin.tcl-3.0.0)
+
+Pgin.tcl converts all text sent to PostgreSQL (query strings, COPY FROM
+data, text-mode parameters of prepared queries, and prepared statement
+names) into UTF-8 (Unicode). It converts all text received from PostgreSQL
+(query results which are text-mode, error/notice/notify strings, COPY TO
+data, field names) back from UTF-8 (Unicode).  (This happens implicitly in
+the compiled versions of the Tcl interface, but Pgin.tcl has to do it
+explicitly.)
+
+Pgin.tcl informs the PostgreSQL server that it will be using Unicode when
+communicating with the server. This is the same behavior as the libpq-based
+versions of the Tcl PostgreSQL interface. We do this because Tcl uses
+Unicode internally, and using Unicode allows for different client and
+server character sets without loss of information.
+
+PostgreSQL converts between this Unicode data and the database encoding, if
+necessary.  For example, if the database encoding is Latin1, then Latin1
+characters will be stored in the database, because PostgreSQL converts the
+Tcl-supplied UTF-8 (Unicode) into Latin1.  If the client application also
+uses Latin1, then data is converted twice in each direction: for sending
+over the communications link in Unicode, and then in the server or client
+back to Latin1.
+
+Provided the database encoding is correct, translation will happen
+transparently to the client application. Other non-Tcl applications,
+such as psql, will also be able to access the data correctly provided
+they set their client_encoding parameter.
+
+            * * * CAUTION * * *
+
+  Do not store non-ASCII characters in character or text fields in a
+  PostgreSQL database which was created with encoding SQL_ASCII.
+  The SQL_ASCII encoding provides no information to PostgreSQL on
+  how to translate characters, so the server will be unable to
+  translate.  Applications using a Tcl interface, including
+  pgin.tcl, will encode these characters using UTF-8 for storage
+  in the database, but PostgreSQL will not know it due to the
+  SQL_ASCII encoding setting.  The result is that it may be
+  impossible to access the data correctly from other applications.
+  Always use the correct encoding when creating a database: for
+  example, LATIN1 or Unicode.
+
+  Pgin.tcl-2.x and older do not convert to/from Unicode and do not set
+  client_encoding at all. These older versions may not work with non-ASCII
+  characters in any database encoding.
+
+  At this time, Pgin.tcl does not recode connection string parameters
+  Username, Database Name, or Password. Non-ASCII characters in these
+  fields will probably not work.
+
+-----------------------------------------------------------------------------
+
+# getDBs :
+#   get the names of all the databases at a given host and port number
+#   with the defaults being the localhost and port 5432
+#   return them in alphabetical order
+proc getDBs { {host "localhost"} {port "5432"} } {
+    # datnames is the list to be result
+    set conn [pg_connect template1 -host $host -port $port]
+    set res [pg_exec $conn "SELECT datname FROM pg_database ORDER BY datname;"]
+    set ntups [pg_result $res -numTuples]
+    for {set i 0} {$i < $ntups} {incr i} {
+        lappend datnames [pg_result $res -getTuple $i]
+    }
+    pg_result $res -clear
+    pg_disconnect $conn
+    return $datnames
+}
