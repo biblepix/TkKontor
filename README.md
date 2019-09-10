@@ -1,2 +1,2 @@
-# TkKontor
-Business office software written in Tcl/Tk
+# TkOffice
+Auftragsverwaltung / Business office software written in Tcl/Tk
