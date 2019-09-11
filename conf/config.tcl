@@ -1,5 +1,5 @@
-#set auftragDir $env(HOME)/Kontor
-#cd $auftragDir
+set auftragDir $env(HOME)/tkoffice
+cd $auftragDir
 
 set HOME $env(HOME)
 set db kontordb

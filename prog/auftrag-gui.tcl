@@ -176,8 +176,9 @@ entry .invArtPriceE -textvariable artPrice
 label .invArtNameL -textvariable artName
 label .invArtUnitL -textvariable artUnit
 
-label .subtotal -textvariable ::subtot -bg orange
-pack .subtotal -in .n.t2.f2
+label .subtotalL -width 7 -textvariable ::subtot -bg lightblue
+message .subtotalM -width 200 -text "Zwischensumme: "
+pack .subtotalM .subtotalL -side left -in .n.t2.bottomF
 
 button .saveInvB -text "Rechnung speichern" -command {
   saveInv2DB
