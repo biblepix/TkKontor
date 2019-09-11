@@ -1,0 +1,26 @@
+#!/usr/bin/tclsh
+# ~/TkAuftrag/auftrag.tcl
+# Main launcher prog for TkAuftrag Business Software
+# Installation requirements: Tcl/Tk library, PostgreSQL database
+# Updated: 10Sep 19
+
+set auftragDir [file normalize [file dirname [info script]]]
+set confDir [file join $auftragDir conf]
+set confFile [file join $confDir config.tcl]
+set progDir [file join $auftragDir prog]
+
+if [catch {source $confFile}] {
+  set db "myDB"
+  set dbname "myDB"
+  set dbuser "postgres"
+  source [file join $progDir auftrag-gui.tcl]
+  after 7000 {
+    .n select 3
+  }
+  NewsHandler::QueryNews "Keine Konfigurationsdatei gefunden. Sie müssen das Programm erst einrichten." red
+
+} else {
+
+  source [file join $progDir auftrag-gui.tcl]
+}
+
