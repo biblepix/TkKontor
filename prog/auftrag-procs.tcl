@@ -29,13 +29,22 @@ global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
 	set street [pg_exec $db "SELECT street FROM address WHERE objectid=$adrOID"]
 	set zip [pg_exec $db "SELECT zip FROM address WHERE objectid=$adrOID"]
 	set city [pg_exec $db "SELECT city FROM address WHERE objectid=$adrOID"]
+  set tel1 [pg_exec $db "SELECT phone FROM address WHERE objectid=$adrOID"]
+  set tel2 [pg_exec $db "SELECT mobile FROM address WHERE objectid=$adrOID"]
+  set mail [pg_exec $db "SELECT mail FROM address WHERE objectid=$adrOID"]
+  set www  [pg_exec $db "SELECT www FROM address WHERE objectid=$adrOID"]
+
 	#insert into adrWin
-	set ::name1 [pg_result $name1 -list]
-	set ::name2 [pg_result $name2 -list]
-	set ::street [pg_result $street -list]
+regsub -all \}\{ "[pg_result $name1 -list]" \" ::name1
+regsub -all \{\} "[pg_result $name2 -list]" \" ::name2
+regsub -all \{\} "[pg_result $street -list]" {} ::street
+regsub -all \{\} "[pg_result $city -list]" {} ::city
 	set ::zip [pg_result $zip -list]
-	set ::city [pg_result $city -list]
-  
+regsub -all \{\} "Tel.: [pg_result $tel1 -list]" {} ::tel1
+regsub -all \{\} "Mobil: [pg_result $tel2 -list]" {} ::tel2
+regsub -all \{\} "Mail: [pg_result $mail -list]" {} ::mail
+regsub -all \{\} "Internet: [pg_result $www -list]" {} ::www
+
   return 0
 }
 

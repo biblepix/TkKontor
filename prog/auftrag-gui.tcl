@@ -1,6 +1,6 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
-# Restored: 10sep19
+# Restored: 13sep19
 
 
 #Source Tk/Pgintcl packages
@@ -59,7 +59,8 @@ pack [frame .n.t4.f1 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor n
 label .adrTitel -text "Adressverwaltung" -font TkCaptionFont
 pack .adrTitel -in .n.t1.f2 -side top -fill x
 
-pack [frame .adrF2 -bd 3 -relief sunken -bg lightblue] -anchor nw -side left -in .n.t1.f2
+pack [frame .adrF2 -bd 3 -relief sunken -bg lightblue] -anchor nw -side left -in .n.t1.f2 -expand 1
+pack [frame .adrF4 -bg lightblue] -anchor s -side bottom -in .adrF2 -fill x -expand 1
 pack [frame .adrF1] -anchor nw -side left -in .n.t1.f2
 pack [frame .adrF3] -anchor se -side left -in .n.t1.f2 -expand 1
 
@@ -86,6 +87,14 @@ label .name2L -width 50 -textvariable name2 -justify left -anchor w -bg lightblu
 label .streetL -width 50 -textvariable street -justify left -anchor w -bg lightblue -pady 2 -padx 2
 label .zipL -width 10 -textvariable zip -justify left -anchor w -bg lightblue -pady 2 -padx 2
 label .cityL -width 40 -textvariable city -justify left -anchor w -bg lightblue -pady 2 -padx 2
+label .tel1L -textvariable tel1 -anchor w -fg maroon -bg lightblue -pady 2 -padx 2
+label .tel2L -textvariable tel2 -anchor w -fg maroon -bg lightblue -pady 2 -padx 10
+label .mailL -textvariable mail -anchor w -fg maroon -bg lightblue -pady 2 -padx 10
+label .wwwL -textvariable www -anchor w -fg maroon -bg lightblue -pady 2 -padx 10
+set tel1 "Tel.: "
+set tel2 "Mobil: "
+set mail "Mail: "
+set www "Internet: "
 
 #Create address entries, to be packed only when 'changeAddress' or 'newAddress' are invoked
 entry .name1E -width 50 -textvariable name1 -justify left -bg beige
@@ -104,6 +113,8 @@ pack $adrSpin -in .adrF1 -anchor nw
 #pack adrF2 labels
 pack .name1L .name2L .streetL -in .adrF2 -anchor nw
 pack .zipL .cityL -anchor nw -in .adrF2 -side left
+pack .tel1L .tel2L .mailL .wwwL -in .adrF4 -side left -anchor w
+
 #Pack adrF3 buttons
 pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
 
