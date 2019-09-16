@@ -2,7 +2,7 @@
 # ~/TkAuftrag/auftrag.tcl
 # Main launcher prog for TkAuftrag Business Software
 # Installation requirements: Tcl/Tk library, PostgreSQL database
-# Updated: 10Sep 19
+# Updated: 16Sep 19
 
 set auftragDir [file normalize [file dirname [info script]]]
 set confDir [file join $auftragDir conf]
@@ -13,7 +13,7 @@ if [catch {source $confFile}] {
   set db "myDB"
   set dbname "myDB"
   set dbuser "postgres"
-  source [file join $progDir auftrag-gui.tcl]
+  source [file join $progDir tkoffice-gui.tcl]
   after 7000 {
     .n select 3
   }
@@ -21,6 +21,6 @@ if [catch {source $confFile}] {
 
 } else {
 
-  source [file join $progDir auftrag-gui.tcl]
+  source [file join $progDir tkoffice-gui.tcl]
 }
 
