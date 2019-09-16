@@ -1,7 +1,7 @@
 # ~/bin/kontor/auftrag-procs.tcl
 # called by auftrag.tcl
 # Aktualisiert: 1nov17
-# Restored: 11sep19
+# Restored: 16sep19
 
 ##################################################################################################
 ###  A D D R E S S  P R O C S  
@@ -35,15 +35,15 @@ global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
   set www  [pg_exec $db "SELECT www FROM address WHERE objectid=$adrOID"]
 
 	#insert into adrWin
-regsub -all \}\{ "[pg_result $name1 -list]" \" ::name1
-regsub -all \{\} "[pg_result $name2 -list]" \" ::name2
-regsub -all \{\} "[pg_result $street -list]" {} ::street
-regsub -all \{\} "[pg_result $city -list]" {} ::city
-	set ::zip [pg_result $zip -list]
-regsub -all \{\} "Tel.: [pg_result $tel1 -list]" {} ::tel1
-regsub -all \{\} "Mobil: [pg_result $tel2 -list]" {} ::tel2
-regsub -all \{\} "Mail: [pg_result $mail -list]" {} ::mail
-regsub -all \{\} "Internet: [pg_result $www -list]" {} ::www
+  regsub {({)(.*)(})} [pg_result $name1 -list] {\2} ::name1
+  regsub {({)(.*)(})} [pg_result $name2 -list] {\2} ::name2
+  regsub {({)(.*)(})} [pg_result $street -list] {\2} ::street
+  regsub {({)(.*)(})} [pg_result $city -list] {\2} ::city
+  set ::zip [pg_result $zip -list]
+  set ::tel1 [pg_result $tel1 -list]
+  set ::tel2 [pg_result $tel2 -list]
+  set ::www [pg_result $www -list]
+  set ::mail [pg_result $mail -list]
 
   return 0
 }
@@ -165,9 +165,7 @@ proc fillAdrInvWin {adrId} {
 
 proc searchAddress {s} {
   global db adrSpin adrSearch
-puts "Search string: $s"
-set s [.searchE get]
-puts $s
+  set s [.searchE get]
 
   if {$s == ""} {return 0}
 
@@ -190,6 +188,7 @@ puts $s
 
   #B: fill adrSB spinbox to choose from selection
   } else {
+
 	$adrSpin config -bg beige -values "$adrList"
   catch {button .adrClearSelB -width 13 -text "^ Auswahl löschen" -command {setAdrList}}
   pack .adrClearSelB -in .adrF1
@@ -212,65 +211,85 @@ puts $s
 
 proc clearAdrWin {} {
   global adrSpin  
-  foreach s [pack slaves .adrF2] {pack forget $s}  
   $adrSpin delete 0 end
-  $adrSpin configure -bg gray
-  .name1E configure -bg beige -fg silver -validate focusin -validatecommand {%W delete 0 end;%W conf -fg black;return 0}
-  .name2E configure -bg beige -fg silver -validate focusin -validatecommand {%W delete 0 end;%W conf -fg black;return 0}
-  .streetE configure -bg beige -fg silver -validate focusin -validatecommand {%W delete 0 end;%W conf -fg black;return 0}
-  .zipE configure -bg beige -fg silver -validate focusin -validatecommand {%W delete 0 end;%W conf -fg black;return 0}
-  .cityE configure -bg beige -fg silver -validate focusin -validatecommand {%W delete 0 end;%W conf -fg black;return 0}
+  $adrSpin configure -bg #d9d9d9
+  foreach e [pack slaves .adrF2] {
+    $e conf -bg beige -fg silver -state normal -validate focusin -validatecommand "
+    %W delete 0 end
+    return 0
+    "
+  }
   catch {pack forget .adrClearSelB}
-}
-
-proc resetAdrWin {} {
-  foreach s [pack slaves .adrF2] {pack forget $s}
-  pack .name1L .name2L .streetL -in .adrF2 -anchor nw
-  pack .zipL .cityL -anchor nw -in .adrF2 -side left
-  .b1 configure -text "Anschrift ändern" -command {changeAddress $adrNo}
-  .b2 configure -text "Anschrift löschen" -command {deleteAdress $adrNo}
-  catch {pack forget .adrClearSelB}
+  .adrF2 conf -bg #d9d9d9
   return 0
 }
 
+# resetAdrWin
+##called by GUI (first fill) + Abbruch btn + aveAddress
+proc resetAdrWin {} {
+  global adrSpin
+  pack .name1E .name2E .streetE -in .adrF2 -anchor nw
+  pack .zipE .cityE -anchor nw -in .adrF2 -side left
+  pack .tel1E .tel2E .mailE .wwwE -in .adrF2 -side right
+  foreach e [pack slaves .adrF2] {
+    $e conf -bg lightblue -validate none -fg black -state readonly -readonlybackground lightblue -relief flat -bd 0
+  } 
+  .b1 configure -text "Anschrift ändern" -command {changeAddress $adrNo}
+  .b2 configure -text "Anschrift löschen" -command {deleteAdress $adrNo}
+  $adrSpin conf -bg lightblue
+  .adrF2 conf -bg lightblue
+  catch {pack forget .adrClearSelB}
+
+  setAdrList
+  fillAdrInvWin [$adrSpin get]
+}
+
 proc newAddress {} {
+
   clearAdrWin
   set ::name1 "Anrede"
   set ::name2 "Name"
   set ::street "Strasse"
   set ::zip "PLZ"
   set ::city "Ortschaft"
-  pack .name1E .name2E .streetE -in .adrF2 -anchor nw
-  pack .zipE .cityE -anchor nw -in .adrF2 -side left
+  set ::tel1 "Telephon"
+  set ::tel2 "Telephon"
+  set ::www "Internet"
+  set ::mail "E-Mail"
   .b1 configure -text "Anschrift speichern" -command {saveAddress $adrNo}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
   return 0
 }
 
 proc changeAddress {adrNo} {
-  clearAdrWin
-  pack .name1E .name2E .streetE -in .adrF2 -anchor nw
-  pack .zipE .cityE -anchor nw -in .adrF2 -side left
+  
+  #pack .name1E .name2E .streetE -in .adrF2 -anchor nw
+  #pack .zipE .cityE -anchor nw -in .adrF2 -side left
   .b1 configure -text "Anschrift speichern" -command {saveAddress $adrNo}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
-  return 0
+clearAdrWin  
+return 0
 }
 
 proc saveAddress {} {
   global db adrSpin
 
 	set adrno [$adrSpin get]		
-	set name1 ::name1
-	set name2 ::name2
-	set street ::street
-	set zip ::zip
-	set city ::city
-	
+	set name1 $::name1
+	set name2 $::name2
+	set street $::street
+	set zip $::zip
+	set city $::city
+	set tel1 $::tel1
+  set tel2 $::tel2
+  set mail $::mail
+  set www $::www
+
 	#A: save new
 	if {$adrno == ""} {
 		set newNo [createNewNumber address]
-		set token [pg_exec $db "INSERT INTO address (objectid, ts, name1, name2, street, zip, city) 	
-		VALUES ($newNo, $newNo, '$name1', '$name2', '$street', '$zip', '$city') RETURNING objectid"]
+		set token [pg_exec $db "INSERT INTO address (objectid, ts, name1, name2, street, zip, city, telephone, mobile, email, www) 	
+		VALUES ($newNo, $newNo, '$name1', '$name2', '$street', '$zip', '$city', '$tel1', '$tel2', '$mail', '$www') RETURNING objectid"]
     set adrno $newNo
 
 	#B: change old
@@ -281,8 +300,12 @@ proc saveAddress {} {
 		name2='$name2',
 		street='$street',
 		zip='$zip',
-		city='$city' 
-		WHERE objectid=$adrno"
+		city='$city',
+    telephone='$tel1',
+    mobile='$tel2',
+    email='$mail',
+    www='$www'
+  WHERE objectid=$adrno"
     ]
 	}
 

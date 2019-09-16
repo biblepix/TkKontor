@@ -1,6 +1,6 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
-# Restored: 13sep19
+# Restored: 16sep19
 
 
 #Source Tk/Pgintcl packages
@@ -32,8 +32,6 @@ pack .titelL -anchor nw -in .titelF -side left
 pack .titelC -in .titelF -side right
 pack .n -fill y -expand 1
 
-
-
 #Tab 1
 pack [frame .n.t1.f2 -borderwidth 5 -relief ridge -pady 10 -padx 10] -anchor nw -fill x
 pack [frame .n.t1.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
@@ -50,17 +48,18 @@ pack [frame .n.t4.f3 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor n
 pack [frame .n.t4.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t4.f1 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 
+
 ###############################################
 # T A B 1. : A D R E S S F E N S T E R
 ###############################################
 
 #Pack 3 top frames seitwärts
 #Create "Adressen" title
-label .adrTitel -text "Adressverwaltung" -font TkCaptionFont
+label .adrTitel -text "Adressverwaltung" -font TkCaptionFont -pady 5
 pack .adrTitel -in .n.t1.f2 -side top -fill x
 
-pack [frame .adrF2 -bd 3 -relief sunken -bg lightblue] -anchor nw -side left -in .n.t1.f2 -expand 1
-pack [frame .adrF4 -bg lightblue] -anchor s -side bottom -in .adrF2 -fill x -expand 1
+pack [frame .adrF2 -bd 3 -relief sunken -bg lightblue -pady $py -padx $px] -anchor nw -side left -in .n.t1.f2
+#ack [frame .adrF4 -bg lightblue] -anchor e -in .adrF2 -side right
 pack [frame .adrF1] -anchor nw -side left -in .n.t1.f2
 pack [frame .adrF3] -anchor se -side left -in .n.t1.f2 -expand 1
 
@@ -71,7 +70,7 @@ focus $adrSpin
 #Create search field
 set suche "Adresssuche"
 set adrSearch [entry .searchE]
-  .searchE config -width 35 -borderwidth 3 -bg beige -fg grey -textvariable suche
+  .searchE config -width 25 -borderwidth 3 -bg beige -fg grey -textvariable suche
   .searchE config -validate focusin -validatecommand {
     set ::suche ""
     %W config -fg black -validate focusout -validatecommand {
@@ -81,27 +80,16 @@ set adrSearch [entry .searchE]
   return 0
   }
 
-#Create address labels
-label .name1L -width 50 -textvariable name1 -justify left -anchor w -bg lightblue -pady 2 -padx 2
-label .name2L -width 50 -textvariable name2 -justify left -anchor w -bg lightblue -pady 2 -padx 2
-label .streetL -width 50 -textvariable street -justify left -anchor w -bg lightblue -pady 2 -padx 2
-label .zipL -width 10 -textvariable zip -justify left -anchor w -bg lightblue -pady 2 -padx 2
-label .cityL -width 40 -textvariable city -justify left -anchor w -bg lightblue -pady 2 -padx 2
-label .tel1L -textvariable tel1 -anchor w -fg maroon -bg lightblue -pady 2 -padx 2
-label .tel2L -textvariable tel2 -anchor w -fg maroon -bg lightblue -pady 2 -padx 10
-label .mailL -textvariable mail -anchor w -fg maroon -bg lightblue -pady 2 -padx 10
-label .wwwL -textvariable www -anchor w -fg maroon -bg lightblue -pady 2 -padx 10
-set tel1 "Tel.: "
-set tel2 "Mobil: "
-set mail "Mail: "
-set www "Internet: "
-
 #Create address entries, to be packed only when 'changeAddress' or 'newAddress' are invoked
-entry .name1E -width 50 -textvariable name1 -justify left -bg beige
-entry .name2E -width 50 -textvariable name2 -justify left -bg beige
-entry .streetE -width 50 -textvariable street -justify left -bg beige
-entry .zipE -width 10 -textvariable zip -justify left -bg beige
-entry .cityE -width 39 -textvariable city -justify left -bg beige
+entry .name1E -width 50 -textvariable name1 -justify left
+entry .name2E -width 50 -textvariable name2 -justify left
+entry .streetE -width 50 -textvariable street -justify left
+entry .zipE -width 7 -textvariable zip -justify left
+entry .cityE -width 43 -textvariable city -justify left
+entry .tel1E -width 15 -textvariable tel1 -justify right
+entry .tel2E -width 15 -textvariable tel2 -justify right
+entry .mailE -width 15 -textvariable mail -justify right
+entry .wwwE -width 15 -textvariable www -justify right
 
 #create Address buttons
 button .b0 -text "Neue Anschrift" -width 20 -command {newAddress}
@@ -110,10 +98,8 @@ button .b2 -text "Anschrift löschen" -width 20 -command {deleteAddress $adrNo} 
 
 #Pack adrF1 spinbox
 pack $adrSpin -in .adrF1 -anchor nw
-#pack adrF2 labels
-pack .name1L .name2L .streetL -in .adrF2 -anchor nw
-pack .zipL .cityL -anchor nw -in .adrF2 -side left
-pack .tel1L .tel2L .mailL .wwwL -in .adrF4 -side left -anchor w
+
+#Pack adrF2 entries later
 
 #Pack adrF3 buttons
 pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
@@ -193,8 +179,6 @@ pack .subtotalM .subtotalL -side left -in .n.t2.bottomF
 
 button .saveInvB -text "Rechnung speichern" -command {
   saveInv2DB
-#TODO: reactivate after testing
-#  saveInv2Rtf $invNo
   }
 
 pack .saveInvB -in .n.t2.bottomF -side right
@@ -280,6 +264,7 @@ if {[string length $res] >20} {
 NewsHandler::QueryNews "Mit Datenbank verbunden" green
 set db $res
 setAdrList
+resetAdrWin
 fillAdrInvWin [$adrSpin get]
 .confDBNameE conf -state disabled
 .confDBUserE conf -state disabled
