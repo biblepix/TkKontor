@@ -1,6 +1,6 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
-# Restored: 16sep19
+# Restored: 19sep19
 
 
 #Source Tk/Pgintcl packages
@@ -137,21 +137,21 @@ pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invStatusH -in .n.t1.headF -
 #label .titel3 -text "Neue Rechnung" -font "TkCaptionFont"
 
 #Zahlungsbedingung - TODO : move to config/DB?
-label .condL -text Zahlungsbedingung
-spinbox .condSB -width 7 -values {"10 Tage" "vor Kursbeginn" "bar"} -textvariable cond
+label .condL -text "Zahlungsbedingung"
+spinbox .condSB -width 20 -values {"10 Tage" "vor Kursbeginn" "bar"} -textvar cond -bg beige
 
 #Auftragsdatum: set to heute
 label .auftrDatL -text "Auftragsdatum"
-entry .auftrDatE -width 9 -textvariable auftrDat
+entry .auftrDatE -width 9 -textvar auftrDat -bg beige
 set auftrDat [clock format [clock seconds] -format %d.%m.%Y]
 
 #Referenz
 label .refL -text "Ihre Referenz"
-entry .refE -width 20
+entry .refE -width 20 -bg beige
 
 #Int. Kommentar - TODO: needed?
 label .komL -text "Bemerkung"
-entry .komE -width 20
+entry .komE -width 20 -bg beige
 
 #Set up Artikelliste, fill later when connected to DB
 label .invArtlistL -text "Artikelliste" -font TkCaptionFont
@@ -163,8 +163,8 @@ catch {frame .invoiceFrame}
 pack .invoiceFrame -in .n.t2.f2 -side bottom -fill both
 
 #Set KundenName in Invoice window
-label .clientL -text "Kunde:" -font "TkCaptionFont" -bg orange
-label .clientNameL -textvariable name2 -font "bold"
+label .clientL -text "Kunde:" -font "TkCaptionFont" -bg lightblue
+label .clientNameL -textvariable name2 -font "TkCaptionFont"
 pack .clientNameL .clientL -in .n.t2.f1 -side right
 
 label .invArtPriceL -textvariable artPrice -padx 20
