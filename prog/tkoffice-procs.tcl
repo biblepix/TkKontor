@@ -1,7 +1,7 @@
 # ~/bin/kontor/auftrag-procs.tcl
 # called by auftrag.tcl
 # Aktualisiert: 1nov17
-# Restored: 16sep19
+# Restored: 19sep19
 
 ##################################################################################################
 ###  A D D R E S S  P R O C S  
@@ -363,7 +363,7 @@ proc resetNewInvDialog {} {
   pack .condL .condSB .auftrDatL .auftrDatE .refL .refE .komL .komE -in .n.t2.f1 -side left -fill x 
   pack .invArtlistL -in .n.t2.f1 -before .n.t2.f2 -anchor w 
   pack .invArtNumSB .invArtNameL .invArtPriceL .mengeE .invArtUnitL -in .n.t2.f2 -side left -fill x
-pack .addrowB -in .n.t2.f2 -side right -fill x
+  pack .addrowB -in .n.t2.f2 -side right -fill x
   
   #Reset .saveInvB to "Rechnung speichern"
   .saveInvB conf -text "Rechung speichern" -command "
@@ -401,7 +401,7 @@ puts $artPrice
   set ::artPrice [lindex [pg_result $token -list] 1]
   set ::artUnit [lindex [pg_result $token -list] 2]
   return 0
-}
+} ;#END setArticleLine
 
 # addInvRow
 ##called by setupNewInvDialog
@@ -435,25 +435,28 @@ proc addInvRow {} {
     set rowNo [incr lastrow 1]
 
     namespace eval $rowNo  {
-      #Set vars
-      set article $::artName
+      #get global vars
+      set artName $::artName
       set menge $::menge
-      set einzel $::artPrice
-      set unit $::artUnit
-      set beschr $::artName
+      set artPrice $::artPrice
+      set artUnit $::artUnit
       set rowNo $::rows::rowNo
       set rowtot [expr $menge * $artPrice]
-      #Export subtot
-      set ::subtot [expr $rowtot + $::subtot]
+
+      #Export subtot with 2 decimal points
+      set newsubtot [expr $rowtot + $::subtot]
+      set ::subtot [expr {double(round(100*$newsubtot))/100}]
 
       #Create row frame
       catch {frame .invF${rowNo}}
-      catch {label .rowL${rowNo}}
-      pack .invF${rowNo} -in .invoiceFrame -fill x -expand 1
- 
-      .rowL${rowNo} conf -text "$article \t$menge \t  Fr. $artPrice \t Fr. $rowtot" -justify left -bg lightblue
-      set ::ROWS [.rowL${rowNo} conf -text]
-      pack .rowL${rowNo} -in .invF${rowNo} -anchor nw -fill x
+      pack .invF${rowNo} -in .invoiceFrame -fill x -expand 1 -anchor w    
+
+      #Create labels
+      catch {label .mengeL${rowNo} -text $menge -bg lightblue -width 20 -justify left -anchor w}
+      catch {label .artnameL${rowNo} -text $artName -bg lightblue -width 50 -justify left -anchor w}
+      catch {label .artpriceL${rowNo} -text $artPrice -bg lightblue -width 20 -justify left -anchor w}
+      catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
+      pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} .rowtotL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
     }
   }
 } ;#END addInvRow
@@ -547,57 +550,56 @@ proc printInvoice {invNo} {
   }
 }
 
-# saveInv2Rtf 
+# saveInv2Tex 
 ##called by saveInv2DB
-proc saveInv2Rtf {invNo} {
-  global db
-  global vorlage spoolDir
+proc saveInv2Tex {invNo} {
+  global vorlage texdir
+  set posten.tex [file join $texdir newInvPosten.tex]
+  set data.tex [file join $texdir newInvData.tex]
 
-  set chan [open $vorlage] 
-  set invtext [read $chan]
-  close $chan
+  global adr auftrdat rdatlang ref cond finalsum rdatkurz
+	NewsHandler::QueryNews "Speichere Rechnung $invNo als RTF..." lightblue
 
-#TODO: eleganter wär statt Entries mit Labels/Textvariablen!
-set adr "$::name1
-$::name2
-$::street
-$::zip $::city"
-regsub -all {[{}]} $adr {} adr
+  #get vars per row & export to \fee line
+  foreach w [namespace children rows] {
+    set artPrice [.artpriceL[namespace tail $w] cget -text]
+    set artName [.artnameL[namespace tail $w] cget -text]
+    set menge [.mengeL[namespace tail $w] cget -text]
+    append itemList "\\fee\{\$artName\}\{$artPrice\}\{$menge\}" \n
+  }
 
-set rdatkurz [.auftrDatE get]
-set auftrdat $rdatkurz
-#set rdatkurz $::auftrDat
-set token [pg_exec $db "SELECT to_date('[.auftrDatE get]','DD MM YYYY')"]
-set rdatlang [pg_result $token -list]
-set ref $::ref
-set cond $::cond
-set finalsum $::subtot
+#1.set vars for 'data.tex' file
+append dataList "\\newcommand\{\\comm\}\{$comm\}" \n
+append dataList "\\newcommand\{\\cond\}\{$cond\}" \n
+append dataList "\\newcommand\{\\dat\}\{$auftrDat\}" \n
+append dataList "\\newcommand\{\\invNo\}\{$invNo\}" \n
+append dataList "\\newcommand\{\\custAdr\}\{$??\}" \n
+append dataList "\\newcommand\{\\bank\}\{$??\}" \n
 
-  regsub {ADDRESS} $invtext $adr invtext
-  regsub {O_DATE} $invtext $auftrdat invtext
-  regsub {INV_NO} $invtext $invNo invtext
-  regsub {RDATUM} $invtext $rdatlang invtext
-  regsub {COMMENT} $invtext $ref	 invtext
-  regsub {ROWS} $invtext $::ROWS invtext
-  regsub {CONDITION} $invtext $cond invtext
-  regsub {FINAL_SUME} $invtext $finalsum invtext
-  regsub {HEUTE} $invtext $rdatkurz invtext 
-  #what does this do?		
-  regsub -all {[\s]} $invNo {} INV_NO
-  	
-  #Save invoice to ~spool
+append dataList "\\newcommand\{\\myName\}\{$??\}" \n
+append dataList "\\newcommand\{\\myAdr\}\{$??\}" \n
+
+
+#1.Overwrite any old data file
+set chan [open $data.tex w] 
+put $chan $dataList
+close $chan
+
+#2.Overwrite any old posten file
+set chan [open $posten.tex w] 
+put $chan $itemList
+close $chan
+
+#3. Tex $vorlage & save invoice to $spool - TODO: to DB? no spool?
   append invName $spoolDir / invoiceVollmar - $invNo . rtf
 	set chan [open $invName w]
 	puts $chan $invtext
 	close $chan
 	
   #Change "Rechnung speichern" button to "Rechnung drucken" button
+  .saveInv configure -text "Rechnung drucken" -command {printInvoice}
 
-  .saveInvB configure -text "Rechnung drucken" -command {printInvoice}
-
-	NewsHandler::QueryNews "Rechnung $invNo als RTF gespeichert" green
-
-} ;#END saveInvoiceToRTF
+} ;#END saveInvToTex
 
 
 # saveEntry

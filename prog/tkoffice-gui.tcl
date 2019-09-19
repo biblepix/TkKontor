@@ -143,15 +143,15 @@ spinbox .condSB -width 7 -values {"10 Tage" "vor Kursbeginn" "bar"} -textvariabl
 #Auftragsdatum: set to heute
 label .auftrDatL -text "Auftragsdatum"
 entry .auftrDatE -width 9 -textvariable auftrDat
-set ::auftrdat [clock format [clock seconds] -format %d.%m.%Y]
+set auftrDat [clock format [clock seconds] -format %d.%m.%Y]
 
 #Referenz
 label .refL -text "Ihre Referenz"
-entry .refE -width 10 -textvariable ::ref
+entry .refE -width 20
 
 #Int. Kommentar - TODO: needed?
 label .komL -text "Bemerkung"
-entry .komE -width 20 -textvariable ::comm
+entry .komE -width 20
 
 #Set up Artikelliste, fill later when connected to DB
 label .invArtlistL -text "Artikelliste" -font TkCaptionFont
@@ -167,10 +167,10 @@ label .clientL -text "Kunde:" -font "TkCaptionFont" -bg orange
 label .clientNameL -textvariable name2 -font "bold"
 pack .clientNameL .clientL -in .n.t2.f1 -side right
 
-label .invArtPriceL -textvariable artPrice
+label .invArtPriceL -textvariable artPrice -padx 20
 entry .invArtPriceE -textvariable artPrice
-label .invArtNameL -textvariable artName
-label .invArtUnitL -textvariable artUnit
+label .invArtNameL -textvariable artName -padx 50
+label .invArtUnitL -textvariable artUnit -padx 20
 
 label .subtotalL -width 7 -textvariable ::subtot -bg lightblue
 message .subtotalM -width 200 -text "Zwischensumme: "
