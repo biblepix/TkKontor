@@ -1,7 +1,7 @@
 # ~/bin/kontor/auftrag-procs.tcl
 # called by auftrag.tcl
 # Aktualisiert: 1nov17
-# Restored: 19sep19
+# Restored: 20sep19
 
 ##################################################################################################
 ###  A D D R E S S  P R O C S  
@@ -53,7 +53,6 @@ global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
 ##Note: ts=customerOID in 'address', now identical with objectid,needed for identification with 'invoice'
 proc fillAdrInvWin {adrId} {
   global invF db
-  puts "filling $adrId"
 
   #Delete previous frames
   set slaveList [pack slaves $invF]
@@ -436,10 +435,10 @@ proc addInvRow {} {
 
     namespace eval $rowNo  {
       #get global vars
-      set artName $::artName
-      set menge $::menge
-      set artPrice $::artPrice
-      set artUnit $::artUnit
+      set artName [.invArtNameL cget -text]
+      set menge [.mengeE get]
+      set artPrice [.invArtPriceL cget -text]
+      set artUnit [.invArtUnitL cget -text]
       set rowNo $::rows::rowNo
       set rowtot [expr $menge * $artPrice]
 
@@ -451,10 +450,10 @@ proc addInvRow {} {
       catch {frame .invF${rowNo}}
       pack .invF${rowNo} -in .invoiceFrame -fill x -expand 1 -anchor w    
 
-      #Create labels
+      #Create labels per row
       catch {label .mengeL${rowNo} -text $menge -bg lightblue -width 20 -justify left -anchor w}
-      catch {label .artnameL${rowNo} -text $artName -bg lightblue -width 50 -justify left -anchor w}
-      catch {label .artpriceL${rowNo} -text $artPrice -bg lightblue -width 20 -justify left -anchor w}
+      catch {label .artnameL${rowNo} -text $artName -bg lightblue -width 53 -justify left -anchor w}
+      catch {label .artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify left -anchor w}
       catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
       pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} .rowtotL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
     }
@@ -535,7 +534,7 @@ proc saveInv2DB {} {
 
 };#END saveInv2DB
 
-# printInvoice
+# printInvoice ??TODO
 ##prints existing RTF
 ##called by "Rechnung drucken" button
 ##manuell mit Num.Eingabe
@@ -553,49 +552,53 @@ proc printInvoice {invNo} {
 # saveInv2Tex 
 ##called by saveInv2DB
 proc saveInv2Tex {invNo} {
-  global vorlage texdir
-  set posten.tex [file join $texdir newInvPosten.tex]
-  set data.tex [file join $texdir newInvData.tex]
+  global spoolDir vorlage texDir compAdr compName compPhone compBank
+  set itemFile [file join $texDir newInvPosten.tex]
+  set dataFile [file join $texDir newInvData.tex]
 
-  global adr auftrdat rdatlang ref cond finalsum rdatkurz
-	NewsHandler::QueryNews "Speichere Rechnung $invNo als RTF..." lightblue
+	NewsHandler::QueryNews "Speichere Rechnung $invNo als DVI..." lightblue
 
-  #get vars per row & export to \fee line
+  #1.set itemList for 'posten' file
   foreach w [namespace children rows] {
     set artPrice [.artpriceL[namespace tail $w] cget -text]
+    set artUnit $::artUnit
     set artName [.artnameL[namespace tail $w] cget -text]
     set menge [.mengeL[namespace tail $w] cget -text]
-    append itemList "\\fee\{\$artName\}\{$artPrice\}\{$menge\}" \n
+    append itemList "\\Fee\{$artName \(pro $artUnit\)\}\{$artPrice\}\{$menge\}" \n
   }
 
-#1.set vars for 'data.tex' file
-append dataList "\\newcommand\{\\comm\}\{$comm\}" \n
-append dataList "\\newcommand\{\\cond\}\{$cond\}" \n
-append dataList "\\newcommand\{\\dat\}\{$auftrDat\}" \n
-append dataList "\\newcommand\{\\invNo\}\{$invNo\}" \n
-append dataList "\\newcommand\{\\custAdr\}\{$??\}" \n
-append dataList "\\newcommand\{\\bank\}\{$??\}" \n
+  #2.set dataList for 'data.tex' file
+  lappend custAdr $::name1 \n $::name2 \n $::street \n $::zip $::city
+  append dataList "\\newcommand\{\\comm\}\{$::comm\}" \n
+  append dataList "\\newcommand\{\\cond\}\{$::cond\}" \n
+  append dataList "\\newcommand\{\\dat\}\{$::auftrDat\}" \n
+  append dataList "\\newcommand\{\\invNo\}\{$invNo\}" \n
+  append dataList "\\newcommand\{\\custAdr\}\{$custAdr\}" \n
+  append dataList "\\newcommand\{\\bank\}\{$::compBank\}" \n
+  append dataList "\\newcommand\{\\myName\}\{$::compName\}" \n
+  append dataList "\\newcommand\{\\myAddress\}\{$::compAdr\}" \n
+  append dataList "\\newcommand\{\\myCity\}\{$::city\}" \n
+  append dataList "\\newcommand\{\\myPhone\}\{$::tel1\}" \n
 
-append dataList "\\newcommand\{\\myName\}\{$??\}" \n
-append dataList "\\newcommand\{\\myAdr\}\{$??\}" \n
+  #3.Overwrite any old data file
+  set chan [open $dataFile w] 
+  puts $chan $dataList
+  close $chan
 
+  #4.Overwrite any old posten file
+  set chan [open $itemFile w] 
+  puts $chan $itemList
+  close $chan
 
-#1.Overwrite any old data file
-set chan [open $data.tex w] 
-put $chan $dataList
-close $chan
+  #3. LaTex $vorlage & save invoice to $spool - TODO: to DB? no spool?
+  ##1. overwrite $vorlage.dvi
+  exec latex -output-directory=$spoolDir -output-format=dvi $vorlage
+puts "latex ok"
 
-#2.Overwrite any old posten file
-set chan [open $posten.tex w] 
-put $chan $itemList
-close $chan
-
-#3. Tex $vorlage & save invoice to $spool - TODO: to DB? no spool?
-  append invName $spoolDir / invoiceVollmar - $invNo . rtf
-	set chan [open $invName w]
-	puts $chan $invtext
-	close $chan
-	
+  ##2. create $invName PDF
+  append invName $spoolDir / invoice${compShortname} - $invNo . pdf
+  exec dvi2pdf $spoolDir/rechnung-vorlage.dvi $spoolDir/$invName 
+puts "pdf ok"
   #Change "Rechnung speichern" button to "Rechnung drucken" button
   .saveInv configure -text "Rechnung drucken" -command {printInvoice}
 

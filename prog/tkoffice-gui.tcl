@@ -147,11 +147,11 @@ set auftrDat [clock format [clock seconds] -format %d.%m.%Y]
 
 #Referenz
 label .refL -text "Ihre Referenz"
-entry .refE -width 20 -bg beige
+entry .refE -width 20 -bg beige -textvar ref
 
 #Int. Kommentar - TODO: needed?
 label .komL -text "Bemerkung"
-entry .komE -width 20 -bg beige
+entry .komE -width 20 -bg beige -textvar comm
 
 #Set up Artikelliste, fill later when connected to DB
 label .invArtlistL -text "Artikelliste" -font TkCaptionFont
