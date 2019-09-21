@@ -230,18 +230,57 @@ button .confArtCreateB -text "Artikel erfassen" -command {createArticle}
 pack .confArtT -in .n.t4.f1 -anchor w
 pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL -in .n.t4.f1 -side left
 pack .confArtSaveB .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
-
+#DATENBANK SICHERN
 label .dumpDBT -text "Datenbank sichern" -font "TkHeadingFont"
 message .dumpDBM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner [file join $auftragDir dumps] abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando 'psql $db < $dbname-\[DATUM\].sql' wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
 button .dumpDBB -text "Datenbank sichern" -command {dumpDB}
-
+#DATENBANK EINRICHTEN
 label .confDBT -text "Datenbank einrichten" -font "TkHeadingFont"
 message .confDBM -width 800 -text "Fürs Einrichten der PostgresQL-Datenbank sind folgende Schritte nötig:..............."
 label .confDBNameL -text "Name der Datenbank" -font "TKSmallCaptionFont"
-label .confDBUserL -text "Benutzer" -font "TKSmallCaptionFont"
+label .confDBUserL -text "Benutzer" -font "TkSmallCaptionFont"
 entry .confDBNameE -textvariable Datenbankname -validate focusin -validatecommand {set Datenbankname "";return 0}
 entry .confDBUserE -textvariable Benutzername -validate focusin -validatecommand {set Datenbanknutzer "";return 0}
 button .initDBB -text "Datenbank erstellen" -command {initDB}
+
+#RECHNUNGSSTELLUNG
+pack [frame .n.t4.f5] -side left -anchor nw
+pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
+label .billingT -text "Rechnungsstellung" -font "TkHeadingFont"
+message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung und können nach Belieben gesetzt werden.\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
+
+radiobutton .billformatlinksRB -text "Adressfenster rechts (Schweiz)" -value Links -variable adrpos -command {set usepkg letter}
+radiobutton .billformatrechtsRB -text "Adressfenster links (International)" -value Rechts -variable adrpos -command {set usepkg chletter}
+.billformatrechtsRB select
+
+entry .billvatE
+entry .billownerE
+entry .billcompnameE
+entry .billcompstreetE
+entry .billcompcityE
+entry .billingphoneE
+
+pack .billingT .billingM -in .n.t4.f5 -anchor nw
+pack .billformatlinksRB .billformatrechtsRB -in .n.t4.f5 -anchor se -side bottom
+
+pack .billvatE .billownerE .billcompnameE .billcompstreetE .billcompcityE .billingphoneE -in .billing2F
+foreach e [pack slaves .billing2F] {
+  $e config -fg grey -bg beige -validate focusin -validatecommand "
+    %W delete 0 end
+    $e config -fg black -state normal
+    return 0
+"
+  }
+button .billingSaveB -text "Einstellungen speichern" -command {saveConfig}
+pack .billingSaveB -in .billing2F -side bottom -anchor se
+
+#Check if vars in config
+if [info exists vat] {.billvatE insert 0 $vat} {.billvatE insert 0 "Mehrwertsteuersatz %"}
+if [info exists myName] {.billownerE insert 0 $myName} {.billownerE insert 0 "Name"}
+if [info exists myComp] {.billcompnameE insert 0 $myComp} {.billcompnameE insert 0 "Firmenname"}
+if [info exists myAdr] {.billcompstreetE insert 0 $myAdr} {.billcompstreetE insert 0 "Strasse"}
+if [info exists myCity] {.billcompcityE insert 0 $myCity} {.billcompcityE insert 0 "PLZ & Ortschaft"}
+if [info exists myPhone] {.billingphoneE insert 0 $myPhone} {.billingphoneE insert 0 "Telefon"}
 
 pack .dumpDBT .dumpDBM -in .n.t4.f2 -anchor w -side left
 pack .dumpDBB -in .n.t4.f2 -anchor e -side right
@@ -250,6 +289,8 @@ pack .confDBT -in .n.t4.f3 -anchor w
 
 pack .confDBM .confDBNameE .confDBUserE -in .n.t4.f3 -side left
 pack .initDBB -in .n.t4.f3 -side right
+
+
 
 
 #######################################################################
