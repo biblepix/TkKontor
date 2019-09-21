@@ -216,27 +216,33 @@ pack .news -in .bottomF -side left -anchor nw -fill x
 ######################################################################################
 
 #1. ARTIKEL VERWALTEN
-label .confArtT -text "Artikel verwalten" -font "TkHeadingFont"
+label .confArtT -text "Artikel erfassen" -font "TkHeadingFont"
+message .confArtM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B. Std.) dürfen nicht leer sein.\nDie Kontrollkästchen 'Auslage' und 'Rabatt' für den Artikeltyp können leer sein. Wenn 'Rabatt' ein Häkchen bekommt, gilt der Artikel als Abzugswert in Prozent (im Feld 'Preis' Prozentzahl ohne %-Zeichen eingeben, z.B. 5.5). Der Rabatt wird in der Rechnung vom Gesamtbetrag abgezogen.\nFalls das Feld 'Auslage' angehakt wird (z.B. für Artikel 'Zugfahrt'), wird der Artikel in der Rechnung separat als Auslage aufgeführt und unterliegt nicht der Mehrwertsteuerpflicht."
 label .confArtL -text "Artikel Nr."
 spinbox .confArtNumSB -width 5 -command {setArticleLine TAB4}
-label .confArtNameL -padx 10 -textvariable artName
-#allow for entry if article list price is 0, pack entry later if necessary
-label .confArtPriceL -padx 10 -textvariable artPrice
-label .confArtUnitL -padx 10 -textvariable artUnit
+label .confArtNameL -padx 10 -textvar artName
+label .confArtPriceL -padx 10 -textvar artPrice
+label .confArtUnitL -padx 10 -textvar artUnit
+label .confArtTypeL -padx 10 -textvar artType
 button .confArtSaveB -text "Artikel speichern" -command {saveArticle}
 button .confArtDeleteB -text "Artikel löschen" -command {deleteArticle} -activebackground red
 button .confArtCreateB -text "Artikel erfassen" -command {createArticle}
-
-pack .confArtT -in .n.t4.f1 -anchor w
-pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL -in .n.t4.f1 -side left
+pack .confArtT .confArtM -in .n.t4.f1 -anchor w
+pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArtTypeL -in .n.t4.f1 -side left
 pack .confArtSaveB .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
+
 #DATENBANK SICHERN
 label .dumpDBT -text "Datenbank sichern" -font "TkHeadingFont"
 message .dumpDBM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner [file join $auftragDir dumps] abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando 'psql $db < $dbname-\[DATUM\].sql' wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
 button .dumpDBB -text "Datenbank sichern" -command {dumpDB}
+
 #DATENBANK EINRICHTEN
 label .confDBT -text "Datenbank einrichten" -font "TkHeadingFont"
-message .confDBM -width 800 -text "Fürs Einrichten der PostgresQL-Datenbank sind folgende Schritte nötig:..............."
+message .confDBM -width 800 -text "Fürs Einrichten der PostgreSQL-Datenbank sind folgende Schritte nötig:\n1. Das Programm Postgres bzw Postgresql über die Systemsteuerung installieren.\n1. Einen Nutzernamen für Postgres einrichten, welcher von TkOffice auf die Datenbank zugreifen darf: In einer Konsole als root (su oder sudo) folgende Kommando eingeben: 
+\n (wahrscheinlich nicht nötig:) sudo useradd postgres
+\n sudo -u postgres createuser testuser (nur nötig wenn man nicht als 'postgres' auf die Datenbank zugreichen möchte)
+\n sudo -u postgres createdb --owner=testuser testdbuseradd postgres 
+\n3. Den eben erstellten User und einen beliebigen Namen für die TkOffice-Datenbank hier eingeben (z.B. tkofficedb).\n4. Den Knopf 'Datenbank erstellen' betätigen, um die Datenbank und die von TkOffice benötigten Tabellen einzurichten.\n5. TkOffice neu starten und hier weitermachen (Artikel erfassen, Angaben für die Rechnungsstellung)."
 label .confDBNameL -text "Name der Datenbank" -font "TKSmallCaptionFont"
 label .confDBUserL -text "Benutzer" -font "TkSmallCaptionFont"
 entry .confDBNameE -textvariable Datenbankname -validate focusin -validatecommand {set Datenbankname "";return 0}
@@ -247,7 +253,7 @@ button .initDBB -text "Datenbank erstellen" -command {initDB}
 pack [frame .n.t4.f5] -side left -anchor nw
 pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
 label .billingT -text "Rechnungsstellung" -font "TkHeadingFont"
-message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung und können nach Belieben gesetzt werden.\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
+message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\n\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung; nur die Angabe für den Mehrwertsteuersatz ist obligatorisch (bei Angabe 0 erscheint er nicht in der Rechnung).\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
 
 radiobutton .billformatlinksRB -text "Adressfenster rechts (Schweiz)" -value Links -variable adrpos -command {set usepkg letter}
 radiobutton .billformatrechtsRB -text "Adressfenster links (International)" -value Rechts -variable adrpos -command {set usepkg chletter}
@@ -282,7 +288,7 @@ if [info exists myAdr] {.billcompstreetE insert 0 $myAdr} {.billcompstreetE inse
 if [info exists myCity] {.billcompcityE insert 0 $myCity} {.billcompcityE insert 0 "PLZ & Ortschaft"}
 if [info exists myPhone] {.billingphoneE insert 0 $myPhone} {.billingphoneE insert 0 "Telefon"}
 
-pack .dumpDBT .dumpDBM -in .n.t4.f2 -anchor w -side left
+pack .dumpDBT .dumpDBM -in .n.t4.f2 -anchor nw
 pack .dumpDBB -in .n.t4.f2 -anchor e -side right
 
 pack .confDBT -in .n.t4.f3 -anchor w 

@@ -395,10 +395,11 @@ puts $artPrice
     }
   }
   
-  set token [pg_exec $db "SELECT artname,artprice,artunit FROM artikel WHERE artnum=$artNum"]
+  set token [pg_exec $db "SELECT artname,artprice,artunit,arttype FROM artikel WHERE artnum=$artNum"]
   set ::artName [lindex [pg_result $token -list] 0]
   set ::artPrice [lindex [pg_result $token -list] 1]
   set ::artUnit [lindex [pg_result $token -list] 2]
+  set ::artType [lindex [pg_result $token -list] 3]
   return 0
 } ;#END setArticleLine
 
@@ -552,7 +553,7 @@ proc printInvoice {invNo} {
 # saveInv2Tex 
 ##called by saveInv2DB
 proc saveInv2Tex {invNo} {
-  global spoolDir vorlage texDir compAdr compName compPhone compBank
+  global spoolDir vorlage texDir compAdr compName compPhone compBank 
   set itemFile [file join $texDir newInvPosten.tex]
   set dataFile [file join $texDir newInvData.tex]
 
@@ -562,8 +563,17 @@ proc saveInv2Tex {invNo} {
   foreach w [namespace children rows] {
     set artPrice [.artpriceL[namespace tail $w] cget -text]
     set artUnit $::artUnit
+    set artType $::artType
     set artName [.artnameL[namespace tail $w] cget -text]
     set menge [.mengeL[namespace tail $w] cget -text]
+
+  #Check if Discount
+  if {$artType=="D"} {
+    append itemList "\\Discount\{$artName $artPrice %\}\{[expr ($::subtot * $artPrice)/100]\}" \n
+  #Check if Auslage (no VAT)
+  } elseif {$artType=="A"} {
+    append itemList "\\EBC\{$artName\}\{$artPrice\}" \n}
+  } else {
     append itemList "\\Fee\{$artName \(pro $artUnit\)\}\{$artPrice\}\{$menge\}" \n
   }
 
@@ -587,6 +597,8 @@ proc saveInv2Tex {invNo} {
 
   #4.Overwrite any old posten file
   set chan [open $itemFile w] 
+puts $chan vat
+puts $chan currency
   puts $chan $itemList
   close $chan
 
@@ -740,6 +752,8 @@ proc createArticle {} {
   catch {entry .confArtNameE -bg beige}
   catch {entry .confArtUnitE -bg beige}
   catch {entry .confArtPriceE -bg beige}
+  catch {ttk::checkbutton .confarttypeACB -text "Auslage"}
+  catch {ttk::checkbutton .confarttypeRCB -text "Rabatt"}
 
   .confArtNameE delete 0 end
   .confArtUnitE delete 0 end
@@ -749,7 +763,7 @@ proc createArticle {} {
   set ::artName "Bezeichnung"
   set ::artPrice "Preis"
   set ::artUnit "Einheit"
-  pack .confArtNameL .confArtNameE .confArtUnitL .confArtUnitE .confArtPriceL .confArtPriceE -in .n.t4.f1 -side left
+  pack .confArtNameL .confArtNameE .confArtUnitL .confArtUnitE .confArtPriceL .confArtPriceE .confarttypeACB .confarttypeRCB -in .n.t4.f1 -side left
   pack forget .confArtDeleteB
 
   #Rename Button
@@ -766,7 +780,15 @@ proc saveArticle {} {
 
   set artName [.confArtNameE get]
   set artUnit [.confArtUnitE get]
-
+  #check if type "Auslage"
+  if [.confarttypeACB instate selected] {
+    set artType A
+  #check if type "Rabatt"
+  } elseif [.confarttypeRCB instate selected] {
+      set artType R
+  } else {
+    set artType ""
+  }
   #Allow for empty article price
   set artPrice [.confArtPriceE get]
   if {$artPrice == ""} {set artPrice 0}
@@ -774,17 +796,21 @@ proc saveArticle {} {
   set token [pg_exec $db "INSERT INTO artikel (
     artname,
     artunit,
-    artprice
+    artprice,
+    arttype
     ) 
     VALUES (
       '$artName',
       '$artUnit',
-      $artPrice
+      $artPrice,
+      '$artType'
     )"]
 
   #Reset original mask
-  pack forget .confArtNameE .confArtUnitE .confArtPriceE
-  pack .confArtNameL .confArtPriceL .confArtUnitL -in .n.t4.f1 -side left
+  foreach w [pack slaves .n.t4.f1] {
+    pack forget $w
+  }
+  pack .confArtNameL .confArtPriceL .confArtUnitL .confArtTypeL -in .n.t4.f1 -side left
   
   #Recreate article list
   updateArticleList
