@@ -9,6 +9,7 @@ package require Tk
 package require Img
 source [file join $progDir tkoffice-procs.tcl]
 source [file join $progDir pgin.tcl]
+source $confFile
 
 #Haupttitel & Frames
 set px 5
@@ -104,11 +105,9 @@ pack $adrSpin -in .adrF1 -anchor nw
 pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
 
 
-##################################################
+#########################################################################################
 # T A B 1 :  I N V O I C E   L I S T
-##################################################
-# Inv. no. | Beschr. | Datum | Betrag  | Status (1-3)     #    Bezahlt (Text)   # Zahlen (Button)   #
-##########################################################
+#########################################################################################
 
 #Create "Rechnungen" Titel
 label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont"
@@ -136,22 +135,33 @@ pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invStatusH -in .n.t1.headF -
 #Main Title
 #label .titel3 -text "Neue Rechnung" -font "TkCaptionFont"
 
-#Zahlungsbedingung - TODO : move to config/DB?
-label .condL -text "Zahlungsbedingung"
-spinbox .condSB -width 20 -values {"10 Tage" "vor Kursbeginn" "bar"} -textvar cond -bg beige
+#Get Zahlungsbedingungen from config
+set condList ""
+label .invcondL -text "Zahlungsbedingung"
+if [info exists cond1] {
+lappend condList $cond1
+}
+if [info exists cond2] {
+lappend condList $cond2
+}
+if [info exists cond3] {
+lappend condList $cond3
+}
+#Insert into spinbox
+spinbox .invcondSB -width 20 -values $condList -textvar cond -bg beige
 
 #Auftragsdatum: set to heute
-label .auftrDatL -text "Auftragsdatum"
-entry .auftrDatE -width 9 -textvar auftrDat -bg beige
+label .invauftrdatL -text "Auftragsdatum"
+entry .invauftrdatE -width 9 -textvar auftrDat -bg beige
 set auftrDat [clock format [clock seconds] -format %d.%m.%Y]
 
 #Referenz
-label .refL -text "Ihre Referenz"
-entry .refE -width 20 -bg beige -textvar ref
+label .invrefL -text "Ihre Referenz"
+entry .invrefE -width 20 -bg beige -textvar ref
 
 #Int. Kommentar - TODO: needed?
-label .komL -text "Bemerkung"
-entry .komE -width 20 -bg beige -textvar comm
+label .invcomL -text "Bemerkung"
+entry .invcomE -width 20 -bg beige -textvar comm
 
 #Set up Artikelliste, fill later when connected to DB
 label .invArtlistL -text "Artikelliste" -font TkCaptionFont
@@ -171,6 +181,7 @@ label .invArtPriceL -textvariable artPrice -padx 20
 entry .invArtPriceE -textvariable artPrice
 label .invArtNameL -textvariable artName -padx 50
 label .invArtUnitL -textvariable artUnit -padx 20
+label .invArtTypeL -textvar artType -padx 20
 
 label .subtotalL -width 7 -textvariable ::subtot -bg lightblue
 message .subtotalM -width 200 -text "Zwischensumme: "
@@ -253,46 +264,55 @@ button .initDBB -text "Datenbank erstellen" -command {initDB}
 pack [frame .n.t4.f5] -side left -anchor nw
 pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
 label .billingT -text "Rechnungsstellung" -font "TkHeadingFont"
-message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\n\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung; nur die Angabe für den Mehrwertsteuersatz ist obligatorisch (bei Angabe 0 erscheint er nicht in der Rechnung).\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
+message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\n\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung. Der Mehrwertsteuersatz ist obligatorisch (z.B. 0 (erscheint nicht) / 0.0 (erscheint)) / 7.5 usw.).\nIn den Feldern 'Zahlungskondition 1-3' können verschiedene Zahlungsbedingungen erfasst werden, welche bei der Rechnungserstellung jeweils zur Auswahl stehen (z.B. 10 Tage / 30 Tage / bar bei Abholung). Wenn sie leer bleiben, muss die Kondition von Hand eingegeben werden.\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
 
 radiobutton .billformatlinksRB -text "Adressfenster rechts (Schweiz)" -value Links -variable adrpos -command {set usepkg letter}
 radiobutton .billformatrechtsRB -text "Adressfenster links (International)" -value Rechts -variable adrpos -command {set usepkg chletter}
 .billformatrechtsRB select
 
+spinbox .billcurrencySB -width 5 -text Währung -values {€ £ $ CHF}
+
 entry .billvatE
 entry .billownerE
-entry .billcompnameE
-entry .billcompstreetE
-entry .billcompcityE
-entry .billingphoneE
-
+entry .billcompE
+entry .billstreetE
+entry .billcityE
+entry .billphoneE
+entry .billbankE -width 50
+entry .billcond1E
+entry .billcond2E
+entry .billcond3E
 pack .billingT .billingM -in .n.t4.f5 -anchor nw
 pack .billformatlinksRB .billformatrechtsRB -in .n.t4.f5 -anchor se -side bottom
 
-pack .billvatE .billownerE .billcompnameE .billcompstreetE .billcompcityE .billingphoneE -in .billing2F
+pack .billcurrencySB .billvatE .billownerE .billcompE .billstreetE .billcityE .billphoneE .billbankE .billcond1E .billcond2E .billcond3E -in .billing2F
 foreach e [pack slaves .billing2F] {
-  $e config -fg grey -bg beige -validate focusin -validatecommand "
+  catch {$e config -fg grey -bg beige -width 30 -validate focusin -validatecommand "
     %W delete 0 end
     $e config -fg black -state normal
     return 0
-"
+    "
+    }
   }
 button .billingSaveB -text "Einstellungen speichern" -command {saveConfig}
 pack .billingSaveB -in .billing2F -side bottom -anchor se
 
 #Check if vars in config
-if [info exists vat] {.billvatE insert 0 $vat} {.billvatE insert 0 "Mehrwertsteuersatz %"}
-if [info exists myName] {.billownerE insert 0 $myName} {.billownerE insert 0 "Name"}
-if [info exists myComp] {.billcompnameE insert 0 $myComp} {.billcompnameE insert 0 "Firmenname"}
-if [info exists myAdr] {.billcompstreetE insert 0 $myAdr} {.billcompstreetE insert 0 "Strasse"}
-if [info exists myCity] {.billcompcityE insert 0 $myCity} {.billcompcityE insert 0 "PLZ & Ortschaft"}
-if [info exists myPhone] {.billingphoneE insert 0 $myPhone} {.billingphoneE insert 0 "Telefon"}
+if [info exists vat] {.billvatE insert 0 $vat; .billvatE conf -bg lightgreen -validate none} {.billvatE insert 0 "Mehrwertsteuersatz %"}
+if [info exists myName] {.billownerE insert 0 $myName; .billownerE conf -bg lightgreen -validate none} {.billownerE insert 0 "Name"}
+if [info exists myComp] {.billcompE insert 0 $myComp; .billcompE conf -bg lightgreen -validate none} {.billcompE insert 0 "Firmenname"}
+if [info exists myAdr] {.billstreetE insert 0 $myAdr; .billstreetE conf -bg lightgreen -validate none} {.billstreetE insert 0 "Strasse"}
+if [info exists myCity] {.billcityE insert 0 $myCity; .billcityE conf -bg lightgreen -validate none} {.billcityE insert 0 "PLZ & Ortschaft"}
+if [info exists myPhone] {.billphoneE insert 0 $myPhone; .billphoneE conf -bg lightgreen -validate none} {.billphoneE insert 0 "Telefon"}
+if [info exists myBank] {.billbankE insert 0 $myBank; .billbankE conf -bg lightgreen -validate none} {.billphoneE insert 0 "Bankverbindung"}
+if [info exists cond1] {.billcond1E insert 0 $cond1; .billcond1 conf -bg lightgreen -validate none} {.billcond1E insert 0 "Zahlungskondition 1"}
+if [info exists cond2] {.billcond2E insert 0 $cond2; .billcond2 conf -bg lightgreen -validate none} {.billcond2E insert 0 "Zahlungskondition 2"}
+if [info exists cond3] {.billcond3E insert 0 $cond3; .billcond3 conf -bg lightgreen -validate none} {.billcond3E insert 0 "Zahlungskondition 3"}
+if [info exists currency] {.billcurrencySB conf -bg lightgreen -width 5; .billcurrencySB set $currency}
 
 pack .dumpDBT .dumpDBM -in .n.t4.f2 -anchor nw
 pack .dumpDBB -in .n.t4.f2 -anchor e -side right
-
 pack .confDBT -in .n.t4.f3 -anchor w 
-
 pack .confDBM .confDBNameE .confDBUserE -in .n.t4.f3 -side left
 pack .initDBB -in .n.t4.f3 -side right
 
