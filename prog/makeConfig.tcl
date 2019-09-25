@@ -51,12 +51,13 @@ proc makeTexVorlage {} {
   puts $chan $tex
   close $chan
 
+  return 0
 } ;#END makeTexVorlage
 
 # makeConfig
 ##called by .saveConfigB "Einstellungen speichern" button 
 proc makeConfig {} {
-  global config adrpos
+  global confFile adrpos
 
   #Get DB name & User
   set dbname [.confDBNameE get]
@@ -84,7 +85,7 @@ proc makeConfig {} {
 
   append setMyName set { } myName { } \" [.billownerE get] \"
   append setMyComp set { } myComp { } \" [.billcompE get] \"
-  append setMyAdr set { } myAdr { } \" [.billstreetE get] { } [.billcityE get] \" 
+  append setMyAdr set { } myAdr { } \" [.billstreetE get] , { } [.billcityE get] \" 
   append setMyPhone set { } myPhone { } \" [.billphoneE get] \"
   append setMyBank set { } myBank { } \" [.billbankE get] \"
 
@@ -93,13 +94,15 @@ proc makeConfig {} {
   set cond1 [.billcond1E get]
   set cond2 [.billcond2E get]
   set cond3 [.billcond3E get]
-  if {[string compare -length $testphrase $cond1] != 0} {
+
+#TODO: Bedingung stimmt nicht!!!
+  if [string compare -length 17 $testphrase $cond1] {
     set cond1 ""
   }
-  if {[string compare -length $testphrase $cond2] != 0} {
+  if [string compare -length 17 $testphrase $cond2] {
     set cond2 ""
   }
-  if {[string compare -length $testphrase $cond3] != 0} {
+  if [string compare -length 17 $testphrase $cond3] {
     set cond3 ""
   }
   append setCond1 set { } cond1 { } \" $cond1 \"
@@ -107,7 +110,7 @@ proc makeConfig {} {
   append setCond3 set { } cond1 { } \" $cond3 \"
   
   #Overwrite config file with new entries, deleting old
-  set chan [open $config w]
+  set chan [open $confFile w]
     puts $chan $setDbName
     puts $chan $setDbUser
     puts $chan $setLetterclass
@@ -124,5 +127,8 @@ proc makeConfig {} {
   close $chan
 
   unset setCurrency setVat setMyName setMyComp setMyAdr setMyPhone setMyBank setCond1 setCond2 setCond3
+
+  #makeTexVorlage
+  return 0
 }
 

@@ -8,11 +8,12 @@ set auftragDir [file normalize [file dirname [info script]]]
 set confDir [file join $auftragDir conf]
 set confFile [file join $confDir config.tcl]
 set progDir [file join $auftragDir prog]
+set spoolDir [file join $auftragDir spool]
+set makeConfig [file join $progDir makeConfig.tcl]
 
 if [catch {source $confFile}] {
-  set db "myDB"
-  set dbname "myDB"
-  set dbuser "postgres"
+  set dbname "Datenbankname eingeben"
+  set dbuser "Nutzername eingeben"
   source [file join $progDir tkoffice-gui.tcl]
   after 7000 {
     .n select 3
