@@ -266,8 +266,8 @@ pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
 label .billingT -text "Rechnungsstellung" -font "TkHeadingFont"
 message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\n\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung. Der Mehrwertsteuersatz ist obligatorisch (z.B. 0 (erscheint nicht) / 0.0 (erscheint)) / 7.5 usw.).\nIn den Feldern 'Zahlungskondition 1-3' können verschiedene Zahlungsbedingungen erfasst werden, welche bei der Rechnungserstellung jeweils zur Auswahl stehen (z.B. 10 Tage / 30 Tage / bar bei Abholung). Wenn sie leer bleiben, muss die Kondition von Hand eingegeben werden.\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
 
-radiobutton .billformatlinksRB -text "Adressfenster rechts (Schweiz)" -value Links -variable adrpos -command {set usepkg letter}
-radiobutton .billformatrechtsRB -text "Adressfenster links (International)" -value Rechts -variable adrpos -command {set usepkg chletter}
+radiobutton .billformatlinksRB -text "Adressfenster links (International)" -value Links -variable adrpos
+radiobutton .billformatrechtsRB -text "Adressfenster rechts (Schweiz)" -value Rechts -variable adrpos
 .billformatrechtsRB select
 
 spinbox .billcurrencySB -width 5 -text Währung -values {€ £ $ CHF}

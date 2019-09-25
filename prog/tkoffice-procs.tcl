@@ -557,21 +557,20 @@ proc printInvoice {invNo} {
 proc saveInv2Tex {invNo} {
   global spoolDir vorlage texDir confFile env
 
-  set itemFile [file join $texDir newInvPosten.tex]
+  set itemFile [file join $texDir newInvItems.tex]
   set dataFile [file join $texDir newInvData.tex]
 
   #vars from top win
-    set comm [.invcomE get]
-    set cond [.invcondE get]
-    set auftrDat [.invAuftrDatE get]
-    set subtot [.subtotalL cget -text]
+  set comm [.invcomE get]
+  set cond [.invcondE get]
+  set auftrDat [.invAuftrDatE get]
+  set subtot [.subtotalL cget -text]
 
   source $confFile
 
-
 	NewsHandler::QueryNews "Speichere Rechnung $invNo als DVI..." lightblue
 
-  #1.set itemList for 'posten' file
+  #1.set itemList for itemFile
   foreach w [namespace children rows] {
     set artPrice [.artpriceL[namespace tail $w] cget -text]
     set artUnit [.artunitL[namespace tail $w] cget -text]
@@ -602,24 +601,21 @@ proc saveInv2Tex {invNo} {
   append dataList "\\newcommand\{\\bank\}\{$myBank\}" \n
   append dataList "\\newcommand\{\\myName\}\{$myComp\}" \n
   append dataList "\\newcommand\{\\myAddress\}\{$myAdr\}" \n
-  append dataList "\\newcommand\{\\myCity\}\{$myCity\}" \n
+#  append dataList "\\newcommand\{\\myCity\}\{$myCity\}" \n
   append dataList "\\newcommand\{\\myPhone\}\{$myPhone\}" \n
-
   if {![string is digit $vat]} {set vat 0.0}
   append dataList "\\newcommand\{\\vat\}\{$vat\}" \n
-  append dataList "\\newcommand\{\\currency\}\{$currency\}" \n
-
-#Begin Invoice
-  append dataList "\\begin\{invoice\}\{$currency\}\{$vat\}" \n
-  append dataList {\ProjectTitle{Rechnung}} \n
-#Insert itemList
-  append dataList $itemList \n
-  append dataList {\end{invoice}}
-  
+  append dataList "\\newcommand\{\\curr\}\{$currency\}" \n
+ 
   #3.Overwrite any old data file
   set chan [open $dataFile w] 
   puts $chan $dataList
   close $chan
+
+  #4. Overwrite any old items file
+  set chan [open $itemFile w]
+  puts $itemFile $itemList
+  close $itemFile
 
   #3. LaTex $vorlage & save invoice to $spool - TODO: to DB? no spool?
   ##1. overwrite $vorlage.dvi
@@ -728,11 +724,11 @@ proc abschlussErstellen {} {
 
 Büromiete
 Abschr. Büroeinrichtung\t\t\t
-Providergebühr Hoststar\t\t\t
-Jahresgebühr Web-Hosting\t\t\t
-Sunrise Grundtaxe & Gespräche 12x70.-\t\t\t
+Providergebühr\t\t\t
+Web-Hosting-Jahresgebühr\t\t\t
+Telefongebühren Grundtaxe & Gespräche\t\t\t
 Postwertzeichen\t\t\t
-SBB-Berufsfahrten\t\t\t
+Bahn-Berufsfahrten\t\t\t
 Bürobedarf\t\t\t
 Beglaubigungen\t\t\t
 Varia
