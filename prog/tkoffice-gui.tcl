@@ -244,7 +244,7 @@ pack .confArtSaveB .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
 
 #DATENBANK SICHERN
 label .dumpDBT -text "Datenbank sichern" -font "TkHeadingFont"
-message .dumpDBM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner [file join $auftragDir dumps] abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando 'psql $dbname < $dbname-\[DATUM\].sql' wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
+message .dumpDBM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner [file join $tkofficeDir dumps] abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando 'psql $dbname < $dbname-\[DATUM\].sql' wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
 button .dumpDBB -text "Datenbank sichern" -command {dumpDB}
 
 #DATENBANK EINRICHTEN
@@ -292,10 +292,12 @@ foreach e [pack slaves .billing2F] {
     $e config -fg black -state normal
     return 0
     "
-    }
   }
+}
 button .billingSaveB -text "Einstellungen speichern" -command {source $makeConfig ; makeConfig}
 pack .billingSaveB -in .billing2F -side bottom -anchor se
+
+.billvatE conf -validate key -vcmd {string is integer %P} -invcmd {%W conf -bg red; %W delete 0 end}
 
 #Check if vars in config
 if [info exists vat] {.billvatE insert 0 $vat; .billvatE conf -bg lightgreen -validate none} {.billvatE insert 0 "Mehrwertsteuersatz %"}
@@ -305,9 +307,10 @@ if [info exists myAdr] {.billstreetE insert 0 $myAdr; .billstreetE conf -bg ligh
 if [info exists myCity] {.billcityE insert 0 $myCity; .billcityE conf -bg lightgreen -validate none} {.billcityE insert 0 "PLZ & Ortschaft"}
 if [info exists myPhone] {.billphoneE insert 0 $myPhone; .billphoneE conf -bg lightgreen -validate none} {.billphoneE insert 0 "Telefon"}
 if [info exists myBank] {.billbankE insert 0 $myBank; .billbankE conf -bg lightgreen -validate none} {.billphoneE insert 0 "Bankverbindung"}
-if [info exists cond1] {.billcond1E insert 0 $cond1; .billcond1E conf -bg lightgreen -validate none} {.billcond1E insert 0 "Zahlungskondition 1"}
-if [info exists cond2] {.billcond2E insert 0 $cond2; .billcond2E conf -bg lightgreen -validate none} {.billcond2E insert 0 "Zahlungskondition 2"}
-if [info exists cond3] {.billcond3E insert 0 $cond3; .billcond3E conf -bg lightgreen -validate none} {.billcond3E insert 0 "Zahlungskondition 3"}
+
+if {[info exists cond1] && $cond1!=""} {.billcond1E insert 0 $cond1; .billcond1E conf -bg lightgreen -validate none} {.billcond1E insert 0 "Zahlungskondition 1"}
+if {[info exists cond2] && $cond2!=""} {.billcond2E insert 0 $cond2; .billcond2E conf -bg lightgreen -validate none} {.billcond2E insert 0 "Zahlungskondition 2"}
+if {[info exists cond3] && $cond3!=""} {.billcond3E insert 0 $cond3; .billcond3E conf -bg lightgreen -validate none} {.billcond3E insert 0 "Zahlungskondition 3"}
 if [info exists currency] {.billcurrencySB conf -bg lightgreen -width 5; .billcurrencySB set $currency}
 
 pack .dumpDBT .dumpDBM -in .n.t4.f2 -anchor nw
@@ -324,8 +327,8 @@ pack .initDBB -in .n.t4.f3 -side right
 #######################################################################
 if {[string length $res] >20} {
   NewsHandler::QueryNews $res red 
-  .confDBNameE -text "Datenbankname eingeben" -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
-  .confDBUserE -text "Datenbanknutzer eingeben" -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
+  .confDBNameE conf -text "Datenbankname eingeben" -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
+  .confDBUserE conf -text "Datenbanknutzer eingeben" -validate focusin -validatecommand {%W conf -text "Name eingeben" -bg beige -fg grey ; return 0}
   return 1
 } 
 

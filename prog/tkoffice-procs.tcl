@@ -439,7 +439,7 @@ proc addInvRow {} {
       set artName [.invArtNameL cget -text]
       set menge [.mengeE get]
       set artPrice [.invArtPriceL cget -text]
-#      set artUnit [.invArtUnitL cget -text]
+      set artUnit [.invArtUnitL cget -text]
       set artType [.invArtTypeL cget -text]
       set rowNo $::rows::rowNo
       set rowtot [expr $menge * $artPrice]
@@ -555,15 +555,15 @@ proc printInvoice {invNo} {
 # saveInv2Tex 
 ##called by saveInv2DB
 proc saveInv2Tex {invNo} {
-  global spoolDir vorlage texDir confFile env
+  global spoolDir texVorlage texDir confFile env
 
   set itemFile [file join $texDir newInvItems.tex]
   set dataFile [file join $texDir newInvData.tex]
 
   #vars from top win
   set comm [.invcomE get]
-  set cond [.invcondE get]
-  set auftrDat [.invAuftrDatE get]
+  set cond [.invcondSB get]
+  set auftrDat [.invauftrdatE get]
   set subtot [.subtotalL cget -text]
 
   source $confFile
@@ -573,7 +573,8 @@ proc saveInv2Tex {invNo} {
   #1.set itemList for itemFile
   foreach w [namespace children rows] {
     set artPrice [.artpriceL[namespace tail $w] cget -text]
-    set artUnit [.artunitL[namespace tail $w] cget -text]
+    #set artUnit [.artunitL[namespace tail $w] cget -text]
+    set artUnit [.invArtUnitL cget -text]
     set artType [.arttypeL[namespace tail $w] cget -text]
     set artName [.artnameL[namespace tail $w] cget -text]
     set menge [.mengeL[namespace tail $w] cget -text]
@@ -614,12 +615,12 @@ proc saveInv2Tex {invNo} {
 
   #4. Overwrite any old items file
   set chan [open $itemFile w]
-  puts $itemFile $itemList
-  close $itemFile
+  puts $chan $itemList
+  close $chan
 
   #3. LaTex $vorlage & save invoice to $spool - TODO: to DB? no spool?
   ##1. overwrite $vorlage.dvi
-  exec latex -output-directory=$spoolDir -output-format=dvi $vorlage
+  exec latex -output-directory=$spoolDir -output-format=dvi $texVorlage
 puts "latex ok"
 
   ##2. create $invName PDF

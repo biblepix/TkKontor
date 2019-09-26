@@ -1,15 +1,17 @@
 #!/usr/bin/tclsh
-# ~/TkAuftrag/auftrag.tcl
-# Main launcher prog for TkAuftrag Business Software
+# ~/TktkofficeDir/tkofficeDir.tcl
+# Main launcher prog for TktkofficeDir Business Software
 # Installation requirements: Tcl/Tk library, PostgreSQL database
 # Updated: 16Sep 19
 
-set auftragDir [file normalize [file dirname [info script]]]
-set confDir [file join $auftragDir conf]
+set tkofficeDir [file normalize [file dirname [info script]]]
+set confDir [file join $tkofficeDir conf]
 set confFile [file join $confDir config.tcl]
-set progDir [file join $auftragDir prog]
-set spoolDir [file join $auftragDir spool]
+set progDir [file join $tkofficeDir prog]
+set spoolDir [file join $tkofficeDir spool]
+set texDir [file join $tkofficeDir tex]
 set makeConfig [file join $progDir makeConfig.tcl]
+set texVorlage [file join $texDir rechnung-vorlage.tex]
 
 if [catch {source $confFile}] {
   set dbname "Datenbankname eingeben"

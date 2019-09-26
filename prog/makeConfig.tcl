@@ -1,60 +1,5 @@
-# makeTexVorlage
-##creates general vars 
-##called by makeConfig
-proc makeTexVorlage {} {
-  global config spoolDir texVorlage
-  source $config
-
-  #1. first line add documentclass (letter OR chletter, from config)
-  append tex \\documentclass\{ $letterclass \} \n
-
-  #2. add fixed text (document & letter specific) 
-  append tex {
-    \usepackage[utf8]{inputenc}
-    \usepackage[T1]{fontenc}
-    \usepackage{textcomp}
-    \usepackage[a4paper]{geometry}
-    \usepackage[german]{babel}
-    \usepackage[german]{invoice}
-    \renewcommand*{\Fees}{Leistungen}
-    \renewcommand*{\UnitRate}{Einzelpeis}
-    \renewcommand*{\Count}{Menge}
-    \renewcommand*{\Activity}{Produkt}
-    \title{}
-    \author{}
-  } \n
-
-  #3. add letter variables
-  append tex \\name\{ $myComp \} \n
-  append tex \\address\{ $myAdr \} \n
-  append tex \\telephone\{ $myPhone \} \n
-  append tex \\location\{ $myCity \} \n
- 
-  #4. add more fix with inv specific data commands
-  append tex {
-  \input{newInvData.tex}
-  \begin{document}
-  \begin{letter}{\custAdr}
-  \date{\location, \today}
-  \opening{Rechnung Nr. \quad \invNo \\ Ihre Referenz: \quad \comm \\ Auftragsdatum: \quad \dat \\ \bf{Zahlungsfrist: \quad \cond}}
-  \begin{invoice}{\curr}{\vat}
-  \ProjectTitle{Rechnung}
-  \input{newInvItems.tex}
-  \end{invoice}
-  \closing{Besten Dank für den geschätzten Auftrag! \\\\ Zahlung an: \bank}
-  \end{letter}
-  \end{document}
-  }
-
-  #Save new vorlage 
-  set chan [open $texVorlage w]
-  puts $chan $tex
-  close $chan
-
-  return 0
-} ;#END makeTexVorlage
-
 # makeConfig
+##saves configFile, overwriting old
 ##called by .saveConfigB "Einstellungen speichern" button 
 proc makeConfig {} {
   global confFile adrpos
@@ -70,7 +15,8 @@ proc makeConfig {} {
 
   #Get Vat: if 0, invoice ignores it, from 0.0 upwards invoice displays it
   set vat [.billvatE get]
-  if {![string is double $vat]} {
+  ##rejec non-digit values
+  if {![string is double -strict $vat]} {
     set vat 0.0
   }
   append setVat set { } vat { } $vat
@@ -85,7 +31,8 @@ proc makeConfig {} {
 
   append setMyName set { } myName { } \" [.billownerE get] \"
   append setMyComp set { } myComp { } \" [.billcompE get] \"
-  append setMyAdr set { } myAdr { } \" [.billstreetE get] , { } [.billcityE get] \" 
+  append setMyAdr set { } myAdr { } \" [.billstreetE get] \"
+  append setMyCity set { } myCity { } \" [.billcityE get] \" 
   append setMyPhone set { } myPhone { } \" [.billphoneE get] \"
   append setMyBank set { } myBank { } \" [.billbankE get] \"
 
@@ -96,18 +43,19 @@ proc makeConfig {} {
   set cond3 [.billcond3E get]
 
 #TODO: Bedingung stimmt nicht!!!
-  if [string compare -length 17 $testphrase $cond1] {
+  if {![string compare -length 17 $testphrase $cond1]} {
     set cond1 ""
   }
-  if [string compare -length 17 $testphrase $cond2] {
+  if {![string compare -length 17 $testphrase $cond2]} {
     set cond2 ""
   }
-  if [string compare -length 17 $testphrase $cond3] {
+  if {![string compare -length 17 $testphrase $cond3]} {
     set cond3 ""
   }
+
   append setCond1 set { } cond1 { } \" $cond1 \"
-  append setCond2 set { } cond1 { } \" $cond2 \"
-  append setCond3 set { } cond1 { } \" $cond3 \"
+  append setCond2 set { } cond2 { } \" $cond2 \"
+  append setCond3 set { } cond3 { } \" $cond3 \"
   
   #Overwrite config file with new entries, deleting old
   set chan [open $confFile w]
@@ -119,6 +67,7 @@ proc makeConfig {} {
     puts $chan $setMyName
     puts $chan $setMyComp
     puts $chan $setMyAdr
+    puts $chan $setMyCity
     puts $chan $setMyPhone
     puts $chan $setMyBank
     puts $chan $setCond1
@@ -128,7 +77,66 @@ proc makeConfig {} {
 
   unset setCurrency setVat setMyName setMyComp setMyAdr setMyPhone setMyBank setCond1 setCond2 setCond3
 
-  #makeTexVorlage
+  NewsHandler::QueryNews "Einstellungen in $confFile gespeichert." lightgreen
+
+  makeTexVorlage
   return 0
 }
 
+# makeTexVorlage
+##creates general invoice vars 
+##called by makeConfig
+proc makeTexVorlage {} {
+  global confFile spoolDir texVorlage
+  source $confFile
+
+  #1. first line add documentclass (letter OR chletter, from config)
+  append tex \\documentclass\{ $letterclass \}
+
+  #2. add fixed text (document & letter specific) 
+  append tex {
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{textcomp}
+  \usepackage[a4paper]{geometry}
+  \usepackage[german]{babel}
+  \usepackage[german]{invoice}
+  \renewcommand*{\Fees}{Leistungen}
+  \renewcommand*{\UnitRate}{Einzelpeis}
+  \renewcommand*{\Count}{Menge}
+  \renewcommand*{\Activity}{Produkt}
+  \title{}
+  \author{}
+  }
+
+  #3. add letter variables
+  append tex \\name\{ $myComp \} \n
+  append tex \\address\{ $myAdr \} \n
+  append tex \\telephone\{ $myPhone \} \n
+  append tex \\location\{ $myCity \}
+ 
+  #4. add more fix with inv specific data commands
+  append tex {
+  \input{newInvData.tex}
+  \begin{document}
+  \begin{letter}{\custAdr}
+  \date{\location, \today}
+  \opening{Rechnung Nr. \quad \invNo \\ Ihre Referenz: \quad \comm \\ Auftragsdatum: \quad \dat \\ \bf{Zahlungsfrist: \quad \cond}}
+  \begin{invoice}{\currency}{\vat}
+  \ProjectTitle{Rechnung}
+  \input{newInvItems.tex}
+  \end{invoice}
+  \closing{Besten Dank für den geschätzten Auftrag! \\\\ Zahlung an: \bank}
+  \end{letter}
+  \end{document}
+  }
+
+  #Save new vorlage 
+  set chan [open $texVorlage w]
+  puts $chan $tex
+  close $chan
+
+  NewsHandler::QueryNews "Personalisierte Rechnungsvorlage in $texVorlage gespeichert." lightgreen
+
+  return 0
+} ;#END makeTexVorlage
