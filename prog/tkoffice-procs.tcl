@@ -456,9 +456,10 @@ proc addInvRow {} {
       catch {label .mengeL${rowNo} -text $menge -bg lightblue -width 20 -justify left -anchor w}
       catch {label .artnameL${rowNo} -text $artName -bg lightblue -width 53 -justify left -anchor w}
       catch {label .artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify left -anchor w}
-      catch {label .arttypeL${rowNo} -text $artType -bg lightblue -width 2}
+      catch {label .artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
+      catch {label .arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
       catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
-      pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} .rowtotL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
+      pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo}  -in .invF${rowNo} -anchor w -fill x -side left
     }
   }
 } ;#END addInvRow
@@ -535,7 +536,93 @@ proc saveInv2DB {} {
       .saveInvB conf -text "Rechnung ausdrucken" -command {printInvoice $invNo}
     } 
 
-};#END saveInv2DB
+} ;#END saveInv2DB
+
+
+# saveInv2Tex 
+##called by saveInv2DB
+proc saveInv2Tex {invNo} {
+  global spoolDir texVorlage texDir confFile env
+
+  set itemFile [file join $texDir invitems.tex]
+  set dataFile [file join $texDir invdata.tex]
+
+  #vars from top win
+  set comm [.invcomE get]
+  set cond [.invcondSB get]
+  set auftrDat [.invauftrdatE get]
+  set subtot [.subtotalL cget -text]
+
+  source $confFile
+  if {![string is digit $vat]} {set vat 0.0}
+  if {$currency=="$"} {set currency \\textdollar}
+  if {$currency=="£"} {set currency \\textsterling}
+  if {$currency=="€"} {set currency \\texteuro}
+  if {$currency=="CHF"} {set currency {Fr.}}
+  
+  #1.set itemList for itemFile
+  foreach w [namespace children rows] {
+  
+    set artUnit [.aurtunitL[namespace tail $w] cget -text]
+    set artPrice [.artpriceL[namespace tail $w] cget -text]
+    set artType [.arttypeL[namespace tail $w] cget -text]
+    set artName [.artnameL[namespace tail $w] cget -text]
+    set menge [.mengeL[namespace tail $w] cget -text]
+    
+    #Check if Discount
+    if {$artType==""} {
+      append itemList \\Fee\{ $artName { } \( pro { } $artUnit \) \} \{ $artPrice \} \{ $menge \} \n
+    } elseif {$artType=="R"} {
+      append itemList \\Discount\{ $artName { } $artPrice % \} \{ [expr ($subtot * $artPrice)/100] \} \n
+    #Check if Auslage - TODO change save2DB 
+    } elseif {$artType=="A"} {
+      append itemList \\EBC\{ $artName \} \{ $artPrice \} \n
+    }
+  } ;#END foreach w
+
+  #2.set dataList for usepackage letter
+  lappend custAdr $::name1 \n $::name2 \n $::street \n $::zip $::city
+
+  append dataList \\newcommand\{\\comm\} \{ $comm \} \n
+  append dataList \\newcommand\{\\cond\} \{ $cond \} \n
+  append dataList \\newcommand\{\\dat\} \{ $auftrDat \} \n
+  append dataList \\newcommand\{\\invNo\} \{ $invNo \} \n
+  append dataList \\newcommand\{\\custAdr\} \{ $custAdr \} \n
+  append dataList \\newcommand\{\\bank\} \{ $myBank \} \n
+  append dataList \\newcommand\{\\myName\} \{ $myComp \} \n
+  append dataList \\newcommand\{\\myAddress\} \{ $myAdr \} \n
+  append dataList \\newcommand\{\\myPhone\} \{ $myPhone \} \n
+  append dataList \\newcommand\{\\vat\} \{ $vat \} \n
+  append dataList \\newcommand\{\\curr\} \{ $currency \} \n
+ 
+  #3.Overwrite any old data file
+  set chan [open $dataFile w] 
+  puts $chan $dataList
+  close $chan
+
+  #4. Overwrite any old items file
+  set chan [open $itemFile w]
+  puts $chan $itemList
+  close $chan
+
+  #3. LaTex $vorlage & save invoice to $spool - TODO: to DB? no spool?
+  ##1. overwrite $vorlage.dvi
+  eval exec latex -output-directory=$spoolDir -draftmode $texVorlage
+
+	NewsHandler::QueryNews "Speicherte Rechnung $invNo als DVI." lightblue
+return dvidone
+
+  ##2. create $invName PDF
+  set compShortname [lindex ${compName} 0]
+  append invName $spoolDir / invoice _ $compShortname - $invNo . pdf
+  exec dvipdf $spoolDir/rechnung-vorlage.dvi $spoolDir/$invName 
+	NewsHandler::QueryNews "Speicher5e Rechnung $invNo als PDF..." lightblue
+
+  #Change "Rechnung speichern" button to "Rechnung drucken" button
+  .saveInv configure -text "Rechnung drucken" -command {printInvoice}
+
+} ;#END saveInvToTex
+
 
 # printInvoice ??TODO
 ##prints existing RTF
@@ -551,88 +638,6 @@ proc printInvoice {invNo} {
     NewsHandler::QueryNews "$invName nicht gefunden." red
   }
 }
-
-# saveInv2Tex 
-##called by saveInv2DB
-proc saveInv2Tex {invNo} {
-  global spoolDir texVorlage texDir confFile env
-
-  set itemFile [file join $texDir newInvItems.tex]
-  set dataFile [file join $texDir newInvData.tex]
-
-  #vars from top win
-  set comm [.invcomE get]
-  set cond [.invcondSB get]
-  set auftrDat [.invauftrdatE get]
-  set subtot [.subtotalL cget -text]
-
-  source $confFile
-
-	NewsHandler::QueryNews "Speichere Rechnung $invNo als DVI..." lightblue
-
-  #1.set itemList for itemFile
-  foreach w [namespace children rows] {
-    set artPrice [.artpriceL[namespace tail $w] cget -text]
-    #set artUnit [.artunitL[namespace tail $w] cget -text]
-    set artUnit [.invArtUnitL cget -text]
-    set artType [.arttypeL[namespace tail $w] cget -text]
-    set artName [.artnameL[namespace tail $w] cget -text]
-    set menge [.mengeL[namespace tail $w] cget -text]
-  
-    #Check if Discount
-    puts  "Arttype $artType"
-
-    if {$artType=="D"} {
-      append itemList "\\Discount\{$artName $artPrice %\}\{[expr ($subtot * $artPrice)/100]\}" \n
-    #Check if Auslage (no VAT)
-    } elseif {$artType=="A"} {
-      append itemList "\\EBC\{$artName\}\{$artPrice\}" \n
-    } else {
-      append itemList "\\Fee\{$artName \(pro $artUnit\)\}\{$artPrice\}\{$menge\}" \n
-    }
-  } ;#END foreach w
-
-  #2.set dataList for usepackage letter
-  lappend custAdr $::name1 \n $::name2 \n $::street \n $::zip $::city
-  append dataList "\\newcommand\{\\comm\}\{$comm\}" \n
-  append dataList "\\newcommand\{\\cond\}\{$cond\}" \n
-  append dataList "\\newcommand\{\\dat\}\{$auftrDat\}" \n
-  append dataList "\\newcommand\{\\invNo\}\{$invNo\}" \n
-  append dataList "\\newcommand\{\\custAdr\}\{$custAdr\}" \n
-  append dataList "\\newcommand\{\\bank\}\{$myBank\}" \n
-  append dataList "\\newcommand\{\\myName\}\{$myComp\}" \n
-  append dataList "\\newcommand\{\\myAddress\}\{$myAdr\}" \n
-#  append dataList "\\newcommand\{\\myCity\}\{$myCity\}" \n
-  append dataList "\\newcommand\{\\myPhone\}\{$myPhone\}" \n
-  if {![string is digit $vat]} {set vat 0.0}
-  append dataList "\\newcommand\{\\vat\}\{$vat\}" \n
-  append dataList "\\newcommand\{\\curr\}\{$currency\}" \n
- 
-  #3.Overwrite any old data file
-  set chan [open $dataFile w] 
-  puts $chan $dataList
-  close $chan
-
-  #4. Overwrite any old items file
-  set chan [open $itemFile w]
-  puts $chan $itemList
-  close $chan
-
-  #3. LaTex $vorlage & save invoice to $spool - TODO: to DB? no spool?
-  ##1. overwrite $vorlage.dvi
-  exec latex -output-directory=$spoolDir -output-format=dvi $texVorlage
-puts "latex ok"
-
-  ##2. create $invName PDF
-  set compShortname [lindex ${compName} 0]
-  append invName $spoolDir / invoice _ $compShortname - $invNo . pdf
-  exec dvi2pdf $spoolDir/rechnung-vorlage.dvi $spoolDir/$invName 
-puts "pdf ok"
-  #Change "Rechnung speichern" button to "Rechnung drucken" button
-  .saveInv configure -text "Rechnung drucken" -command {printInvoice}
-
-} ;#END saveInvToTex
-
 
 # saveEntry
 ###called by fillAdrInvWin by $invF.$n.payedsumE entry widget
@@ -696,7 +701,8 @@ puts "$curNS"
 ################################################################################################
 
 proc abschlussErstellen {} {
-  global db 
+  global db myComp
+
   set jahr [.abschlussJahrSB get]
 	#put Jahr's abschluss in array
 #get date from 'invoice'
@@ -717,9 +723,11 @@ proc abschlussErstellen {} {
 		catch {set sumtotal [expr $sumtotal + $total]}  
 		$t insert end "\n $j($no,f_number) \t $j($no,f_date) \t $j($no,addressheader) \t $j($no,finalsum) \t $j($no,payedsum)"		
 	}
-	$t insert 1.0 "V O L L M A R   Ü B E R S E T Z U N G S - S E R V I C E\nE r f o l g s r e c h n u n g   $jahr
-=======================================================
-\nE i n n a h m e n\n\nRch.Nr. \tDatum\tAdresse\tBetrag\tBezahlt\n\n"
+#TODO : add Tags for font size!
+	$t insert 1.0 "$myComp"
+  $t insert end "Erfolgsrechnung $jahr"
+  $t insert end "======================================================="
+  $t insert end "\nE i n n a h m e n\n\nRch.Nr. \tDatum\tAdresse\tBetrag\tBezahlt\n\n"
 	$t insert end "\n\n Einnahmen Total \t\t\t\t $sumtotal"
 	$t insert end "\n\nA u s l a g e n
 
@@ -766,26 +774,38 @@ proc createArticle {} {
  #clear previous entries
   .confArtNumSB set ""
   .confArtNumSB conf -bg lightgrey
-  catch {entry .confArtNameE -bg beige}
-  catch {entry .confArtUnitE -bg beige}
-  catch {entry .confArtPriceE -bg beige}
+#TODO:move to GUI?
+  catch {entry .confartnameE -bg beige}
+  catch {entry .confartunitE -bg beige -textvar rabatt}
+  catch {entry .confartpriceE -bg beige}
   catch {ttk::checkbutton .confarttypeACB -text "Auslage"}
   catch {ttk::checkbutton .confarttypeRCB -text "Rabatt"}
+  .confarttypeRCB conf -variable rabattselected -command {
+    if [.confarttypeRCB instate selected] {
+      set rabatt %
+      .confartunitE conf -state readonly
+      set ::artPrice "Abzug in %"
+    } else {
+      set rabatt ""
+      .confartunitE conf -state normal
+      set ::artPrice "Preis"
+    }
+  }
 
-  .confArtNameE delete 0 end
-  .confArtUnitE delete 0 end
-  .confArtPriceE delete 0 end
-
+  .confartnameE delete 0 end
+  .confartunitE delete 0 end
+  .confartpriceE delete 0 end
+  .confartpriceE conf -validate key -vcmd {%W conf -bg beige ; string is double %P} -invcmd {%W conf -bg red}
   #Rename list entries to headers  
   set ::artName "Bezeichnung"
   set ::artPrice "Preis"
   set ::artUnit "Einheit"
-  pack .confArtNameL .confArtNameE .confArtUnitL .confArtUnitE .confArtPriceL .confArtPriceE .confarttypeACB .confarttypeRCB -in .n.t4.f1 -side left
+  pack .confArtNameL .confartnameE .confArtUnitL .confartunitE .confArtPriceL .confartpriceE .confarttypeACB .confarttypeRCB -in .n.t4.f1 -side left
   pack forget .confArtDeleteB
 
   #Rename Button
   .confArtCreateB conf -text "Abbruch" -activebackground red -command {
-    pack forget .confArtNameE .confArtUnitE .confArtPriceE
+    pack forget .confartnameE .confartunitE .confartpriceE
     .confArtCreateB conf -text "Artikel erfassen" -activebackground #ececec -command {createArticle}
     .confArtNumSB conf -bg white
     pack .confArtDeleteB .confArtSaveB .confArtCreateB -in .n.t4.f1 -side right
@@ -795,8 +815,9 @@ proc createArticle {} {
 proc saveArticle {} {
   global db
 
-  set artName [.confArtNameE get]
-  set artUnit [.confArtUnitE get]
+  set artName [.confartnameE get]
+  set artUnit [.confartunitE get]
+
   #check if type "Auslage"
   if [.confarttypeACB instate selected] {
     set artType A
@@ -806,8 +827,9 @@ proc saveArticle {} {
   } else {
     set artType ""
   }
+
   #Allow for empty article price
-  set artPrice [.confArtPriceE get]
+  set artPrice [.confartpriceE get]
   if {$artPrice == ""} {set artPrice 0}
 
   set token [pg_exec $db "INSERT INTO artikel (
@@ -832,6 +854,12 @@ proc saveArticle {} {
   #Recreate article list
   updateArticleList
   reportResult $token "Artikel $artName gespeichert"
+}
+
+# deleteArticle - TODO!
+proc deleteArticle {} {
+
+
 }
 
 # updateArticleList
@@ -923,7 +951,6 @@ global db
 	} elseif {$objectKind=="invoice"} {
 		set object "f_number"
 	}
-
 	set lastNo [pg_exec $db "SELECT $object FROM $objectKind ORDER BY $object DESC LIMIT 1"]
 	set objectNo [pg_result $lastNo -list]
 	incr objectNo
@@ -958,7 +985,6 @@ proc initialiseDB {dbname} {
       artprice NUMERIC
     )"
     ]
-
 }
 
 # dumpDB
