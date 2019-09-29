@@ -272,7 +272,6 @@ radiobutton .billformatrechtsRB -text "Adressfenster rechts (Schweiz)" -value Re
 
 spinbox .billcurrencySB -width 5 -text Währung -values {€ £ $ CHF}
 
-
 entry .billvatE
 entry .billownerE
 entry .billcompE
@@ -286,33 +285,34 @@ entry .billcond3E
 pack .billingT .billingM -in .n.t4.f5 -anchor nw
 pack .billformatlinksRB .billformatrechtsRB -in .n.t4.f5 -anchor se -side bottom
 pack .billcurrencySB .billvatE .billownerE .billcompE .billstreetE .billcityE .billphoneE .billbankE .billcond1E .billcond2E .billcond3E -in .billing2F
-#Configure all entries to change colour & be emtied when focused
+#Configure all entries to change colour & be emptied when focused
 foreach e [pack slaves .billing2F] {
   catch {$e config -fg grey -bg beige -width 30 -validate focusin -validatecommand "
     %W delete 0 end
-    $e config -fg black -state normal
+    $e config -bg beige -fg black -state normal
     return 0
     "
   }
 }
 
 #Configure vat entry to accept only numbers like 0 / 1.0 / 7.5
-.billvatE conf -validate key -vcmd {%W conf -bg beige ; string is double %P} -invcmd {%W conf -bg red}
+#.billvatE conf -validate key -vcmd {%W conf -bg beige ; string is double %P} -invcmd {%W conf -bg red}
+
 button .billingSaveB -text "Einstellungen speichern" -command {source $makeConfig ; makeConfig}
 pack .billingSaveB -in .billing2F -side bottom -anchor se
 
 #Check if vars in config
-if {[info exists vat] && $vat != ""} {.billvatE insert 0 $vat; .billvatE conf -bg #d9d9d9} {.billvatE conf -bg beige ; .billvatE insert 0 "Mehrwertsteuersatz %"}
-if {[info exists myName] && $myName != ""} {.billownerE insert 0 $myName; .billownerE conf -bg "#d9d9d9" -validate none} {.billownerE insert 0 "Name"}
-if {[info exists myComp] && $myComp != ""} {.billcompE insert 0 $myComp; .billcompE conf -bg "#d9d9d9" -validate none} {.billcompE insert 0 "Firmenname"}
-if {[info exists myAdr] && $myAdr != ""} {.billstreetE insert 0 $myAdr; .billstreetE conf -bg "#d9d9d9" -validate none} {.billstreetE insert 0 "Strasse"}
-if {[info exists myCity] && $myCity != ""} {.billcityE insert 0 $myCity; .billcityE conf -bg "#d9d9d9" -validate none} {.billcityE insert 0 "PLZ & Ortschaft"}
-if {[info exists myPhone] && $myPhone != ""} {.billphoneE insert 0 $myPhone; .billphoneE conf -bg "#d9d9d9" -validate none} {.billphoneE insert 0 "Telefon"}
-if {[info exists myBank] && $myBank != ""} {.billbankE insert 0 $myBank; .billbankE conf -bg "#d9d9d9" -validate none} {.billphoneE insert 0 "Bankverbindung"}
+if {[info exists vat] && $vat != ""} {.billvatE insert 0 $vat; .billvatE conf -bg "#d9d9d9"} {.billvatE conf -bg beige ; .billvatE insert 0 "Mehrwertsteuersatz %"}
+if {[info exists myName] && $myName != ""} {.billownerE insert 0 $myName; .billownerE conf -bg "#d9d9d9"} {.billownerE insert 0 "Name"}
+if {[info exists myComp] && $myComp != ""} {.billcompE insert 0 $myComp; .billcompE conf -bg "#d9d9d9"} {.billcompE insert 0 "Firmenname"}
+if {[info exists myAdr] && $myAdr != ""} {.billstreetE insert 0 $myAdr; .billstreetE conf -bg "#d9d9d9"} {.billstreetE insert 0 "Strasse"}
+if {[info exists myCity] && $myCity != ""} {.billcityE insert 0 $myCity; .billcityE conf -bg "#d9d9d9"} {.billcityE insert 0 "PLZ & Ortschaft"}
+if {[info exists myPhone] && $myPhone != ""} {.billphoneE insert 0 $myPhone; .billphoneE conf -bg "#d9d9d9"} {.billphoneE insert 0 "Telefon"}
+if {[info exists myBank] && $myBank != ""} {.billbankE insert 0 $myBank; .billbankE conf -bg "#d9d9d9"} {.billphoneE insert 0 "Bankverbindung"}
 
-if {[info exists cond1] && $cond1!=""} {.billcond1E insert 0 $cond1; .billcond1E conf -bg "#d9d9d9" -validate none} {.billcond1E insert 0 "Zahlungskondition 1"}
-if {[info exists cond2] && $cond2!=""} {.billcond2E insert 0 $cond2; .billcond2E conf -bg "#d9d9d9" -validate none} {.billcond2E insert 0 "Zahlungskondition 2"}
-if {[info exists cond3] && $cond3!=""} {.billcond3E insert 0 $cond3; .billcond3E conf -bg "#d9d9d9" -validate none} {.billcond3E insert 0 "Zahlungskondition 3"}
+if {[info exists cond1] && $cond1!=""} {.billcond1E insert 0 $cond1; .billcond1E conf -bg "#d9d9d9"} {.billcond1E insert 0 "Zahlungskondition 1"}
+if {[info exists cond2] && $cond2!=""} {.billcond2E insert 0 $cond2; .billcond2E conf -bg "#d9d9d9"} {.billcond2E insert 0 "Zahlungskondition 2"}
+if {[info exists cond3] && $cond3!=""} {.billcond3E insert 0 $cond3; .billcond3E conf -bg "#d9d9d9"} {.billcond3E insert 0 "Zahlungskondition 3"}
 if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcurrencySB set $currency}
 
 pack .dumpDBT .dumpDBM -in .n.t4.f2 -anchor nw
