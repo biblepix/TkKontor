@@ -10,6 +10,7 @@ set confFile [file join $confDir config.tcl]
 set progDir [file join $tkofficeDir prog]
 set spoolDir [file join $tkofficeDir spool]
 set texDir [file join $tkofficeDir tex]
+set dumpDir [file join $tkofficeDir dumps]
 set makeConfig [file join $progDir makeConfig.tcl]
 set texVorlage [file join $texDir rechnung-vorlage.tex]
 

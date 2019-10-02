@@ -28,8 +28,7 @@ proc setMyLogo {} {
     pack .mylogoC -in .titelF -side right
   }
 }
-setMyLogo
-#catch setMyLogo
+catch setMyLogo
 
 #Create Notebook
 ttk::notebook .n -width 1400

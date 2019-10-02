@@ -1,4 +1,3 @@
-# ~/bin/kontor/auftrag-procs.tcl
 # called by auftrag.tcl
 # Aktualisiert: 1nov17
 # Restored: 1oct19
@@ -1058,6 +1057,8 @@ proc initialiseDB {dbname} {
 ##called by 'Datenbank sichern' button
 proc dumpDB {} {
   global dbname dbuser dumpDir
+  file mkdir $dumpDir
+
   set date [clock format [clock seconds] -format %d-%m-%Y]
   set dumpfile $dbname-${date}.sql
   set dumppath [file join $dumpDir $dumpfile]
