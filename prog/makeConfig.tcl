@@ -56,6 +56,16 @@ proc makeConfig {} {
   append setCond1 set { } cond1 { } \" $cond1 \"
   append setCond2 set { } cond2 { } \" $cond2 \"
   append setCond3 set { } cond3 { } \" $cond3 \"
+
+  #Check company logo (TODO: not for letter yet!)
+  ##check if newly set by button
+  if [info exists ::logoPath] {
+    set myLogo $::logoPath
+  ##else check if already in Config
+  } elseif {![info exists myLogo]} {
+    set myLogo ""
+  }
+  append setMyLogo set { } myLogo { } \" $myLogo \"
   
   #Overwrite config file with new entries, deleting old
   set chan [open $confFile w]
@@ -73,11 +83,15 @@ proc makeConfig {} {
     puts $chan $setCond1
     puts $chan $setCond2
     puts $chan $setCond3
+    puts $chan $setMyLogo
   close $chan
 
   unset setCurrency setVat setMyName setMyComp setMyAdr setMyPhone setMyBank setCond1 setCond2 setCond3
 
   NewsHandler::QueryNews "Einstellungen in $confFile gespeichert." lightgreen
+
+  source $configFile
+  setMyLogo
 
   makeTexVorlage
   return 0

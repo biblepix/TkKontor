@@ -15,12 +15,22 @@ source $confFile
 set px 5
 set py 5
 pack [frame .titelF -padx 10 -pady 10] -fill x
-label .titelL -text "TkOffice\nAuftragsverwaltung" -pady $py -padx 50 -font "TkHeadingFont 40 bold" -fg steelblue -justify left
+#label .titelL -text "TkOffice\nAuftragsverwaltung" -pady $py -padx 50 -font "TkHeadingFont 40 bold" -fg steelblue -justify left
+#createTkOfficeLogo
 
-catch {image create photo vollmar -file ~/www/bilder/logo_rot.gif -format GIF
-  canvas .titelC -width 250 -height 150
-  .titelC create image 0 0 -image vollmar -anchor nw
+#Eigenes Firmenlogo falls vorhanden
+proc setMyLogo {} {
+  global myLogo
+  if {[info exists myLogo] && [file exists $myLogo]} {
+    image create photo logo -file $myLogo
+    canvas .mylogoC -width [image width logo] -height [image height logo]
+    .mylogoC create image 0 0 -image logo -anchor nw
+    pack .mylogoC -in .titelF -side right
+  }
 }
+setMyLogo
+#catch setMyLogo
+
 #Create Notebook
 ttk::notebook .n -width 1400
 .n add [frame .n.t1] -text "Adressen + Aufträge"
@@ -29,9 +39,8 @@ ttk::notebook .n -width 1400
 .n add [frame .n.t4] -text "Einstellungen"
 
 #Pack all frames
-pack .titelL -anchor nw -in .titelF -side left
+#pack .titelL -anchor nw -in .titelF -side left
 createTkOfficeLogo
-pack .titelC -in .titelF -side right
 pack .n -fill y -expand 1
 
 #Tab 1
@@ -291,9 +300,14 @@ entry .billbankE -width 50
 entry .billcond1E
 entry .billcond2E
 entry .billcond3E
+button .billcomplogoB -text "Firmenlogo hinzufügen" -command {
+  set ::logoPath [tk_getOpenFile]
+  return 0
+}
 pack .billingT .billingM -in .n.t4.f5 -anchor nw
 pack .billformatlinksRB .billformatrechtsRB -in .n.t4.f5 -anchor se -side bottom
-pack .billcurrencySB .billvatE .billownerE .billcompE .billstreetE .billcityE .billphoneE .billbankE .billcond1E .billcond2E .billcond3E -in .billing2F
+pack .billcomplogoB .billcurrencySB .billvatE .billownerE .billcompE .billstreetE .billcityE .billphoneE .billbankE .billcond1E .billcond2E .billcond3E -in .billing2F
+
 #Configure all entries to change colour & be emptied when focused
 foreach e [pack slaves .billing2F] {
   catch {$e config -fg grey -bg beige -width 30 -validate focusin -validatecommand "
