@@ -16,10 +16,11 @@ set px 5
 set py 5
 pack [frame .titelF -padx 10 -pady 10] -fill x
 label .titelL -text "TkOffice\nAuftragsverwaltung" -pady $py -padx 50 -font "TkHeadingFont 40 bold" -fg steelblue -justify left
-image create photo vollmar -file ~/www/bilder/logo_rot.gif -format GIF
-canvas .titelC -width 250 -height 150
-.titelC create image 0 0 -image vollmar -anchor nw
 
+catch {image create photo vollmar -file ~/www/bilder/logo_rot.gif -format GIF
+  canvas .titelC -width 250 -height 150
+  .titelC create image 0 0 -image vollmar -anchor nw
+}
 #Create Notebook
 ttk::notebook .n -width 1400
 .n add [frame .n.t1] -text "Adressen + Aufträge"
@@ -29,6 +30,7 @@ ttk::notebook .n -width 1400
 
 #Pack all frames
 pack .titelL -anchor nw -in .titelF -side left
+createTkOfficeLogo
 pack .titelC -in .titelF -side right
 pack .n -fill y -expand 1
 
@@ -44,9 +46,10 @@ pack [frame .n.t2.bottomF] -anchor nw -padx 20 -pady 20 -fill x
 pack [frame .n.t3.f1 -relief ridge -pady $py -padx $px -borderwidth 5] -fill x
 pack [frame .n.t3.bottomF] -anchor nw -padx 20 -pady 20 -fill x
 #Tab 4
-pack [frame .n.t4.f3 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
-pack [frame .n.t4.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
-pack [frame .n.t4.f1 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
+pack [frame .n.t4.f3 -pady $py -padx $px -borderwidth 5 -highlightbackground silver -highlightthickness 5] -anchor nw -fill x
+pack [frame .n.t4.f2 -pady $py -padx $px -borderwidth 5 -highlightbackground silver -highlightthickness 5] -anchor nw -fill x
+pack [frame .n.t4.f1 -pady $py -padx $px -borderwidth 5 -highlightbackground silver -highlightthickness 5] -anchor nw -fill x
+pack [frame .n.t4.f5 -pady $py -padx $px -borderwidth 5 -highlightbackground silver -highlightthickness 5] -anchor nw -fill x -side left -expand 1
 
 
 ###############################################
@@ -229,6 +232,9 @@ pack .news -in .bottomF -side left -anchor nw -fill x
 #1. A R T I K E L   V E R W A L T E N
 label .confArtT -text "Artikel erfassen" -font "TkHeadingFont"
 message .confArtM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B. Std.) dürfen nicht leer sein.\nDie Kontrollkästchen 'Auslage' und 'Rabatt' für den Artikeltyp können leer sein. Wenn 'Rabatt' ein Häkchen bekommt, gilt der Artikel als Abzugswert in Prozent (im Feld 'Preis' Prozentzahl ohne %-Zeichen eingeben, z.B. 5.5). Der Rabatt wird in der Rechnung vom Gesamtbetrag abgezogen.\nFalls das Feld 'Auslage' angehakt wird (z.B. für Artikel 'Zugfahrt'), wird der Artikel in der Rechnung separat als Auslage aufgeführt, unterliegt nicht der Mehrwertsteuerpflicht und wird nicht als Einnahme verbucht."
+
+#TODO: move?
+proc rebuildArticleWin {} {
 label .confArtL -text "Artikel Nr."
 spinbox .confArtNumSB -width 5 -command {setArticleLine TAB4}
 label .confArtNameL -padx 10 -textvar artName
@@ -241,30 +247,33 @@ button .confArtCreateB -text "Artikel erfassen" -command {createArticle}
 pack .confArtT .confArtM -in .n.t4.f1 -anchor w
 pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArtTypeL -in .n.t4.f1 -side left
 pack .confArtSaveB .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
+}
+rebuildArticleWin
 
 #DATENBANK SICHERN
 label .dumpDBT -text "Datenbank sichern" -font "TkHeadingFont"
-message .dumpDBM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner [file join $tkofficeDir dumps] abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando 'psql $dbname < $dbname-\[DATUM\].sql' wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
+message .dumpDBM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner [file join $tkofficeDir dumps] abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando \n\tsu postgres -c 'psql $dbname < $dbname-\[DATUM\].sql' \n wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
 button .dumpDBB -text "Datenbank sichern" -command {dumpDB}
+pack .dumpDBT -in .n.t4.f2 -anchor nw
+pack .dumpDBM -in .n.t4.f2 -anchor nw -side left
+pack .dumpDBB -in .n.t4.f2 -anchor se -side right
 
 #DATENBANK EINRICHTEN
 label .confDBT -text "Datenbank einrichten" -font "TkHeadingFont"
-message .confDBM -width 800 -text "Fürs Einrichten der PostgreSQL-Datenbank sind folgende Schritte nötig:\n1. Das Programm Postgres bzw Postgresql über die Systemsteuerung installieren.\n1. Einen Nutzernamen für Postgres einrichten, welcher von TkOffice auf die Datenbank zugreifen darf: In einer Konsole als root (su oder sudo) folgende Kommando eingeben: 
-\n (wahrscheinlich nicht nötig:) sudo useradd postgres
-\n sudo -u postgres createuser testuser (nur nötig wenn man nicht als 'postgres' auf die Datenbank zugreichen möchte)
-\n sudo -u postgres createdb --owner=testuser testdbuseradd postgres 
-\n3. Den eben erstellten User und einen beliebigen Namen für die TkOffice-Datenbank hier eingeben (z.B. tkofficedb).\n4. Den Knopf 'Datenbank erstellen' betätigen, um die Datenbank und die von TkOffice benötigten Tabellen einzurichten.\n5. TkOffice neu starten und hier weitermachen (Artikel erfassen, Angaben für die Rechnungsstellung)."
+message .confDBM -width 800 -text "Fürs Einrichten der PostgreSQL-Datenbank sind folgende Schritte nötig:\n1. Das Programm PostgreSQL über die Systemsteuerung installieren.\n2. (optional) Einen Nutzernamen für PostgreSQL einrichten, welcher von TkOffice auf die Datenbank zugreifen darf. Normalerweise wird der privilegierte Nutzer 'postgres' automatisch erstellt. Sonst in einer Konsole als root (su oder sudo) folgendes Kommando eingeben: \n\t sudo useradd postgres \n3. Den Nutzernamen und einen beliebigen Namen für die TkOffice-Datenbank hier eingeben (z.B. tkofficedb).\n4. Den Knopf 'Datenbank erstellen' betätigen, um die Datenbank und die von TkOffice benötigten Tabellen einzurichten.\n5. TkOffice neu starten und hier weitermachen (Artikel erfassen, Angaben für die Rechnungsstellung)."
 label .confDBNameL -text "Name der Datenbank" -font "TKSmallCaptionFont"
 label .confDBUserL -text "Benutzer" -font "TkSmallCaptionFont"
 entry .confDBNameE -textvar dbname
 entry .confDBUserE -textvar dbuser -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
 button .initDBB -text "Datenbank erstellen" -command {initDB}
+pack .confDBT -in .n.t4.f3 -anchor nw 
+pack .confDBM -in .n.t4.f3 -anchor ne -side left
+pack .initDBB  .confDBNameE .confDBUserE -in .n.t4.f3 -anchor se -side right
 
 #RECHNUNGSSTELLUNG
-pack [frame .n.t4.f5] -side left -anchor nw
 pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
 label .billingT -text "Rechnungsstellung" -font "TkHeadingFont"
-message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\n\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung. Der Mehrwertsteuersatz ist obligatorisch (z.B. 0 (erscheint nicht) / 0.0 (erscheint)) / 7.5 usw.).\nIn den Feldern 'Zahlungskondition 1-3' können verschiedene Zahlungsbedingungen erfasst werden, welche bei der Rechnungserstellung jeweils zur Auswahl stehen (z.B. 10 Tage / 30 Tage / bar bei Abholung). Wenn sie leer bleiben, muss die Kondition von Hand eingegeben werden.\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
+message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\n\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung.\nDer Mehrwertsteuersatz ist obligatorisch (z.B. 0 (erscheint nicht) / 0.0 (erscheint)) / 7.5 usw.).\nIn den Feldern 'Zahlungskondition 1-3' können verschiedene Zahlungsbedingungen erfasst werden, welche bei der Rechnungserstellung jeweils zur Auswahl stehen (z.B. 10 Tage / 30 Tage / bar bei Abholung). Wenn sie leer bleiben, muss die Kondition von Hand eingegeben werden.\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
 
 radiobutton .billformatlinksRB -text "Adressfenster links (International)" -value Links -variable adrpos
 radiobutton .billformatrechtsRB -text "Adressfenster rechts (Schweiz)" -value Rechts -variable adrpos
@@ -314,13 +323,6 @@ if {[info exists cond1] && $cond1!=""} {.billcond1E insert 0 $cond1; .billcond1E
 if {[info exists cond2] && $cond2!=""} {.billcond2E insert 0 $cond2; .billcond2E conf -bg "#d9d9d9"} {.billcond2E insert 0 "Zahlungskondition 2"}
 if {[info exists cond3] && $cond3!=""} {.billcond3E insert 0 $cond3; .billcond3E conf -bg "#d9d9d9"} {.billcond3E insert 0 "Zahlungskondition 3"}
 if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcurrencySB set $currency}
-
-pack .dumpDBT .dumpDBM -in .n.t4.f2 -anchor nw
-pack .dumpDBB -in .n.t4.f2 -anchor e -side right
-pack .confDBT -in .n.t4.f3 -anchor w 
-pack .confDBM .confDBNameE .confDBUserE -in .n.t4.f3 -side left
-pack .initDBB -in .n.t4.f3 -side right
-
 
 
 

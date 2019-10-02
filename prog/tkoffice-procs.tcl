@@ -1,11 +1,25 @@
 # ~/bin/kontor/auftrag-procs.tcl
 # called by auftrag.tcl
 # Aktualisiert: 1nov17
-# Restored: 23sep19
+# Restored: 1oct19
 
 ##################################################################################################
 ###  A D D R E S S  P R O C S  
 ##################################################################################################
+
+proc createTkOfficeLogo {} {
+  canvas .logoC -width 200 -height 50 -bg grey
+  pack .logoC -in .titelF -side left
+
+  set kreis [.logoC create oval 0 0 40 40]
+  .logoC itemconf $kreis -fill red -outline beige
+
+  set schrift1 [.logoC create text 20 20]
+  .logoC itemconf $schrift1 -font "TkHeadingFont 20" -fill blue -text "Tk"
+
+  set schrift2 [.logoC create text 65 20]
+  .logoC itemconf $schrift2 -font "TkHeadingFont 20" -fill beige -text "ffice"
+}
 
 proc setAdrList {} {
   global db adrSpin
@@ -213,10 +227,11 @@ proc clearAdrWin {} {
   $adrSpin delete 0 end
   $adrSpin configure -bg #d9d9d9
   foreach e [pack slaves .adrF2] {
-    $e conf -bg beige -fg silver -state normal -validate focusin -validatecommand "
+    $e conf -bg beige -fg silver -state normal -validate focusin -validatecommand {
     %W delete 0 end
+    %W conf -fg black
     return 0
-    "
+    }
   }
   catch {pack forget .adrClearSelB}
   .adrF2 conf -bg #d9d9d9
@@ -245,7 +260,6 @@ proc resetAdrWin {} {
 
 proc newAddress {} {
 
-  clearAdrWin
   set ::name1 "Anrede"
   set ::name2 "Name"
   set ::street "Strasse"
@@ -255,19 +269,22 @@ proc newAddress {} {
   set ::tel2 "Telefon"
   set ::www "Internet"
   set ::mail "E-Mail"
-  .b1 configure -text "Anschrift speichern" -command {saveAddress $adrNo}
+
+  clearAdrWin
+
+  .b1 configure -text "Anschrift speichern" -command {saveAddress}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
   return 0
 }
 
 proc changeAddress {adrNo} {
-  
-  #pack .name1E .name2E .streetE -in .adrF2 -anchor nw
-  #pack .zipE .cityE -anchor nw -in .adrF2 -side left
-  .b1 configure -text "Anschrift speichern" -command {saveAddress $adrNo}
+
+  clearAdrWin
+
+  .b1 configure -text "Anschrift speichern" -command {saveAddress}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
-clearAdrWin  
-return 0
+
+  return 0
 }
 
 proc saveAddress {} {
@@ -287,8 +304,33 @@ proc saveAddress {} {
 	#A: save new
 	if {$adrno == ""} {
 		set newNo [createNewNumber address]
-		set token [pg_exec $db "INSERT INTO address (objectid, ts, name1, name2, street, zip, city, telephone, mobile, email, www) 	
-		VALUES ($newNo, $newNo, '$name1', '$name2', '$street', '$zip', '$city', '$tel1', '$tel2', '$mail', '$www') RETURNING objectid"]
+		set token [pg_exec $db "INSERT INTO address (
+      objectid, 
+      ts, 
+      name1, 
+      name2, 
+      street, 
+      zip, 
+      city, 
+      telephone, 
+      mobile, 
+      email, 
+      www
+      ) 	
+		VALUES (
+      $newNo, 
+      $newNo, 
+      '$name1', 
+      '$name2', 
+      '$street', 
+      '$zip', 
+      '$city', 
+      '$tel1', 
+      '$tel2', 
+      '$mail', 
+      '$www'
+      )"
+    ]
     set adrno $newNo
 
 	#B: change old
@@ -555,6 +597,7 @@ proc saveInv2Tex {invNo} {
 
   source $confFile
   if {![string is digit $vat]} {set vat 0.0}
+
   if {$currency=="$"} {set currency \\textdollar}
   if {$currency=="£"} {set currency \\textsterling}
   if {$currency=="€"} {set currency \\texteuro}
@@ -605,23 +648,41 @@ proc saveInv2Tex {invNo} {
   puts $chan $itemList
   close $chan
 
-  #3. LaTex $vorlage & save invoice to $spool - TODO: to DB? no spool?
+  #3. LaTex $vorlage & save invoice to $spool
+
   ##1. overwrite $vorlage.dvi
   eval exec latex -output-directory=$spoolDir -draftmode $texVorlage
 
-	NewsHandler::QueryNews "Speicherte Rechnung $invNo als DVI." lightblue
-return dvidone
-
-  ##2. create $invName PDF
+  ##2. Create $invName DVI
+  append vorlageDvi [file root $texVorlage] . dvi
   set compShortname [lindex ${compName} 0]
-  append invName $spoolDir / invoice _ $compShortname - $invNo . pdf
-  exec dvipdf $spoolDir/rechnung-vorlage.dvi $spoolDir/$invName 
-	NewsHandler::QueryNews "Speicher5e Rechnung $invNo als PDF..." lightblue
+  append invName invoice _ $compShortname - $invNo
+  append invDviPath [file join $texDir] / $invName . dvi
+  append invPdfPath [file join $spoolDir] / $invName . pdf
+
+  ##3. Create $invName PDF  
+  cp $vorlageDvi $invPathDvi
+  eval exec dvipdf $invDviPath $invPdfPath
+ 
+  ##4. save $invDvi to DB
+  set chan [open $invDviPath]
+  set invDviText [read $chan]
+  close $chan
+  ##convert to hex to avoid encoding probs
+  set hexText [binary encode hex $invDviTex]
+
+#TODO: gehtnicht ,keine negativ-Suchen möglich!!!  
+regsub -all {![[:xdigit:]]} $hexText {} hexText
+
+  set token [pg_exec $db "UPDATE invoice SET dok = '$hexText' WHERE objectid = $invNo"]
+  #file delete $invDviPath
+
+  reportResult $token "Rechnung $invNo in $invPdfPath gespeichert." lightblue
 
   #Change "Rechnung speichern" button to "Rechnung drucken" button
   .saveInv configure -text "Rechnung drucken" -command {printInvoice}
 
-} ;#END saveInvToTex
+} ;#END saveInv2Tex
 
 
 # printInvoice ??TODO
@@ -849,17 +910,23 @@ proc saveArticle {} {
   foreach w [pack slaves .n.t4.f1] {
     pack forget $w
   }
-  pack .confArtNameL .confArtPriceL .confArtUnitL .confArtTypeL -in .n.t4.f1 -side left
+
+pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArtTypeL -in .n.t4.f1 -side left
+#pack .confArtSaveB .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
+#  pack .confArtNameL .confArtPriceL .confArtUnitL .confArtTypeL -in .n.t4.f1 -side left
   
   #Recreate article list
   updateArticleList
   reportResult $token "Artikel $artName gespeichert"
 }
 
-# deleteArticle - TODO!
+# deleteArticle
 proc deleteArticle {} {
-
-
+  global db
+  set artNo [.confArtNumSB get]
+  set token [pg_exec $db "DELETE FROM artikel WHERE artnum=$artNo"]
+  reportResult $token "Artikel $artNo gelöscht."
+  updateArticleList
 }
 
 # updateArticleList
