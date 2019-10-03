@@ -1,6 +1,6 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
-# Restored: 19sep19
+# Restored: 2oct19
 set version 1.0
 
 #Source Tk/Pgintcl packages
@@ -15,8 +15,7 @@ source $confFile
 set px 5
 set py 5
 pack [frame .titelF -padx 10 -pady 10] -fill x
-#label .titelL -text "TkOffice\nAuftragsverwaltung" -pady $py -padx 50 -font "TkHeadingFont 40 bold" -fg steelblue -justify left
-#createTkOfficeLogo
+label .titelL -text "Auftragsverwaltung" -pady $py -padx $px -font "TkHeadingFont 80 bold" -fg silver -anchor w
 
 #Eigenes Firmenlogo falls vorhanden
 proc setMyLogo {} {
@@ -38,8 +37,8 @@ ttk::notebook .n -width 1400
 .n add [frame .n.t4] -text "Einstellungen"
 
 #Pack all frames
-#pack .titelL -anchor nw -in .titelF -side left
 createTkOfficeLogo
+#pack .titelL -anchor nw -in .titelF -side left
 pack .n -fill y -expand 1
 
 #Tab 1
@@ -80,9 +79,9 @@ focus $adrSpin
 
 #Create search field
 set suche "Adresssuche"
-set adrSearch [entry .searchE]
-  .searchE config -width 25 -borderwidth 3 -bg beige -fg grey -textvariable suche
-  .searchE config -validate focusin -validatecommand {
+set adrSearch [entry .adrSearchE]
+  $adrSearch config -width 25 -borderwidth 3 -bg beige -fg grey -textvariable suche
+  $adrSearch config -validate focusin -validatecommand {
     set ::suche ""
     %W config -fg black -validate focusout -validatecommand {
       searchAddress %s

@@ -1,23 +1,30 @@
 # called by auftrag.tcl
 # Aktualisiert: 1nov17
-# Restored: 1oct19
+# Restored: 3oct19
 
 ##################################################################################################
 ###  A D D R E S S  P R O C S  
 ##################################################################################################
 
 proc createTkOfficeLogo {} {
-  canvas .logoC -width 200 -height 50 -bg grey
-  pack .logoC -in .titelF -side left
+  canvas .logoC -width 1000 -height 200 -bg lightcyan2
+  pack .logoC -in .titelF -side left -anchor nw
 
   set kreis [.logoC create oval 0 0 40 40]
   .logoC itemconf $kreis -fill red -outline beige
 
-  set schrift1 [.logoC create text 20 20]
-  .logoC itemconf $schrift1 -font "TkHeadingFont 20" -fill blue -text "Tk"
+  set ::schrift1 [.logoC create text 17 17]
+  .logoC itemconf $::schrift1 -font "TkHeadingFont 20" -fill blue -text "Tk"
 
-  set schrift2 [.logoC create text 65 20]
-  .logoC itemconf $schrift2 -font "TkHeadingFont 20" -fill beige -text "ffice"
+  set ::schrift2 [.logoC create text 65 20]
+  .logoC itemconf $::schrift2 -font "TkHeadingFont 20" -fill beige -text "ffice"
+
+  set ::schrift3 [.logoC create text 2 70 -anchor w]
+  .logoC itemconf $::schrift3 -font "TkCaptionFont 18" -fill lightblue -text "Business Software"
+  
+  set ::schrift4 [.logoC create text 0 130 -anchor w]
+  .logoC itemconf $::schrift4 -font "TkHeadingFont 80 bold" -fill lightblue2 -text "Auftragsverwaltung" -angle 4.5
+  .logoC lower $::schrift4
 }
 
 proc setAdrList {} {
@@ -177,7 +184,7 @@ proc fillAdrInvWin {adrId} {
 
 proc searchAddress {s} {
   global db adrSpin adrSearch
-  set s [.searchE get]
+  set s [$adrSearch get]
 
   if {$s == ""} {return 0}
 
@@ -209,7 +216,7 @@ proc searchAddress {s} {
   set ::suche "Adressuche"
 
   #Reset adrSearch widget & address list (called by .adrClearSelB)
-  .searchE conf -fg grey -validate focusin -validatecommand {
+  $adrSearch conf -fg grey -validate focusin -validatecommand {
     set ::suche ""
     %W config -fg black -validate focusout -validatecommand {
       searchAddress %s
@@ -221,10 +228,10 @@ proc searchAddress {s} {
   return 0
 } ;# END searchAddress
 
+# clearAdrWin
+##called by "Neue Anschrift" & "Anschrift ändern" buttons
 proc clearAdrWin {} {
-  global adrSpin  
-  $adrSpin delete 0 end
-  $adrSpin configure -bg #d9d9d9
+  global adrSpin adrSearch
   foreach e [pack slaves .adrF2] {
     $e conf -bg beige -fg silver -state normal -validate focusin -validatecommand {
     %W delete 0 end
@@ -233,6 +240,7 @@ proc clearAdrWin {} {
     }
   }
   catch {pack forget .adrClearSelB}
+  $adrSearch conf -state disabled
   .adrF2 conf -bg #d9d9d9
   return 0
 }
@@ -240,7 +248,7 @@ proc clearAdrWin {} {
 # resetAdrWin
 ##called by GUI (first fill) + Abbruch btn + aveAddress
 proc resetAdrWin {} {
-  global adrSpin
+  global adrSpin adrSearch
   pack .name1E .name2E .streetE -in .adrF2 -anchor nw
   pack .zipE .cityE -anchor nw -in .adrF2 -side left
   pack .tel1E .tel2E .mailE .wwwE -in .adrF2 -side right
@@ -248,8 +256,10 @@ proc resetAdrWin {} {
     $e conf -bg lightblue -validate none -fg black -state readonly -readonlybackground lightblue -relief flat -bd 0
   } 
   .b1 configure -text "Anschrift ändern" -command {changeAddress $adrNo}
-  .b2 configure -text "Anschrift löschen" -command {deleteAdress $adrNo}
+  .b2 configure -text "Anschrift löschen" -command {deleteAddress $adrNo}
+  pack .b0 -in .adrF3  
   $adrSpin conf -bg lightblue
+  $adrSearch conf -state normal
   .adrF2 conf -bg lightblue
   catch {pack forget .adrClearSelB}
 
@@ -258,6 +268,7 @@ proc resetAdrWin {} {
 }
 
 proc newAddress {} {
+  global adrSpin
 
   set ::name1 "Anrede"
   set ::name2 "Name"
@@ -270,22 +281,26 @@ proc newAddress {} {
   set ::mail "E-Mail"
 
   clearAdrWin
+  $adrSpin delete 0 end
+  $adrSpin configure -bg #d9d9d9  
 
   .b1 configure -text "Anschrift speichern" -command {saveAddress}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
+  pack forget .b0
   return 0
 }
 
 proc changeAddress {adrNo} {
-
   clearAdrWin
-
   .b1 configure -text "Anschrift speichern" -command {saveAddress}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
-
+  pack forget .b0
   return 0
 }
 
+# saveAddress
+##saves existing or new address
+##called by "Anschrift speichern" button
 proc saveAddress {} {
   global db adrSpin
 
@@ -364,11 +379,18 @@ proc deleteAddress {adrNo} {
   global db
   #Check if any invoice is attached
   set token [pg_exec $db "SELECT f_number from invoice where customeroid=$adrNo"]
+
   if {[pg_result $token -list] == ""} {
-  	pg_exec $db "DELETE FROM address WHERE objectid=$adrNo"
+
+    set res [tk_messageBox -message "Wollen Sie die Adresse $adrNo wirklich löschen?" -type yesno]
+    if {!$res} {return 1}
+  	
+    set token [pg_exec $db "DELETE FROM address WHERE objectid=$adrNo"]
     reportResult $token "Adresse $adrNo gelöscht."
+    resetAdrWin
+
   } else {
-    reportResult $token "Adresse $adrNo nicht gelöscht, da mit Rechnung(en) [pg_result $token -list] verknüpft."  
+    reportResult $token "Adresse $adrNo nicht gelöscht, da mit Rechnung(en) [pg_result $token -list] verknüpft." 
   }
 }
 
@@ -499,6 +521,23 @@ proc addInvRow {} {
       catch {label .artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify left -anchor w}
       catch {label .artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
       catch {label .arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
+
+      #Handle "A" and "R" types:
+      set type [.arttypeL${rowNo} cget -text] 
+
+      ##deduce Rabatt from subtot (for GUI + DB, Invoice makes its own calculation)
+      if {$type == "R"} {
+        set rabatt [expr ($::subtot * $artPrice) / 100]
+        set ::subtot [expr $::subtot - $rabatt]
+       #TODO: 1. erfasse Rabatt ohne Menge, 2. don't show menge in row
+
+
+
+      ##deduce Auslagen from subtot (for GUI + DB!)
+      } elseif {$type == "A"} {
+        set ::subtot [expr $newsubtot - $artPrice]
+      }
+
       catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
       pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo}  -in .invF${rowNo} -anchor w -fill x -side left
     }
@@ -1029,11 +1068,10 @@ proc reportResult {token text} {
   	NewsHandler::QueryNews "[pg_result $token -error]" red
 
   #if empty - TODO: falsches ERgebnis bei Zahlungseingang!
-  } elseif {[pg_result $token -numTuples] == 0} {
-    NewsHandler::QueryNews "Suchergebnis leer" orange
+#FOR deletions? insertions? 
+  } elseif {[pg_result $token -oid] != ""} {
 
-  } else {
-   	NewsHandler::QueryNews "$text" green
+    NewsHandler::QueryNews "$text [pg_result $token -oid]" green
   } 
 }
 
