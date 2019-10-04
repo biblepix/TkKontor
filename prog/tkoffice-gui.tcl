@@ -46,9 +46,11 @@ pack [frame .n.t1.f2 -borderwidth 5 -relief ridge -pady 10 -padx 10] -anchor nw 
 pack [frame .n.t1.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
 pack [frame .n.t1.f4] -anchor nw -padx 20 -pady 20 -fill x
 #Tab 2
-pack [frame .n.t2.f1 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
+pack [frame .n.t2.f1 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
-pack [frame .n.t2.bottomF] -anchor nw -padx 20 -pady 20 -fill x
+pack [frame .n.t2.f3 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
+pack [frame .n.t2.bottomF] -anchor nw -padx 20 -pady 20 -fill both -expand 1
+
 #Tab 3
 pack [frame .n.t3.f1 -relief ridge -pady $py -padx $px -borderwidth 5] -fill x
 pack [frame .n.t3.bottomF] -anchor nw -padx 20 -pady 20 -fill x
@@ -143,7 +145,8 @@ pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invStatusH -in .n.t1.headF -
 ########################################################################################
 
 #Main Title
-#label .titel3 -text "Neue Rechnung" -font "TkCaptionFont"
+label .titel3 -text "Neue Rechnung erfassen" -font "TkCaptionFont" -pady 15
+pack .titel3 -in .n.t2.f1
 
 #Get Zahlungsbedingungen from config
 set condList ""
@@ -174,26 +177,26 @@ label .invcomL -text "Bemerkung"
 entry .invcomE -width 20 -bg beige -textvar comm
 
 #Set up Artikelliste, fill later when connected to DB
-label .invArtlistL -text "Artikelliste" -font TkCaptionFont
+label .invArtlistL -text "Artikelliste" -font "TkHeadingFont"
 label .artL -text "Artikel Nr."
 spinbox .invArtNumSB -width 2 -command {setArticleLine TAB2}
 
 #Make invoiceFrame
 catch {frame .invoiceFrame}
-pack .invoiceFrame -in .n.t2.f2 -side bottom -fill both
+pack .invoiceFrame -in .n.t2.f3 -side bottom -fill both
 
 #Set KundenName in Invoice window
 label .clientL -text "Kunde:" -font "TkCaptionFont" -bg lightblue
 label .clientNameL -textvariable name2 -font "TkCaptionFont"
 pack .clientNameL .clientL -in .n.t2.f1 -side right
 
-label .invArtPriceL -textvariable artPrice -padx 20
-entry .invArtPriceE -textvariable artPrice
-label .invArtNameL -textvariable artName -padx 50
-label .invArtUnitL -textvariable artUnit -padx 20
+label .invArtPriceL -textvar artPrice -padx 20
+entry .invArtPriceE -textvar artPrice
+label .invArtNameL -textvar artName -padx 50
+label .invArtUnitL -textvar artUnit -padx 20
 label .invArtTypeL -textvar artType -padx 20
 
-label .subtotalL -width 7 -textvariable ::subtot -bg lightblue
+label .subtotalL -width 7 -textvariable subtot -bg lightblue
 message .subtotalM -width 200 -text "Zwischensumme: "
 pack .subtotalM .subtotalL -side left -in .n.t2.bottomF
 

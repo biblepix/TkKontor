@@ -7,24 +7,30 @@
 ##################################################################################################
 
 proc createTkOfficeLogo {} {
-  canvas .logoC -width 1000 -height 200 -bg lightcyan2
+  canvas .logoC -width 1000 -height 130 -borderwidth 7 -bg steelblue2
   pack .logoC -in .titelF -side left -anchor nw
 
-  set kreis [.logoC create oval 0 0 40 40]
-  .logoC itemconf $kreis -fill red -outline beige
+set blau lightblue2
 
-  set ::schrift1 [.logoC create text 17 17]
-  .logoC itemconf $::schrift1 -font "TkHeadingFont 20" -fill blue -text "Tk"
+  set kreis [.logoC create oval 7 7 50 50]
+  .logoC itemconf $kreis -fill red -outline gold
 
-  set ::schrift2 [.logoC create text 65 20]
-  .logoC itemconf $::schrift2 -font "TkHeadingFont 20" -fill beige -text "ffice"
+  set ::schrift1 [.logoC create text 20 25]
+  .logoC itemconf $::schrift1 -font "TkHeadingFont 20 bold" -fill $blau -text "Tk"
 
-  set ::schrift3 [.logoC create text 2 70 -anchor w]
-  .logoC itemconf $::schrift3 -font "TkCaptionFont 18" -fill lightblue -text "Business Software"
+  set ::schrift2 [.logoC create text 100 30]
+  .logoC itemconf $::schrift2 -font "TkHeadingFont 20 bold" -fill gold -text "f f i c e"
+
+  set ::schrift3 [.logoC create text 8 65 -anchor w]
+  .logoC itemconf $::schrift3 -font "TkCaptionFont 18 bold" -fill $blau -text "Business Software"
   
-  set ::schrift4 [.logoC create text 0 130 -anchor w]
-  .logoC itemconf $::schrift4 -font "TkHeadingFont 80 bold" -fill lightblue2 -text "Auftragsverwaltung" -angle 4.5
+  set ::schrift4 [.logoC create text 0 110 -anchor w]
+  .logoC itemconf $::schrift4 -font "TkHeadingFont 80 bold" -fill steelblue3 -text "Auftragsverwaltung" -angle 4.
   .logoC lower $::schrift4
+
+  set schrift5 [.logoC create text 900 128 -justify right -text TkOffice.vollmar.ch]
+  .logoC itemconf $schrift5 -fill $blau -font "TkCaptionFont 14 bold"
+
 }
 
 proc setAdrList {} {
@@ -304,16 +310,17 @@ proc changeAddress {adrNo} {
 proc saveAddress {} {
   global db adrSpin
 
+  #get new values from entery widgets
 	set adrno [$adrSpin get]		
-	set name1 $::name1
-	set name2 $::name2
-	set street $::street
-	set zip $::zip
-	set city $::city
-	set tel1 $::tel1
-  set tel2 $::tel2
-  set mail $::mail
-  set www $::www
+	set name1 [.name1E get]
+	set name2 [.name2E get]
+	set street [.streetE get]
+	set zip [.zipE get]
+	set city [.cityE get]
+	set tel1 [.tel1E get]
+  set tel2 [.tel2E get]
+  set mail [.mailE get]
+  set www [.wwwE get]
 
 	#A: save new
 	if {$adrno == ""} {
@@ -413,11 +420,14 @@ proc resetNewInvDialog {} {
   catch {message .einzel -textvariable einzel}
 
   #Create Menge entry
-  catch {entry .mengeE -width 7 -textvariable ::menge -bg yellow -fg grey}
-  set ::menge "Menge"
-  proc unsetMenge {menge} {set ::menge ""; .mengeE conf -fg black; return 0}
-  .mengeE configure -validate focusin -validatecommand {
-    unsetMenge $menge
+  catch {entry .mengeE -width 7 -bg yellow -fg grey}
+  set menge "Menge"
+  
+.mengeE configure -validate focusin -validatecommand {
+    #set ::menge ""
+    %W conf -fg black
+    %W delete 0 end
+    return 0
   }
 
   set ::subtot 0
@@ -438,32 +448,51 @@ proc resetNewInvDialog {} {
 ##sets Artikel line in New Invoice window
 ##set $args for Artikelverwaltung window
 proc setArticleLine tab {
-global db artPrice
-puts $artPrice
-  #Configuration tab
+  global db artPrice
+  #set ::menge "Menge"
+.mengeE delete 0 end
+.mengeE insert 0 "Menge"
+
   if {$tab == "TAB4"} {
     set artNum [.confArtNumSB get]
-#    set artPrice [.confArtPriceL cget -text]
 
   #Invoice Tab
   } elseif {$tab == "TAB2"} {
     set artNum [.invArtNumSB get]
-#   set artPrice [.invArtPriceL cget -text]
-      if {$artPrice == 0} {
-        set artPrice [.invArtPriceE get]
-        pack forget .invArtPriceL
-        pack .invArtPriceE .invArtUnitL .invArtPriceL -in .n.t2.f2 -side left   
-    } else {
-       pack .invArtNameL .invArtPriceL .invArtUnitL .invArtTypeL -in .n.t2.f2 -side left
-    }
   }
-  
+
+  #Get data per line
   set token [pg_exec $db "SELECT artname,artprice,artunit,arttype FROM artikel WHERE artnum=$artNum"]
   set ::artName [lindex [pg_result $token -list] 0]
   set ::artPrice [lindex [pg_result $token -list] 1]
   set ::artUnit [lindex [pg_result $token -list] 2]
   set ::artType [lindex [pg_result $token -list] 3]
+
+  if {$tab == "TAB4"} {
+    return 0
+  }
+
+  .mengeE conf -state normal -bg beige -fg silver
+
+    if {$::artType == "R"} { 
+.mengeE delete 0 end
+.mengeE insert 0 1
+     .mengeE conf -bg grey -fg silver -state readonly
+      set ::menge 1
+
+    }
+
+    if {$::artPrice == 0} {
+      set ::artPrice [.invArtPriceE get]
+      pack forget .invArtPriceL
+      pack .invArtNameL .invArtPriceE .invArtUnitL .invArtPriceL .invArtTypeL -in .n.t2.f2 -side left   
+
+    } else {
+      pack .invArtNameL .invArtPriceL .invArtUnitL .invArtTypeL -in .n.t2.f2 -side left
+    }
+  
   return 0
+
 } ;#END setArticleLine
 
 # addInvRow
@@ -498,6 +527,7 @@ proc addInvRow {} {
     set rowNo [incr lastrow 1]
 
     namespace eval $rowNo  {
+
       #get global vars
       set artName [.invArtNameL cget -text]
       set menge [.mengeE get]
@@ -505,15 +535,19 @@ proc addInvRow {} {
       set artUnit [.invArtUnitL cget -text]
       set artType [.invArtTypeL cget -text]
       set rowNo $::rows::rowNo
+
       set rowtot [expr $menge * $artPrice]
 
       #Export subtot with 2 decimal points
+#TODO: interferes with Rabatt
       set newsubtot [expr $rowtot + $::subtot]
-      set ::subtot [expr {double(round(100*$newsubtot))/100}]
+
+
+
 
       #Create row frame
       catch {frame .invF${rowNo}}
-      pack .invF${rowNo} -in .invoiceFrame -fill x -expand 1 -anchor w    
+      pack .invF${rowNo} -in .invoiceFrame -fill x -anchor w    
 
       #Create labels per row
       catch {label .mengeL${rowNo} -text $menge -bg lightblue -width 20 -justify left -anchor w}
@@ -524,11 +558,15 @@ proc addInvRow {} {
 
       #Handle "A" and "R" types:
       set type [.arttypeL${rowNo} cget -text] 
+puts "Type $type"
 
       ##deduce Rabatt from subtot (for GUI + DB, Invoice makes its own calculation)
       if {$type == "R"} {
         set rabatt [expr ($::subtot * $artPrice) / 100]
-        set ::subtot [expr $::subtot - $rabatt]
+puts "Subtot: $subtot Rabatt: $rabatt"
+.arttypeL${rowNo} conf -bg orange
+    
+    set ::subtot [expr $::subtot - $rabatt]
        #TODO: 1. erfasse Rabatt ohne Menge, 2. don't show menge in row
 
 
@@ -536,7 +574,10 @@ proc addInvRow {} {
       ##deduce Auslagen from subtot (for GUI + DB!)
       } elseif {$type == "A"} {
         set ::subtot [expr $newsubtot - $artPrice]
-      }
+      } 
+
+    set ::subtot [expr {double(round(100*$newsubtot))/100}]
+      
 
       catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
       pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo}  -in .invF${rowNo} -anchor w -fill x -side left
@@ -956,7 +997,8 @@ pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArt
   #Recreate article list
   updateArticleList
   reportResult $token "Artikel $artName gespeichert"
-}
+
+} ;#END saveArticle
 
 # deleteArticle
 proc deleteArticle {} {
