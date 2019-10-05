@@ -11,22 +11,25 @@ proc createTkOfficeLogo {} {
   pack .logoC -in .titelF -side left -anchor nw
 
 set blau lightblue2
+set dunkelblau steelblue3
 
   set kreis [.logoC create oval 7 7 50 50]
-  .logoC itemconf $kreis -fill red -outline gold
+  .logoC itemconf $kreis -fill orange -outline red
 
-  set ::schrift1 [.logoC create text 20 25]
-  .logoC itemconf $::schrift1 -font "TkHeadingFont 20 bold" -fill $blau -text "Tk"
+  set schrift0 [.logoC create text 23 28]
+  .logoC itemconf $schrift0 -font "TkCaptionFont 20 bold" -fill $dunkelblau -text "T"
+  set schrift1 [.logoC create text 35 32]
+  .logoC itemconf $schrift1 -font "TkCaptionFont 18 bold" -fill $dunkelblau -text "k"
 
-  set ::schrift2 [.logoC create text 100 30]
-  .logoC itemconf $::schrift2 -font "TkHeadingFont 20 bold" -fill gold -text "f f i c e"
+  set schrift2 [.logoC create text 95 30]
+  .logoC itemconf $schrift2 -font "TkHeadingFont 20 bold" -fill orange -text "f f i c e"
 
-  set ::schrift3 [.logoC create text 8 65 -anchor w]
-  .logoC itemconf $::schrift3 -font "TkCaptionFont 18 bold" -fill $blau -text "Business Software"
+  set schrift3 [.logoC create text 8 65 -anchor w]
+  .logoC itemconf $schrift3 -font "TkCaptionFont 18 bold" -fill $blau -text "Business Software"
   
-  set ::schrift4 [.logoC create text 0 110 -anchor w]
-  .logoC itemconf $::schrift4 -font "TkHeadingFont 80 bold" -fill steelblue3 -text "Auftragsverwaltung" -angle 4.
-  .logoC lower $::schrift4
+  set schrift4 [.logoC create text 0 110 -anchor w]
+  .logoC itemconf $schrift4 -font "TkHeadingFont 80 bold" -fill $dunkelblau -text "Auftragsverwaltung" -angle 4.
+  .logoC lower $schrift4
 
   set schrift5 [.logoC create text 900 128 -justify right -text TkOffice.vollmar.ch]
   .logoC itemconf $schrift5 -fill $blau -font "TkCaptionFont 14 bold"
@@ -542,9 +545,6 @@ proc addInvRow {} {
 #TODO: interferes with Rabatt
       set newsubtot [expr $rowtot + $::subtot]
 
-
-
-
       #Create row frame
       catch {frame .invF${rowNo}}
       pack .invF${rowNo} -in .invoiceFrame -fill x -anchor w    
@@ -552,32 +552,33 @@ proc addInvRow {} {
       #Create labels per row
       catch {label .mengeL${rowNo} -text $menge -bg lightblue -width 20 -justify left -anchor w}
       catch {label .artnameL${rowNo} -text $artName -bg lightblue -width 53 -justify left -anchor w}
-      catch {label .artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify left -anchor w}
+      catch {label .artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify right -anchor w}
       catch {label .artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
       catch {label .arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
 
       #Handle "A" and "R" types:
       set type [.arttypeL${rowNo} cget -text] 
-puts "Type $type"
 
       ##deduce Rabatt from subtot (for GUI + DB, Invoice makes its own calculation)
       if {$type == "R"} {
-        set rabatt [expr ($::subtot * $artPrice) / 100]
-puts "Subtot: $subtot Rabatt: $rabatt"
-.arttypeL${rowNo} conf -bg orange
-    
-    set ::subtot [expr $::subtot - $rabatt]
-       #TODO: 1. erfasse Rabatt ohne Menge, 2. don't show menge in row
+        set rabatt [expr ($::subtot * $artPrice / 100)]
+#puts "Newsubtot1 $newsubtot"
+puts "Rabatt $rabatt"
+        .arttypeL${rowNo} conf -bg orange
+        set newsubtot [expr $::subtot - $rabatt]
+        .artpriceL${rowNo} conf -text "-${rabatt}" 
 
+#Export for saveInv2Tex
+set ::rabatt $rabatt
 
-
+puts "Newsubtot2 $newsubtot"
       ##deduce Auslagen from subtot (for GUI + DB!)
       } elseif {$type == "A"} {
-        set ::subtot [expr $newsubtot - $artPrice]
+        set newsubtot [expr $newsubtot - $artPrice]
       } 
 
-    set ::subtot [expr {double(round(100*$newsubtot))/100}]
-      
+#    set ::subtot [expr {double(round(100*$newsubtot))/100}]
+ set ::subtot $newsubtot     
 
       catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
       pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo}  -in .invF${rowNo} -anchor w -fill x -side left
@@ -685,7 +686,7 @@ proc saveInv2Tex {invNo} {
   #1.set itemList for itemFile
   foreach w [namespace children rows] {
   
-    set artUnit [.aurtunitL[namespace tail $w] cget -text]
+    set artUnit [.artunitL[namespace tail $w] cget -text]
     set artPrice [.artpriceL[namespace tail $w] cget -text]
     set artType [.arttypeL[namespace tail $w] cget -text]
     set artName [.artnameL[namespace tail $w] cget -text]
@@ -695,7 +696,9 @@ proc saveInv2Tex {invNo} {
     if {$artType==""} {
       append itemList \\Fee\{ $artName { } \( pro { } $artUnit \) \} \{ $artPrice \} \{ $menge \} \n
     } elseif {$artType=="R"} {
-      append itemList \\Discount\{ $artName { } $artPrice % \} \{ [expr ($subtot * $artPrice)/100] \} \n
+
+#TODO: get Prozentsatz !
+      append itemList \\Discount\{ $artName \} \{ $::rabatt \} \n
     #Check if Auslage - TODO change save2DB 
     } elseif {$artType=="A"} {
       append itemList \\EBC\{ $artName \} \{ $artPrice \} \n
@@ -715,7 +718,7 @@ proc saveInv2Tex {invNo} {
   append dataList \\newcommand\{\\myAddress\} \{ $myAdr \} \n
   append dataList \\newcommand\{\\myPhone\} \{ $myPhone \} \n
   append dataList \\newcommand\{\\vat\} \{ $vat \} \n
-  append dataList \\newcommand\{\\curr\} \{ $currency \} \n
+  append dataList \\newcommand\{\\currency\} \{ $currency \} \n
  
   #3.Overwrite any old data file
   set chan [open $dataFile w] 
@@ -734,14 +737,15 @@ proc saveInv2Tex {invNo} {
 
   ##2. Create $invName DVI
   append vorlageDvi [file root $texVorlage] . dvi
-  set compShortname [lindex ${compName} 0]
+  set compShortname [lindex ${myComp} 0]
   append invName invoice _ $compShortname - $invNo
   append invDviPath [file join $texDir] / $invName . dvi
   append invPdfPath [file join $spoolDir] / $invName . pdf
-
+return
   ##3. Create $invName PDF  
-  cp $vorlageDvi $invPathDvi
+  file copy $vorlageDvi $invDviPath
   eval exec dvipdf $invDviPath $invPdfPath
+return
  
   ##4. save $invDvi to DB
   set chan [open $invDviPath]
@@ -751,7 +755,7 @@ proc saveInv2Tex {invNo} {
   set hexText [binary encode hex $invDviTex]
 
 #TODO: gehtnicht ,keine negativ-Suchen möglich!!!  
-regsub -all {![[:xdigit:]]} $hexText {} hexText
+#regsub -all {![[:xdigit:]]} $hexText {} hexText
 
   set token [pg_exec $db "UPDATE invoice SET dok = '$hexText' WHERE objectid = $invNo"]
   #file delete $invDviPath
