@@ -17,8 +17,8 @@ set dunkelblau steelblue3
   .logoC itemconf $kreis -fill orange -outline red
 
   set schrift0 [.logoC create text 23 28]
-  .logoC itemconf $schrift0 -font "TkCaptionFont 20 bold" -fill $dunkelblau -text "T"
-  set schrift1 [.logoC create text 35 32]
+  .logoC itemconf $schrift0 -font "TkHeadingFont 18 bold" -fill $dunkelblau -text "T"
+  set schrift1 [.logoC create text 32 32]
   .logoC itemconf $schrift1 -font "TkCaptionFont 18 bold" -fill $dunkelblau -text "k"
 
   set schrift2 [.logoC create text 95 30]
@@ -540,10 +540,7 @@ proc addInvRow {} {
       set rowNo $::rows::rowNo
 
       set rowtot [expr $menge * $artPrice]
-
-      #Export subtot with 2 decimal points
-#TODO: interferes with Rabatt
-      set newsubtot [expr $rowtot + $::subtot]
+      set subtot [expr $::subtot + $rowtot]
 
       #Create row frame
       catch {frame .invF${rowNo}}
@@ -558,32 +555,28 @@ proc addInvRow {} {
 
       #Handle "A" and "R" types:
       set type [.arttypeL${rowNo} cget -text] 
-
+      
       ##deduce Rabatt from subtot (for GUI + DB, Invoice makes its own calculation)
       if {$type == "R"} {
-        set rabatt [expr ($::subtot * $artPrice / 100)]
-#puts "Newsubtot1 $newsubtot"
-puts "Rabatt $rabatt"
-        .arttypeL${rowNo} conf -bg orange
-        set newsubtot [expr $::subtot - $rabatt]
+        set rabatt [expr ($subtot * $artPrice / 100)]
+        .arttypeL${rowNo} conf -bg orange    
         .artpriceL${rowNo} conf -text "-${rabatt}" 
 
-#Export for saveInv2Tex
-set ::rabatt $rabatt
+        #Export for saveInv2Tex
+        set subtot [expr $subtot - $rabatt]        
+        set ::rabatt $rabatt
+      }
 
-puts "Newsubtot2 $newsubtot"
-      ##deduce Auslagen from subtot (for GUI + DB!)
-      } elseif {$type == "A"} {
-        set newsubtot [expr $newsubtot - $artPrice]
-      } 
-
-#    set ::subtot [expr {double(round(100*$newsubtot))/100}]
- set ::subtot $newsubtot     
 
       catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
-      pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo}  -in .invF${rowNo} -anchor w -fill x -side left
+      pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
+      pack .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
+
+      #Export subtot with 2 decimal points
+      set ::subtot [expr {double(round(100*$subtot))/100}]    
     }
   }
+
 } ;#END addInvRow
 
 #TODO: save f_date with other data when printing invoice!!!
@@ -706,7 +699,7 @@ proc saveInv2Tex {invNo} {
   } ;#END foreach w
 
   #2.set dataList for usepackage letter
-  lappend custAdr $::name1 \n $::name2 \n $::street \n $::zip $::city
+  lappend custAdr $::name1 {\\} $::name2 {\\} $::street {\\} $::zip { } $::city
 
   append dataList \\newcommand\{\\comm\} \{ $comm \} \n
   append dataList \\newcommand\{\\cond\} \{ $cond \} \n
@@ -734,6 +727,7 @@ proc saveInv2Tex {invNo} {
 
   ##1. overwrite $vorlage.dvi
   eval exec latex -output-directory=$spoolDir -draftmode $texVorlage
+return
 
   ##2. Create $invName DVI
   append vorlageDvi [file root $texVorlage] . dvi
@@ -741,7 +735,7 @@ proc saveInv2Tex {invNo} {
   append invName invoice _ $compShortname - $invNo
   append invDviPath [file join $texDir] / $invName . dvi
   append invPdfPath [file join $spoolDir] / $invName . pdf
-return
+
   ##3. Create $invName PDF  
   file copy $vorlageDvi $invDviPath
   eval exec dvipdf $invDviPath $invPdfPath
