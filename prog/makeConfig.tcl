@@ -1,5 +1,5 @@
 # makeConfig
-##saves configFile, overwriting old
+##saves confFile, overwriting old
 ##called by .saveConfigB "Einstellungen speichern" button 
 proc makeConfig {} {
   global confFile adrpos
@@ -90,8 +90,8 @@ proc makeConfig {} {
 
   NewsHandler::QueryNews "Einstellungen in $confFile gespeichert." lightgreen
 
-  source $configFile
-  setMyLogo
+  source $confFile
+  catch setMyLogo
 
   makeTexVorlage
   return 0
@@ -154,3 +154,14 @@ proc makeTexVorlage {} {
 
   return 0
 } ;#END makeTexVorlage
+
+#Setzt Firmenlogo rechts oben, falls existent
+proc setMyLogo {} {
+  global myLogo
+  if {[info exists myLogo] && [file exists $myLogo]} {
+    image create photo logo -file $myLogo
+    canvas .mylogoC -width [image width logo] -height [image height logo]
+    .mylogoC create image 0 0 -image logo -anchor nw
+    pack .mylogoC -in .titelF -side right
+  }
+}

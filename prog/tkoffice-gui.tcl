@@ -18,15 +18,6 @@ pack [frame .titelF -padx 10 -pady 10] -fill x
 label .titelL -text "Auftragsverwaltung" -pady $py -padx $px -font "TkHeadingFont 80 bold" -fg silver -anchor w
 
 #Eigenes Firmenlogo falls vorhanden
-proc setMyLogo {} {
-  global myLogo
-  if {[info exists myLogo] && [file exists $myLogo]} {
-    image create photo logo -file $myLogo
-    canvas .mylogoC -width [image width logo] -height [image height logo]
-    .mylogoC create image 0 0 -image logo -anchor nw
-    pack .mylogoC -in .titelF -side right
-  }
-}
 catch setMyLogo
 
 #Create Notebook
@@ -70,10 +61,10 @@ pack [frame .n.t4.f5 -pady $py -padx $px -borderwidth 5 -highlightbackground sil
 label .adrTitel -text "Adressverwaltung" -font TkCaptionFont -pady 5
 pack .adrTitel -in .n.t1.f2 -side top -fill x
 
-pack [frame .adrF2 -bd 3 -relief sunken -bg lightblue -pady $py -padx $px] -anchor nw -side left -in .n.t1.f2
-#ack [frame .adrF4 -bg lightblue] -anchor e -in .adrF2 -side right
-pack [frame .adrF1] -anchor nw -side left -in .n.t1.f2
-pack [frame .adrF3] -anchor se -side left -in .n.t1.f2 -expand 1
+pack [frame .adrF2 -bd 3 -relief sunken -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.f2 -side left
+pack [frame .adrF4 -bd 3 -relief sunken -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.f2 -side left
+pack [frame .adrF1] -anchor nw -in .n.t1.f2 -side left 
+pack [frame .adrF3] -anchor se -in .n.t1.f2 -expand 1 -side left
 
 #create Address number Spinbox
 set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -textvariable adrNo -bg lightblue]
@@ -100,6 +91,7 @@ entry .zipE -width 7 -textvariable zip -justify left
 entry .cityE -width 43 -textvariable city -justify left
 entry .tel1E -width 15 -textvariable tel1 -justify right
 entry .tel2E -width 15 -textvariable tel2 -justify right
+entry .faxE -width 15 -textvariable fax -justify right
 entry .mailE -width 15 -textvariable mail -justify right
 entry .wwwE -width 15 -textvariable www -justify right
 
@@ -110,9 +102,6 @@ button .b2 -text "Anschrift löschen" -width 20 -command {deleteAddress $adrNo} 
 
 #Pack adrF1 spinbox
 pack $adrSpin -in .adrF1 -anchor nw
-
-#Pack adrF2 entries later
-
 #Pack adrF3 buttons
 pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
 
@@ -283,7 +272,7 @@ pack .initDBB  .confDBNameE .confDBUserE -in .n.t4.f3 -anchor se -side right
 #RECHNUNGSSTELLUNG
 pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
 label .billingT -text "Rechnungsstellung" -font "TkHeadingFont"
-message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\n\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung.\nDer Mehrwertsteuersatz ist obligatorisch (z.B. 0 (erscheint nicht) / 0.0 (erscheint)) / 7.5 usw.).\nIn den Feldern 'Zahlungskondition 1-3' können verschiedene Zahlungsbedingungen erfasst werden, welche bei der Rechnungserstellung jeweils zur Auswahl stehen (z.B. 10 Tage / 30 Tage / bar bei Abholung). Wenn sie leer bleiben, muss die Kondition von Hand eingegeben werden.\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
+message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\n\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung.\nDer Mehrwertsteuersatz ist obligatorisch (z.B. 0 (erscheint nicht) / 0.0 (erscheint)) / 7.5 usw.).\nIn den Feldern 'Zahlungskondition 1-3' können verschiedene Zahlungsbedingungen erfasst werden, welche bei der Rechnungserstellung jeweils zur Auswahl stehen (z.B. 10 Tage / 30 Tage / bar). Ein Eintrag 'bar' steht für Barzahlung und markiert die Rechnung als bezahlt. Ohne Voreinträge muss die Kondition von Hand eingegeben werden.\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
 
 radiobutton .billformatlinksRB -text "Adressfenster links (International)" -value Links -variable adrpos
 radiobutton .billformatrechtsRB -text "Adressfenster rechts (Schweiz)" -value Rechts -variable adrpos

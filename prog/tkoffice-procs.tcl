@@ -1,6 +1,6 @@
 # called by auftrag.tcl
 # Aktualisiert: 1nov17
-# Restored: 3oct19
+# Restored: 6oct19
 
 ##################################################################################################
 ###  A D D R E S S  P R O C S  
@@ -53,29 +53,33 @@ proc setAdrList {} {
 proc fillAdrWin {adrOID} {
 global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
   #set variables
-	set name1 [pg_exec $db "SELECT name1 FROM address WHERE objectid=$adrOID"]
-	set name2 [pg_exec $db "SELECT name2 FROM address WHERE objectid=$adrOID"]
-	set street [pg_exec $db "SELECT street FROM address WHERE objectid=$adrOID"]
-	set zip [pg_exec $db "SELECT zip FROM address WHERE objectid=$adrOID"]
-	set city [pg_exec $db "SELECT city FROM address WHERE objectid=$adrOID"]
-  set tel1 [pg_exec $db "SELECT phone FROM address WHERE objectid=$adrOID"]
-  set tel2 [pg_exec $db "SELECT mobile FROM address WHERE objectid=$adrOID"]
-  set mail [pg_exec $db "SELECT mail FROM address WHERE objectid=$adrOID"]
-  set www  [pg_exec $db "SELECT www FROM address WHERE objectid=$adrOID"]
+	set name1 [pg_result [pg_exec $db "SELECT name1 FROM address WHERE objectid=$adrOID"] -list]
+	set name2 [pg_result [pg_exec $db "SELECT name2 FROM address WHERE objectid=$adrOID"] -list]
+	set street [pg_result [pg_exec $db "SELECT street FROM address WHERE objectid=$adrOID"] -list]
+	set city [pg_result [pg_exec $db "SELECT city FROM address WHERE objectid=$adrOID"] -list]
 
-	#insert into adrWin
-  regsub {({)(.*)(})} [pg_result $name1 -list] {\2} ::name1
-  regsub {({)(.*)(})} [pg_result $name2 -list] {\2} ::name2
-  regsub {({)(.*)(})} [pg_result $street -list] {\2} ::street
-  regsub {({)(.*)(})} [pg_result $city -list] {\2} ::city
-  set ::zip [pg_result $zip -list]
-  set ::tel1 [pg_result $tel1 -list]
-  set ::tel2 [pg_result $tel2 -list]
-  set ::www [pg_result $www -list]
-  set ::mail [pg_result $mail -list]
+	set ::zip  [pg_result [pg_exec $db "SELECT zip FROM address WHERE objectid=$adrOID"] -list]
 
+  #Export if not empty
+  set tel1 [pg_result [pg_exec $db "SELECT phone FROM address WHERE objectid=$adrOID"] -list]
+  set tel2 [pg_result [pg_exec $db "SELECT mobile FROM address WHERE objectid=$adrOID"] -list]
+  set fax  [pg_result [pg_exec $db "SELECT telefax FROM address WHERE objectid=$adrOID"] -list]
+  set mail [pg_result [pg_exec $db "SELECT mail FROM address WHERE objectid=$adrOID"] -list]
+  set www  [pg_result [pg_exec $db "SELECT www FROM address WHERE objectid=$adrOID"] -list]
+
+  regsub {({)(.*)(})} $name1 {\2} ::name1
+  regsub {({)(.*)(})} $name2 {\2} ::name2
+  regsub {({)(.*)(})} $street {\2} ::street
+  regsub {({)(.*)(})} $city {\2} ::city
+
+  if {[string is punct $tel1] || $tel1==""} {set ::tel1 "Telefon 1"; .tel1E conf -fg silver} {set ::tel1 $tel1}
+  if {[string is punct $tel2] || $tel2==""} {set ::tel2 "Telefon 2"; .tel2E conf -fg silver} {set ::tel2 $tel2}
+  if {[string is punct $mail] || $mail==""} {set ::mail "Mail"; .mailE conf -fg silver} {set ::mail $mail}
+  if {[string is punct $www] || $www==""} {set ::www "Internet"; .wwwE conf -fg silver} {set ::www $www}
+  if {[string is punct $fax] || $fax==""} {set ::fax "Telefax"; .faxE conf -fg silver} {set ::fax $fax}
+  
   return 0
-}
+} ;#END fillAdrWin
 
 # fillAdrInvWin
 ##called by .adrSB 
@@ -257,16 +261,20 @@ proc clearAdrWin {} {
 # resetAdrWin
 ##called by GUI (first fill) + Abbruch btn + aveAddress
 proc resetAdrWin {} {
-  global adrSpin adrSearch
+  global adrSpin adrSearch tel1 tel2 fax mail www
+
   pack .name1E .name2E .streetE -in .adrF2 -anchor nw
   pack .zipE .cityE -anchor nw -in .adrF2 -side left
-  pack .tel1E .tel2E .mailE .wwwE -in .adrF2 -side right
-  foreach e [pack slaves .adrF2] {
-    $e conf -bg lightblue -validate none -fg black -state readonly -readonlybackground lightblue -relief flat -bd 0
-  } 
+  pack .tel1E .tel2E .faxE .mailE .wwwE -in .adrF4
+
+  foreach e "[pack slaves .adrF2] [pack slaves .adrF4]" {
+    $e conf -bg skyblue4 -validate none -fg black -state readonly -readonlybackground skyblue2 -relief flat -bd 0
+  }
+
   .b1 configure -text "Anschrift ändern" -command {changeAddress $adrNo}
   .b2 configure -text "Anschrift löschen" -command {deleteAddress $adrNo}
   pack .b0 -in .adrF3  
+
   $adrSpin conf -bg lightblue
   $adrSearch conf -state normal
   .adrF2 conf -bg lightblue
@@ -416,6 +424,8 @@ proc deleteAddress {adrNo} {
 proc resetNewInvDialog {} {
   pack forget [pack slaves .invoiceFrame]
   set invNo 0
+  catch {namespace delete rows}
+  catch {unset ::shortdescr}
 
   #create Addrow button
   catch {button .addrowB -text "Hinzufügen" -command {addInvRow}}
@@ -423,15 +433,16 @@ proc resetNewInvDialog {} {
   catch {message .einzel -textvariable einzel}
 
   #Create Menge entry
-  catch {entry .mengeE -width 7 -bg yellow -fg grey}
+  catch {entry .mengeE -width 7 -bg yellow -fg grey -textvar menge}
   set menge "Menge"
   
-.mengeE configure -validate focusin -validatecommand {
-    #set ::menge ""
+#TODO: validation geht nicht immer!
+  .mengeE configure -validate focusin -validatecommand {
     %W conf -fg black
-    %W delete 0 end
+    #%W delete 0 end
+set menge ""
     return 0
-  }
+    }
 
   set ::subtot 0
 
@@ -478,8 +489,8 @@ proc setArticleLine tab {
   .mengeE conf -state normal -bg beige -fg silver
 
     if {$::artType == "R"} { 
-.mengeE delete 0 end
-.mengeE insert 0 1
+#.mengeE delete 0 end
+#.mengeE insert 0 1
      .mengeE conf -bg grey -fg silver -state readonly
       set ::menge 1
 
@@ -538,9 +549,7 @@ proc addInvRow {} {
       set artUnit [.invArtUnitL cget -text]
       set artType [.invArtTypeL cget -text]
       set rowNo $::rows::rowNo
-
       set rowtot [expr $menge * $artPrice]
-      set subtot [expr $::subtot + $rowtot]
 
       #Create row frame
       catch {frame .invF${rowNo}}
@@ -553,7 +562,7 @@ proc addInvRow {} {
       catch {label .artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
       catch {label .arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
 
-      #Handle "A" and "R" types:
+      #Handle "R" types
       set type [.arttypeL${rowNo} cget -text] 
       
       ##deduce Rabatt from subtot (for GUI + DB, Invoice makes its own calculation)
@@ -565,6 +574,9 @@ proc addInvRow {} {
         #Export for saveInv2Tex
         set subtot [expr $subtot - $rabatt]        
         set ::rabatt $rabatt
+
+      } else {
+        set subtot [expr $::subtot + $rowtot]
       }
 
 
@@ -573,7 +585,15 @@ proc addInvRow {} {
       pack .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
 
       #Export subtot with 2 decimal points
-      set ::subtot [expr {double(round(100*$subtot))/100}]    
+      set ::subtot [expr {double(round(100*$subtot))/100}]
+
+      #Export shortdescr cumulatively for use in saveInv2DB & fillAdrInvWin
+      set separator {}
+      if [info exists ::shortdescr] {
+        set separator { /}
+      }
+      append ::shortdescr $separator $artName
+
     }
   }
 
@@ -585,8 +605,8 @@ proc addInvRow {} {
 # saveInvoiceToDB
 ##called by "Rechnung speichern" button
 proc saveInv2DB {} {
-  global db adrSpin ref comm auftrdat env msg
-  global artName artPrice menge cond artUnit rowtot
+  global db adrSpin ref comm auftrdat env msg vat
+  global artName artPrice cond artUnit rowtot
 
   #1. Get current vars - TODO: incorporate in DB as 'SERIAL', starting with %YY
 	set invNo [createNewNumber invoice]
@@ -610,6 +630,12 @@ proc saveInv2DB {} {
     set payedsum 0
   }	
 
+  #3. Make entry for vatlesssum if different from finalsum
+  set vatlesssum ""
+  if {$vat < 0} {
+    set vatlesssum [expr ($vat * $finalsum)/100]
+  }
+
   #3. Save new invoice to DB
   set token [pg_exec $db "INSERT INTO invoice 
     (
@@ -619,7 +645,8 @@ proc saveInv2DB {} {
     addressheader, 
     shortdescription, 
     finalsum, 
-    payedsum
+    payedsum,
+    vatlesssum,
     f_number, 
     f_date, 
     f_comment
@@ -629,10 +656,11 @@ proc saveInv2DB {} {
     $invNo, 
     $ts, 
     $custOID, 
-    '$shortAdr', 
-    '$menge $artName', 
+    '$shortAdr',
+    '$::shortdescr', 
     $::subtot,
-    $payedsum, 
+    $payedsum,
+    $vatlesssum,
     $invNo, 
     to_date('$auftrDat','DD MM YYYY'), 
     '$comm'
@@ -645,7 +673,9 @@ proc saveInv2DB {} {
     } else {
 
      	NewsHandler::QueryNews "Rechnung $invNo gespeichert" green
-      saveInv2Rtf
+#TODO:  saveInv2Tex
+
+fillAdrInvWin $custOID
 
       #Reconfigure Button for Printing
       .saveInvB conf -text "Rechnung ausdrucken" -command {printInvoice $invNo}
@@ -657,7 +687,7 @@ proc saveInv2DB {} {
 # saveInv2Tex 
 ##called by saveInv2DB
 proc saveInv2Tex {invNo} {
-  global spoolDir texVorlage texDir confFile env
+  global db spoolDir texVorlage texDir confFile env
 
   set itemFile [file join $texDir invitems.tex]
   set dataFile [file join $texDir invdata.tex]
@@ -726,38 +756,28 @@ proc saveInv2Tex {invNo} {
   #3. LaTex $vorlage & save invoice to $spool
 
   ##1. overwrite $vorlage.dvi
-  eval exec latex -output-directory=$spoolDir -draftmode $texVorlage
-return
+  eval exec latex -output-directory=/tmp -draftmode $texVorlage
 
   ##2. Create $invName DVI
   append vorlageDvi [file root $texVorlage] . dvi
   set compShortname [lindex ${myComp} 0]
   append invName invoice _ $compShortname - $invNo
-  append invDviPath [file join $texDir] / $invName . dvi
-  append invPdfPath [file join $spoolDir] / $invName . pdf
 
-  ##3. Create $invName PDF  
-  file copy $vorlageDvi $invDviPath
-  eval exec dvipdf $invDviPath $invPdfPath
-return
- 
-  ##4. save $invDvi to DB
-  set chan [open $invDviPath]
-  set invDviText [read $chan]
-  close $chan
-  ##convert to hex to avoid encoding probs
-  set hexText [binary encode hex $invDviTex]
+ # set invDviPath [file join /tmp $invName.dvi] 
+ # append invDviPath [file join $spoolDir] / $invName . dvi
+ # file copy $vorlageDvi $invDviPath
+set invDviPath $vorlageDvi
 
-#TODO: gehtnicht ,keine negativ-Suchen möglich!!!  
-#regsub -all {![[:xdigit:]]} $hexText {} hexText
-
+  ##3. convert DVI file to hex & save to DB
+  set hexText [exec hexdump $invDviPath]
   set token [pg_exec $db "UPDATE invoice SET dok = '$hexText' WHERE objectid = $invNo"]
-  #file delete $invDviPath
 
-  reportResult $token "Rechnung $invNo in $invPdfPath gespeichert." lightblue
+##4. TODO: Optional?: Create $invName PDF  
+#  eval exec dvipdf $invDviPath $invPdfPath
+#  reportResult $token "Rechnung $invNo in $invPdfPath gespeichert." lightblue
 
   #Change "Rechnung speichern" button to "Rechnung drucken" button
-  .saveInv configure -text "Rechnung drucken" -command {printInvoice}
+  .saveInvB configure -text "Rechnung drucken" -command {printInvoice}
 
 } ;#END saveInv2Tex
 
@@ -767,8 +787,20 @@ return
 ##called by "Rechnung drucken" button
 ##manuell mit Num.Eingabe
 proc printInvoice {invNo} {
-  global spoolDir printCmd
+  global spoolDir printCmd db
   set invName $spoolDir/invoiceVollmar-${invNo}.rtf
+
+set invHexText [pg_exec $db "SELECT dok from invoice where f_number = $invNo"]
+set invText [binary decode hex $invHexText]
+set dviFile /tmp/$invNo.dvi
+
+set chan [open $dviFile w]
+puts $chan $invText
+close $chan
+
+exec evince $dviFile
+return
+
   if [file exists $invName] {
     NewsHandler::QueryNews "$invName wird ausgedruckt." lightblue
     exec $printCmd $invName
