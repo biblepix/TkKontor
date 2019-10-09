@@ -1,6 +1,6 @@
 # called by auftrag.tcl
 # Aktualisiert: 1nov17
-# Restored: 6oct19
+# Restored: 9oct19
 
 ##################################################################################################
 ###  A D D R E S S  P R O C S  
@@ -61,22 +61,24 @@ global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
 	set ::zip  [pg_result [pg_exec $db "SELECT zip FROM address WHERE objectid=$adrOID"] -list]
 
   #Export if not empty
-  set tel1 [pg_result [pg_exec $db "SELECT phone FROM address WHERE objectid=$adrOID"] -list]
+  set tel1 [pg_result [pg_exec $db "SELECT telephone FROM address WHERE objectid=$adrOID"] -list]
   set tel2 [pg_result [pg_exec $db "SELECT mobile FROM address WHERE objectid=$adrOID"] -list]
   set fax  [pg_result [pg_exec $db "SELECT telefax FROM address WHERE objectid=$adrOID"] -list]
-  set mail [pg_result [pg_exec $db "SELECT mail FROM address WHERE objectid=$adrOID"] -list]
+  set mail [pg_result [pg_exec $db "SELECT email FROM address WHERE objectid=$adrOID"] -list]
   set www  [pg_result [pg_exec $db "SELECT www FROM address WHERE objectid=$adrOID"] -list]
 
   regsub {({)(.*)(})} $name1 {\2} ::name1
   regsub {({)(.*)(})} $name2 {\2} ::name2
   regsub {({)(.*)(})} $street {\2} ::street
   regsub {({)(.*)(})} $city {\2} ::city
+  regsub {({)(.*)(})} $tel1 {\2} ::tel1
+  regsub {({)(.*)(})} $tel2 {\2} ::tel2
 
-  if {[string is punct $tel1] || $tel1==""} {set ::tel1 "Telefon 1"; .tel1E conf -fg silver} {set ::tel1 $tel1}
-  if {[string is punct $tel2] || $tel2==""} {set ::tel2 "Telefon 2"; .tel2E conf -fg silver} {set ::tel2 $tel2}
-  if {[string is punct $mail] || $mail==""} {set ::mail "Mail"; .mailE conf -fg silver} {set ::mail $mail}
-  if {[string is punct $www] || $www==""} {set ::www "Internet"; .wwwE conf -fg silver} {set ::www $www}
-  if {[string is punct $fax] || $fax==""} {set ::fax "Telefax"; .faxE conf -fg silver} {set ::fax $fax}
+  if {[string is punct $tel1] || $tel1==""} {set ::tel1 "Telefon1" ; .tel1E conf -fg silver} {set ::tel1 $tel1}
+  if {[string is punct $tel2] || $tel2==""} {set ::tel2 "Telefon2" ; .tel2E conf -fg silver} {set ::tel2 $tel2}
+  if {[string is punct $mail] || $mail==""} {set ::mail "Mail" ; .mailE conf -fg silver} {set ::mail $mail}
+  if {[string is punct $www] || $www==""} {set ::www "Internet" ; .wwwE conf -fg silver} {set ::www $www}
+  if {[string is punct $fax] || $fax==""} {set ::fax "Telefax" ; .faxE conf -fg silver} {set ::fax $fax}
   
   return 0
 } ;#END fillAdrWin
@@ -226,7 +228,7 @@ proc searchAddress {s} {
   pack .adrClearSelB -in .adrF1
   }
 
-  set ::suche "Adressuche"
+#  set ::suche "Adresssuche (mit Tab quittieren)"
 
   #Reset adrSearch widget & address list (called by .adrClearSelB)
   $adrSearch conf -fg grey -validate focusin -validatecommand {
@@ -245,7 +247,7 @@ proc searchAddress {s} {
 ##called by "Neue Anschrift" & "Anschrift ändern" buttons
 proc clearAdrWin {} {
   global adrSpin adrSearch
-  foreach e [pack slaves .adrF2] {
+  foreach e "[pack slaves .adrF2] [pack slaves .adrF4]" {
     $e conf -bg beige -fg silver -state normal -validate focusin -validatecommand {
     %W delete 0 end
     %W conf -fg black
@@ -261,19 +263,19 @@ proc clearAdrWin {} {
 # resetAdrWin
 ##called by GUI (first fill) + Abbruch btn + aveAddress
 proc resetAdrWin {} {
-  global adrSpin adrSearch tel1 tel2 fax mail www
+  global adrSpin adrSearch
 
   pack .name1E .name2E .streetE -in .adrF2 -anchor nw
   pack .zipE .cityE -anchor nw -in .adrF2 -side left
   pack .tel1E .tel2E .faxE .mailE .wwwE -in .adrF4
 
   foreach e "[pack slaves .adrF2] [pack slaves .adrF4]" {
-    $e conf -bg skyblue4 -validate none -fg black -state readonly -readonlybackground skyblue2 -relief flat -bd 0
+    $e conf -bg lightblue -validate none -fg black -state readonly -readonlybackground lightblue -relief flat -bd 0
   }
 
-  .b1 configure -text "Anschrift ändern" -command {changeAddress $adrNo}
-  .b2 configure -text "Anschrift löschen" -command {deleteAddress $adrNo}
-  pack .b0 -in .adrF3  
+  .b1 config -text "Anschrift ändern" -command {changeAddress $adrNo}
+  .b2 config -text "Anschrift löschen" -command {deleteAddress $adrNo}
+  pack .b1 .b2 .b0 -in .adrF3 -anchor se  
 
   $adrSpin conf -bg lightblue
   $adrSearch conf -state normal
@@ -329,9 +331,11 @@ proc saveAddress {} {
 	set zip [.zipE get]
 	set city [.cityE get]
 	set tel1 [.tel1E get]
-  set tel2 [.tel2E get]
-  set mail [.mailE get]
+  #set tel2 [.tel2E get]
+ # set mail [.mailE get]
   set www [.wwwE get]
+set mail $::mail
+set tel2 $::tel2
 
 	#A: save new
 	if {$adrno == ""} {
@@ -391,7 +395,7 @@ proc saveAddress {} {
   } 
 
   resetAdrWin
-}
+} ;#END saveAddress
 
 proc deleteAddress {adrNo} {
   global db
@@ -410,7 +414,7 @@ proc deleteAddress {adrNo} {
   } else {
     reportResult $token "Adresse $adrNo nicht gelöscht, da mit Rechnung(en) [pg_result $token -list] verknüpft." 
   }
-}
+} ;#END deleteAddress
 
 
 
@@ -472,7 +476,15 @@ proc setArticleLine tab {
 
   #Invoice Tab
   } elseif {$tab == "TAB2"} {
+
     set artNum [.invArtNumSB get]
+    focus .invArtNumSB
+    .mengeE configure -validate focusin -validatecommand {
+      %W conf -fg black
+      #%W delete 0 end
+      set menge ""
+      return 0
+    }
   }
 
   #Get data per line
@@ -489,8 +501,6 @@ proc setArticleLine tab {
   .mengeE conf -state normal -bg beige -fg silver
 
     if {$::artType == "R"} { 
-#.mengeE delete 0 end
-#.mengeE insert 0 1
      .mengeE conf -bg grey -fg silver -state readonly
       set ::menge 1
 
@@ -592,7 +602,7 @@ proc addInvRow {} {
       if [info exists ::shortdescr] {
         set separator { /}
       }
-      append ::shortdescr $separator $artName
+      append ::shortdescr $separator $menge $artName
 
     }
   }

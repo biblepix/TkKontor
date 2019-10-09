@@ -1,6 +1,6 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
-# Restored: 2oct19
+# Restored: 9oct19
 set version 1.0
 
 #Source Tk/Pgintcl packages
@@ -61,9 +61,9 @@ pack [frame .n.t4.f5 -pady $py -padx $px -borderwidth 5 -highlightbackground sil
 label .adrTitel -text "Adressverwaltung" -font TkCaptionFont -pady 5
 pack .adrTitel -in .n.t1.f2 -side top -fill x
 
-pack [frame .adrF2 -bd 3 -relief sunken -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.f2 -side left
-pack [frame .adrF4 -bd 3 -relief sunken -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.f2 -side left
-pack [frame .adrF1] -anchor nw -in .n.t1.f2 -side left 
+pack [frame .adrF2 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.f2 -side left
+pack [frame .adrF4 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.f2 -side left
+pack [frame .adrF1] -anchor nw -in .n.t1.f2 -side left
 pack [frame .adrF3] -anchor se -in .n.t1.f2 -expand 1 -side left
 
 #create Address number Spinbox
@@ -71,7 +71,7 @@ set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -textvariable adrNo -bg light
 focus $adrSpin
 
 #Create search field
-set suche "Adresssuche"
+set suche "Adresssuche (mit Tab quittieren)"
 set adrSearch [entry .adrSearchE]
   $adrSearch config -width 25 -borderwidth 3 -bg beige -fg grey -textvariable suche
   $adrSearch config -validate focusin -validatecommand {
@@ -84,16 +84,16 @@ set adrSearch [entry .adrSearchE]
   }
 
 #Create address entries, to be packed only when 'changeAddress' or 'newAddress' are invoked
-entry .name1E -width 50 -textvariable name1 -justify left
-entry .name2E -width 50 -textvariable name2 -justify left
-entry .streetE -width 50 -textvariable street -justify left
-entry .zipE -width 7 -textvariable zip -justify left
-entry .cityE -width 43 -textvariable city -justify left
-entry .tel1E -width 15 -textvariable tel1 -justify right
-entry .tel2E -width 15 -textvariable tel2 -justify right
-entry .faxE -width 15 -textvariable fax -justify right
-entry .mailE -width 15 -textvariable mail -justify right
-entry .wwwE -width 15 -textvariable www -justify right
+entry .name1E -width 50 -textvar name1 -justify left
+entry .name2E -width 50 -textvar name2 -justify left
+entry .streetE -width 50 -textvar street -justify left
+entry .zipE -width 7 -textvar zip -justify left
+entry .cityE -width 43 -textvar city -justify left
+entry .tel1E -width 25 -textvar tel1 -justify right
+entry .tel2E -width 25 -textvar tel2 -justify right
+entry .faxE -width 25 -textvar fax -justify right
+entry .mailE -width 25 -textvar mail -justify right
+entry .wwwE -width 25 -textvar www -justify right
 
 #create Address buttons
 button .b0 -text "Neue Anschrift" -width 20 -command {newAddress}
