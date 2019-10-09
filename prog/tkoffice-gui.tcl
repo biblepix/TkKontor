@@ -1,10 +1,9 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
 # Restored: 9oct19
+
 set version 1.0
 
-#Source Tk/Pgintcl packages
-#package require pgintcl
 package require Tk
 package require Img
 source [file join $progDir tkoffice-procs.tcl]
