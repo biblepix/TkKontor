@@ -1,6 +1,6 @@
 # called by auftrag.tcl
 # Aktualisiert: 1nov17
-# Restored: 9oct19
+# Restored: 17oct19
 
 ##################################################################################################
 ###  A D D R E S S  P R O C S  
@@ -153,9 +153,9 @@ proc fillAdrInvWin {adrId} {
         $invF.$n.payedsumL conf -text $bezahlt
         catch {entry $invF.$n.payedsumE -text Eingabe -bg beige -fg grey -width 7 -justify right}
 
-        ##create PrintInvoice button (works only if invoice present in spoolDir)
-        catch {button $invF.$n.invPrintB}
-        $invF.$n.invPrintB configure -text "Rechnung nachdrucken" -command "printInvoice $invno"
+        ##create showInvoice button
+        catch {button $invF.$n.invShowB}
+        $invF.$n.invShowB conf -text "Ansicht" -command "showInvoice $invno"
 
 			#PAYEDSUM label/entry
 			#If 3 (payed) make label
@@ -165,7 +165,7 @@ proc fillAdrInvWin {adrId} {
         $invF.$n.payedsumL conf -fg green
         $invF.$n.statusL conf -fg green
         pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL $invF.$n.statusL -side left
-        pack $invF.$n.invPrintB -side right
+        pack $invF.$n.invShowB -side right
 			
       #If 1 or 2 make entry
 			} else {
@@ -177,7 +177,7 @@ proc fillAdrInvWin {adrId} {
         $invF.$n.payedsumE conf -validate focusout -validatecommand "saveEntry %P %W $n" 
         $invF.$n.statusL conf -fg red
 				pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL $invF.$n.statusL -side left
-        pack $invF.$n.invPrintB $invF.$n.zahlenL $invF.$n.payedsumE  -side right
+        pack $invF.$n.invShowB $invF.$n.zahlenL $invF.$n.payedsumE  -side right
 			
       #if 2 (Teilzahlung) include payed amount
 			#WARUM IST payedsum LEER - can't use -textvariable with -validatecommand!
@@ -189,7 +189,7 @@ proc fillAdrInvWin {adrId} {
 				}
 			}
 
-  		pack $invF.$n.invPrintB -side right 
+  		pack $invF.$n.invShowB -side right 
 	
   		} ;#end for loop
     } ;#END namspace $rowNo
@@ -458,7 +458,7 @@ set menge ""
   #Reset .saveInvB to "Rechnung speichern"
   .saveInvB conf -text "Rechung speichern" -command "
     saveInv2DB
-    saveInv2Tex $invNo
+    saveInv2TeX $invNo
     "
 } ;#END resetNewInvDialog
 
@@ -581,7 +581,7 @@ proc addInvRow {} {
         .arttypeL${rowNo} conf -bg orange    
         .artpriceL${rowNo} conf -text "-${rabatt}" 
 
-        #Export for saveInv2Tex
+        #Export for saveInv2TeX
         set subtot [expr $subtot - $rabatt]        
         set ::rabatt $rabatt
 
@@ -631,6 +631,18 @@ proc saveInv2DB {} {
   set cond $::cond
   set auftrDat $::auftrDat
 
+
+
+
+#  set invDvi ... - with this yo udon't need Tcl open etc.!
+#INSERT INTO test_table 
+#VALUES(1, pg_read_binary_file('/path/to/file')::bytea);
+#TODO: testing!
+#pg_exec $db "UPDATE invoice set dok = pg_read_binary_file('/home/pv/tkoffice/tex/rechnung-vorlage.dvi')::bytea WHERE f_number=$invNo"
+#möglicherweise besser ohne ::bytea (=escape format?)
+#Possibly this does it the other way (produces a clean hex stream, butt... ):
+#pg_exec $db "select decode(E'$T'::bytea, 'hex')"
+
   #2. Set payedsum=finalsum and ts=3 if cond="bar"
 	if {$cond=="bar"} {
     set ts 3
@@ -674,29 +686,27 @@ proc saveInv2DB {} {
     $invNo, 
     to_date('$auftrDat','DD MM YYYY'), 
     '$comm'
-    )
+   )
   RETURNING objectid"	]
 
   if {[pg_result $token -error] != ""} {
-    	NewsHandler::QueryNews "Rechnung $invNo nicht gespeichert:\n [pg_result $token -error ]" red
+    	NewsHandler::QueryNews "Rechnung $invNo nicht gespeichert:\n[pg_result $token -error ]" red
 
     } else {
 
      	NewsHandler::QueryNews "Rechnung $invNo gespeichert" green
-#TODO:  saveInv2Tex
-
-fillAdrInvWin $custOID
-
+      saveInv2TeX
+      fillAdrInvWin $custOID
       #Reconfigure Button for Printing
-      .saveInvB conf -text "Rechnung ausdrucken" -command {printInvoice $invNo}
+      .saveInvB conf -text "Rechnung drucken" -command {printInvoice $invNo}
     } 
 
 } ;#END saveInv2DB
 
 
-# saveInv2Tex 
+# saveInv2TeX
 ##called by saveInv2DB
-proc saveInv2Tex {invNo} {
+proc saveInv2TeX {invNo} {
   global db spoolDir texVorlage texDir confFile env
 
   set itemFile [file join $texDir invitems.tex]
@@ -765,48 +775,158 @@ proc saveInv2Tex {invNo} {
 
   #3. LaTex $vorlage & save invoice to $spool
 
-  ##1. overwrite $vorlage.dvi
-  eval exec latex -output-directory=/tmp -draftmode $texVorlage
+  ##1. overwrite $vorlage.dvi in $texDir
+  eval exec latex -draftmode $texVorlage
 
-  ##2. Create $invName DVI
+  ##2. Create $invName DVI - same in showInvoice!
   append vorlageDvi [file root $texVorlage] . dvi
-  set compShortname [lindex ${myComp} 0]
-  append invName invoice _ $compShortname - $invNo
+  set compShortname [lindex $myComp 0]
+  append invName invoice _ $compShortname $invNo
 
- # set invDviPath [file join /tmp $invName.dvi] 
- # append invDviPath [file join $spoolDir] / $invName . dvi
- # file copy $vorlageDvi $invDviPath
-set invDviPath $vorlageDvi
+  #3. Save invoice DVI to Spooldir
+  append invDviPath [file join $spoolDir] / $invName . dvi
+  file copy $vorlageDvi $invDviPath
 
-  ##3. convert DVI file to hex & save to DB
-  set hexText [exec hexdump $invDviPath]
-  set token [pg_exec $db "UPDATE invoice SET dok = '$hexText' WHERE objectid = $invNo"]
-
-##4. TODO: Optional?: Create $invName PDF  
-#  eval exec dvipdf $invDviPath $invPdfPath
-#  reportResult $token "Rechnung $invNo in $invPdfPath gespeichert." lightblue
+  reportResult $token "Rechnung $invNo in $invDviPath gespeichert." lightblue
 
   #Change "Rechnung speichern" button to "Rechnung drucken" button
   .saveInvB configure -text "Rechnung drucken" -command {printInvoice}
 
-} ;#END saveInv2Tex
+} ;#END saveInv2TeX
 
 
-# printInvoice ??TODO
-##prints existing RTF
-##called by "Rechnung drucken" button
-##manuell mit Num.Eingabe
+# doInvoicePdf
+##creates invoice PDF if so desired by user
+##called by showInvoice
+proc doInvoicPdf {invNo} {
+  global invDviName invDviPath invPdfName invPdfPath 
+  global psViewer invPsPath
+
+  set reply [tk_messageBox -type yesno -message "Möchten Sie von der Rechnung Nr. $invNo ein PDF zum Versand/Ausdruck erstellen?"]
+  if {$reply == "yes"} {
+
+    if [catch {exec dvipdf $invDviPath} res] {
+      NewsHandler::QueryNews "Es konnte kein PDF der Rechnung Nr. $invNo erstellt werden: \n$res" red
+      exec dvips $invDviPath
+      exec psViewer $invPsPath
+      NewsHandler::QueryNews "Die Rechnung Nr. $invNo liegt im PostScript-Format vor. Druck/Versand über $psViewer" lightblue
+
+    } else {
+      NewsHandler::QueryNews "Das PDF der Rechnung finden Sie in $invPdfPath" green
+    }
+
+  }
+}
+
+# showInvoice
+##displays existing DVI or PS
+##called by "Ansicht" button
+proc showInvoice {invNo} {
+  global spoolDir db myComp
+  set compShortname [lindex $myComp 0]
+  append invName invoice _ $compShortname $invNo
+  append invDviName $invName . dvi
+  append invPsName $invName . ps
+  append invPdfName $invName . pdf
+  set invDviPath [file join $spoolDir $invDviName]
+  set invPsPath [file join $spoolDir $invPsName]
+  set invPdfPath [file join $spoolDir $invPdfName]
+
+  #1. Exit if DVI doesn't exist
+  if {![file exists $invDviPath]} {
+    NewsHandler::QueryNews "$invDviName kann nicht gefunden werden." red
+    return 1
+  }
+
+  #2. Determine DVI capable display program
+  if {[autoexec_ok evince] != ""} {
+    set dviViewer "evince"
+  } elseif {[autoexec_ok okular] != ""} {
+    set dviViewer "okular"
+  }
+
+  #3.Determine PS capable display program
+  if {[autoexec_ok gv] != ""} {
+    set psViewer "gv"
+  } elseif {[autoexec_ok qpdfview] != ""} {
+    set psViewer "qpdfview"
+  }
+
+  #4. Make PDF & exit if no viewer found
+  if {! [info exists dviViewer] && ! [info exists psViewer]} {
+
+    NewsHandler::QueryNews "Die Rechnung Nr. $invNo kann nicht angezeigt werden. Bitte installieren Sie ein Anzeigeprogramm wie 'evince', 'okular', 'gv' oder 'qpdfview'.\nDas entsprechende PDF finden Sie in $spoolDir" red
+    after 3000 {doInvoicePdf $invNo}
+    return 1
+  }
+
+  ##MAIN CLAUSE
+
+  #A: execute DVi viewer
+  if [info exists dviViewer] {
+    
+    if [catch {exec $dviViewer $invDviPath} res] {
+      NewsHandler::QueryNews "Die Rechnung Nr. $invNo kann nicht angezeigt werden. \n$res" red
+    } else {
+      NewsHandler::QueryNews "Benutzen Sie den Druckdialog von $dviViewer, um die Rechnung auszudrucken." green 
+    }
+
+  #B: Execute PS viewer
+  } elseif [info exists psViewer] {
+    
+    exec dvips $invDviPath 
+    
+    if [catch {exec $psViewer $invPsPath} res] {
+      NewsHandler::QueryNews "Die Rechnung Nr. $invNo kann nicht angezeigt werden: \n$res" red
+    } else {
+      NewsHandler::QueryNews "Benutzen Sie den Druckdialog von $psViewer, um die Rechnung auszudrucken." green
+    }
+
+  } ;#End main clause
+
+  #Offer PDF anyway
+  after 3000 {doInvoicePdf $invNo}
+
+} ;#END showInvoice
+
+
+# printInvoice
+##prints to printer or shows in view prog
+##called by "Rechnung drucken" button (neue Rechnung)
 proc printInvoice {invNo} {
-  global spoolDir printCmd db
-  set invName $spoolDir/invoiceVollmar-${invNo}.rtf
 
-set invHexText [pg_exec $db "SELECT dok from invoice where f_number = $invNo"]
-set invText [binary decode hex $invHexText]
-set dviFile /tmp/$invNo.dvi
+  #1. get inv from spoolDir
+#TODO: make invName global - used already in 2 previous progs!
+#TODO: make proc for viewer selection (<showInvoice) if printing not possible
+set invName ...
+set invDviPath ...(needed?)
+set invPsPath ...(PS needed for gs!)
 
-set chan [open $dviFile w]
-puts $chan $invText
-close $chan
+#2. try direct printing to PostScript capable printer -TODO: on what basis? Try to move somewhere else? View before printing?
+set device "ps2write"
+
+##check if CUPS installed
+set lprCheck [autoexec_ok lpr]
+#Better Test lpinfo / lpstat (CUPS?) !
+#Better check if USB printer connected? !!
+
+if {$lprCheck != ""} {
+  set printer "lpr" 
+} else {
+  set printer "/dev/usb/lp0"
+}
+
+#set printer "lpr" - this works if CUPS installed - but USE ANYWAY FOR MY SAKE!!!! (link bas to lpr?)
+catch {exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invTmpPath} res
+
+
+#3. Evaluate $res! -if negative, try viewing (PS viewer!)
+  set invName $spoolDir/invoice_$compName -${invNo}.ps
+
+#Make 1 command for direct PS printing, else show file in evince/okular
+#TODO: for direct PS printing
+#TODO: use pipe instaed of file?
+set dviFile /tmp/$invName.dvi
 
 exec evince $dviFile
 return
@@ -815,19 +935,19 @@ return
     NewsHandler::QueryNews "$invName wird ausgedruckt." lightblue
     exec $printCmd $invName
   } else {
-    NewsHandler::QueryNews "$invName nicht gefunden." red
+
+    NewsHandler::QueryNews "$invName kann weder angezeigt noch gedruckt werden.... $invPdf ..." red
   }
-}
+
+} ;#END printInvoice
+
 
 # saveEntry
 ###called by fillAdrInvWin by $invF.$n.payedsumE entry widget
 proc saveEntry {curVal curEName ns} {
-  
   global db invF
-  
-set curNS "verbucht::${ns}"
-set rowNo [namespace tail $curNS]
-puts "$curNS"
+  set curNS "verbucht::${ns}"
+  set rowNo [namespace tail $curNS]
 
 	#2. get invNo
   set invNo [$invF.$rowNo.invNoL cget -text]
