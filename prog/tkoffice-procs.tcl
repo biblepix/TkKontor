@@ -455,8 +455,8 @@ set menge ""
   pack .invArtNumSB .invArtNameL .invArtPriceL .mengeE .invArtUnitL -in .n.t2.f2 -side left -fill x
   pack .addrowB -in .n.t2.f2 -side right -fill x
   
-  #Reset .saveInvB to "Rechnung speichern"
-  .saveInvB conf -text "Rechung speichern" -command "
+  #Reset .saveInvB to "Rechnung verbuchen"
+  .saveInvB conf -text "Rechung verbuchen" -command "
     saveInv2DB
     saveInv2TeX $invNo
     "
@@ -631,18 +631,6 @@ proc saveInv2DB {} {
   set cond $::cond
   set auftrDat $::auftrDat
 
-
-
-
-#  set invDvi ... - with this yo udon't need Tcl open etc.!
-#INSERT INTO test_table 
-#VALUES(1, pg_read_binary_file('/path/to/file')::bytea);
-#TODO: testing!
-#pg_exec $db "UPDATE invoice set dok = pg_read_binary_file('/home/pv/tkoffice/tex/rechnung-vorlage.dvi')::bytea WHERE f_number=$invNo"
-#möglicherweise besser ohne ::bytea (=escape format?)
-#Possibly this does it the other way (produces a clean hex stream, butt... ):
-#pg_exec $db "select decode(E'$T'::bytea, 'hex')"
-
   #2. Set payedsum=finalsum and ts=3 if cond="bar"
 	if {$cond=="bar"} {
     set ts 3
@@ -705,15 +693,20 @@ proc saveInv2DB {} {
 
 
 # saveInv2TeX
-##called by saveInv2DB
-proc saveInv2TeX {invNo} {
+##called by saveInv2DB (new) & showInvoice (old)
+##with args = data retrieval from DB
+proc saveInv2TeX {{invNo} args} {
   global db spoolDir texVorlage texDir confFile env
 
   set itemFile [file join $texDir invitems.tex]
   set dataFile [file join $texDir invdata.tex]
 
   #vars from top win
-  set comm [.invcomE get]
+#TODO: wrong var! - comment not used in invoice!
+# set comm [.invcomE get]
+  set ref $::ref
+  set ref [.invrefE get]
+
   set cond [.invcondSB get]
   set auftrDat [.invauftrdatE get]
   set subtot [.subtotalL cget -text]
@@ -748,10 +741,35 @@ proc saveInv2TeX {invNo} {
     }
   } ;#END foreach w
 
-  #2.set dataList for usepackage letter
   lappend custAdr $::name1 {\\} $::name2 {\\} $::street {\\} $::zip { } $::city
 
-  append dataList \\newcommand\{\\comm\} \{ $comm \} \n
+  #2. reset vars retrieved for old invoice
+  if [info exists args] {
+
+    set invToken [pg_exec $db "SELECT vat,comm,cond,f_date,items FROM invoice WHERE f_number=$invNo"]
+    set adrToken [pg_exec $db "SELECT name1,name2,street,zip,city FROM address WHERE ts=$invNo"]
+
+#TODO: reportResult here?
+    if {[pg_result $invToken -error] != ""} {
+      NewsHandler::QueryNews "Konnte Rechnungsdaten Nr. $invNo nicht wiederherstellen.\n[pg_result $invToken -error]" red
+      return 1
+    }
+
+    set vat [pg_result $invToken -getTuple 1]
+    set comm [pg_result $invToken -getTuple 2]
+    set cond [pg_result $invToken -getTuple 3]
+    set auftrDat [pg_result $invToken -getTuple 4]
+    set itemList [pg_result $invToken -getTuple 5]
+
+    lappend custAdr [pg_result $adrToken -getTuple 1] {\\}
+    lappend custAdr [pg_result $adrToken -getTuple 2] {\\}
+    lappend custAdr [pg_result $adrToken -getTuple 3] {\\}
+    lappend custAdr [pg_result $adrToken -getTuple 4]
+    lappend custAdr [pg_result $adrToken -getTuple 5]  
+  }
+
+  #3.set dataList for usepackage letter
+  append dataList \\newcommand\{\\ref\} \{ $ref \} \n
   append dataList \\newcommand\{\\cond\} \{ $cond \} \n
   append dataList \\newcommand\{\\dat\} \{ $auftrDat \} \n
   append dataList \\newcommand\{\\invNo\} \{ $invNo \} \n
@@ -763,21 +781,23 @@ proc saveInv2TeX {invNo} {
   append dataList \\newcommand\{\\vat\} \{ $vat \} \n
   append dataList \\newcommand\{\\currency\} \{ $currency \} \n
  
-  #3.Overwrite any old data file
+  #4.Overwrite any old data file
   set chan [open $dataFile w] 
   puts $chan $dataList
   close $chan
 
-  #4. Overwrite any old items file
+  #5. Overwrite any old items file
   set chan [open $itemFile w]
   puts $chan $itemList
   close $chan
 
-  #3. LaTex $vorlage & save invoice to $spool
 
-  ##1. overwrite $vorlage.dvi in $texDir
+
+  #3. LaTex $vorlage & save invoice to $spool
+  ##1. overwrite any old vorlage.dvi - TODO gehört das hierher???
   eval exec latex -draftmode $texVorlage
 
+proc meyutar {} {
   ##2. Create $invName DVI - same in showInvoice!
   append vorlageDvi [file root $texVorlage] . dvi
   set compShortname [lindex $myComp 0]
@@ -788,11 +808,13 @@ proc saveInv2TeX {invNo} {
   file copy $vorlageDvi $invDviPath
 
   reportResult $token "Rechnung $invNo in $invDviPath gespeichert." lightblue
+}
 
   #Change "Rechnung speichern" button to "Rechnung drucken" button
   .saveInvB configure -text "Rechnung drucken" -command {printInvoice}
 
 } ;#END saveInv2TeX
+
 
 
 # doInvoicePdf
@@ -816,6 +838,14 @@ proc doInvoicPdf {invNo} {
     }
 
   }
+}
+
+# getInvDataFromDB
+##retrieve old invoice for printing existing invoice
+##called by showInvoice
+proc getInvDataFromDB {} {
+  global db
+
 }
 
 # showInvoice
@@ -902,25 +932,31 @@ set invName ...
 set invDviPath ...(needed?)
 set invPsPath ...(PS needed for gs!)
 
-#2. try direct printing to PostScript capable printer -TODO: on what basis? Try to move somewhere else? View before printing?
-set device "ps2write"
+#2. try direct printing PS - achtung: dvi könnte schon da sein
+  catch {eval exec dvips $invDviPath} 
+  
+  ##1. Try lpr
+  if {[autoexec_ok lpr] != ""} {
+    if [catch {eval exec lpr $invPsPath}] {
+    
+    ##2. Try gs
+    set device "ps2write"
+    set printer "/dev/usb/lp0" 
 
-##check if CUPS installed
-set lprCheck [autoexec_ok lpr]
-#Better Test lpinfo / lpstat (CUPS?) !
-#Better check if USB printer connected? !!
+#is there a better way to check?
+#Better Test lpinfo / lpstat (only works if CUPS installed) 
+    catch {
+      eval exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invPsPath
+    } res
 
-if {$lprCheck != ""} {
-  set printer "lpr" 
-} else {
-  set printer "/dev/usb/lp0"
+#TODO: evaluate $res and exit here if print successful
+#Maybe like this: set res [eval exec ...]
+# if {$res == ""} { gleich fail??? }
+
+  }
 }
 
-#set printer "lpr" - this works if CUPS installed - but USE ANYWAY FOR MY SAKE!!!! (link bas to lpr?)
-catch {exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invTmpPath} res
-
-
-#3. Evaluate $res! -if negative, try viewing (PS viewer!)
+#3. Try viewing PS
   set invName $spoolDir/invoice_$compName -${invNo}.ps
 
 #Make 1 command for direct PS printing, else show file in evince/okular
@@ -928,8 +964,8 @@ catch {exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invTm
 #TODO: use pipe instaed of file?
 set dviFile /tmp/$invName.dvi
 
-exec evince $dviFile
-return
+exec $viewer $dviFile
+
 
   if [file exists $invName] {
     NewsHandler::QueryNews "$invName wird ausgedruckt." lightblue

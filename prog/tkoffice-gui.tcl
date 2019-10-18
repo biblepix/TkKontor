@@ -1,6 +1,6 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
-# Restored: 9oct19
+# Restored: 18oct19
 
 set version 1.0
 
@@ -138,7 +138,7 @@ pack .titel3 -in .n.t2.f1
 
 #Get Zahlungsbedingungen from config
 set condList ""
-label .invcondL -text "Zahlungsbedingung"
+label .invcondL -text "Zahlungsbedingung:"
 if [info exists cond1] {
 lappend condList $cond1
 }
@@ -152,17 +152,17 @@ lappend condList $cond3
 spinbox .invcondSB -width 20 -values $condList -textvar cond -bg beige
 
 #Auftragsdatum: set to heute
-label .invauftrdatL -text "Auftragsdatum"
+label .invauftrdatL -text "Auftragsdatum:"
 entry .invauftrdatE -width 9 -textvar auftrDat -bg beige
 set auftrDat [clock format [clock seconds] -format %d.%m.%Y]
 
 #Referenz
-label .invrefL -text "Ihre Referenz"
+label .invrefL -text "Ihre Referenz:"
 entry .invrefE -width 20 -bg beige -textvar ref
 
-#Int. Kommentar - TODO: needed?
-label .invcomL -text "Bemerkung"
-entry .invcomE -width 20 -bg beige -textvar comm
+#Int. Kommentar
+label .invcomL -text "Interne Bemerkung:"
+entry .invcomE -width 30 -bg beige -textvar comm
 
 #Set up Artikelliste, fill later when connected to DB
 label .invArtlistL -text "Artikelliste" -font "TkHeadingFont"
@@ -188,10 +188,7 @@ label .subtotalL -width 7 -textvariable subtot -bg lightblue
 message .subtotalM -width 200 -text "Zwischensumme: "
 pack .subtotalM .subtotalL -side left -in .n.t2.bottomF
 
-button .saveInvB -text "Rechnung speichern" -command {
-  saveInv2DB
-  }
-
+button .saveInvB -text "Rechnung verbuchen" -command {saveInv2DB}
 pack .saveInvB -in .n.t2.bottomF -side right
 
 ####################################################################################

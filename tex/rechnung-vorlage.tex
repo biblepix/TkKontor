@@ -1,40 +1,30 @@
 \documentclass{chletter}
-
-\usepackage[utf8]{inputenc}
-%\usepackage[T1]{fontenc}
-%\usepackage{textcomp}
-
-\usepackage[a4paper]{geometry}
-\usepackage[german]{babel}
-\usepackage[german]{invoice}
-
-\renewcommand*{\Fees}{Leistungen}
-\renewcommand*{\UnitRate}{Einzelpeis}
-%\renewcommand*{\Count}{Menge}
-\renewcommand*{\Activity}{Produkt}
-
-%Load MyCompany details for 'letter' package
-\input{newInvData.tex}
-
-\author{}
-\name{\myName}
-\address{\myAddress}
-\location{\myCity}
-\date{\location, \today}
-\title{\textbf{Rechnung}}
-\telephone{\myPhone}
-
-
-\begin{document}
-\begin{letter}{\custAdr}
-
-\opening{Rechnung Nr. \quad \invNo \\ Ihre Referenz: \quad \comm \\ Auftragsdatum: \quad \dat \\ \bf{Zahlungsfrist: \quad \cond}}
-
-%VAT/MwSt = 0, meaning it doesn't appear in the invoice
-%For Euro/Dollar/Pound symbols activate above fontenc & textcomp packages
-  \input{newInvPosten.tex}
-
-\closing{Besten Dank für den geschätzten Auftrag! \\\\ Zahlung an:  \bank}
-
-\end{letter}
-\end{document}
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{textcomp}
+  \usepackage[a4paper]{geometry}
+  \usepackage[german]{babel}
+  \usepackage[german]{invoice}
+  \renewcommand*{\Fees}{Leistungen}
+  \renewcommand*{\UnitRate}{Einzelpeis}
+  \renewcommand*{\Count}{Menge}
+  \renewcommand*{\Activity}{Produkt}
+  \title{}
+  \author{}
+  \name{Vollmar Übersetzungs-Service}
+\address{Postfach}
+\telephone{071 350 00 34}
+\location{9000 St. Gallen}
+  \input{/home/pv/tkoffice/tex/invdata.tex}
+  \begin{document}
+  \begin{letter}{\custAdr}
+  \date{\location, \today}
+  \opening{Rechnung Nr. \quad \invNo \\ Ihre Referenz: \quad \ref \\ Auftragsdatum: \quad \dat \\ \bf{Zahlungsfrist: \quad \cond}}
+  \begin{invoice}{\currency}{\vat}
+  \ProjectTitle{Rechnung}
+  \input{/home/pv/tkoffice/tex/invitems.tex}
+  \end{invoice}
+  \closing{Besten Dank für den geschätzten Auftrag! \\\\ Zahlung an: \bank}
+  \end{letter}
+  \end{document}
+  
