@@ -289,7 +289,7 @@ proc resetAdrWin {} {
 proc newAddress {} {
   global adrSpin
 
-  set ::name1 "Anrede"
+  set ::name1 "Anrede/Firma"
   set ::name2 "Name"
   set ::street "Strasse"
   set ::zip "PLZ"
@@ -455,10 +455,11 @@ set menge ""
   pack .invArtNumSB .invArtNameL .invArtPriceL .mengeE .invArtUnitL -in .n.t2.f2 -side left -fill x
   pack .addrowB -in .n.t2.f2 -side right -fill x
   
-  #Reset .saveInvB to "Rechnung verbuchen"
+  #Reset .saveInvB to "Rechnung verbuchen" - TODO: make sure below commands are executed in this order!!!! check return codes!!!
   .saveInvB conf -text "Rechung verbuchen" -command "
-    saveInv2DB
-    saveInv2TeX $invNo
+    if ![catch {saveInv2TeX $invNo}] {
+      saveInv2DB
+    }
     "
 } ;#END resetNewInvDialog
 
@@ -609,11 +610,10 @@ proc addInvRow {} {
 
 } ;#END addInvRow
 
-#TODO: save f_date with other data when printing invoice!!!
-#incorporate in printInvoice
 
-# saveInvoiceToDB
+# saveInv2DB
 ##called by "Rechnung speichern" button
+##saveInv2TeX must have run!
 proc saveInv2DB {} {
   global db adrSpin ref comm auftrdat env msg vat
   global artName artPrice cond artUnit rowtot
@@ -646,7 +646,14 @@ proc saveInv2DB {} {
     set vatlesssum [expr ($vat * $finalsum)/100]
   }
 
-  #3. Save new invoice to DB
+#Create item text - todo set var $itemfile!
+set chan [open $itemFile]
+set t [read $chan]
+close $chan
+set itemList [binary encode hex $t]
+
+
+  #3. Save new invoice to DB - TODO: add items,vat,reference !
   set token [pg_exec $db "INSERT INTO invoice 
     (
     objectid,
@@ -660,6 +667,8 @@ proc saveInv2DB {} {
     f_number, 
     f_date, 
     f_comment
+items,
+
     ) 
   VALUES 
     (
@@ -673,7 +682,9 @@ proc saveInv2DB {} {
     $vatlesssum,
     $invNo, 
     to_date('$auftrDat','DD MM YYYY'), 
-    '$comm'
+    '$comm',
+'$itemList',
+
    )
   RETURNING objectid"	]
 
@@ -683,7 +694,7 @@ proc saveInv2DB {} {
     } else {
 
      	NewsHandler::QueryNews "Rechnung $invNo gespeichert" green
-      saveInv2TeX
+    #  saveInv2TeX
       fillAdrInvWin $custOID
       #Reconfigure Button for Printing
       .saveInvB conf -text "Rechnung drucken" -command {printInvoice $invNo}
@@ -694,19 +705,52 @@ proc saveInv2DB {} {
 
 # saveInv2TeX
 ##called by saveInv2DB (new) & showInvoice (old)
-##with args = data retrieval from DB
-proc saveInv2TeX {{invNo} args} {
-  global db spoolDir texVorlage texDir confFile env
-
+##with args (=invNo) retrieve data from DB
+##witout args: get data from new invoice dialogue
+proc saveInv2TeX {args} {
+  global db adrSpin spoolDir texVorlage texDir confFile env
   set itemFile [file join $texDir invitems.tex]
   set dataFile [file join $texDir invdata.tex]
 
-  #vars from top win
-#TODO: wrong var! - comment not used in invoice!
-# set comm [.invcomE get]
+
+  #1.get some vars from config
+  source $confFile
+  if {$currency=="$"} {set currency \\textdollar}
+  if {$currency=="£"} {set currency \\textsterling}
+  if {$currency=="€"} {set currency \\texteuro}
+  if {$currency=="CHF"} {set currency {Fr.}}
+
+  #2.Get more data from DB
+  set custAdr [formatCustAdrForTeX]
+
+  if [info exists args] {
+
+    set invNo $args
+    set invToken [pg_exec $db "SELECT vat,ref,cond,f_date,items FROM invoice WHERE f_number=$invNo"]
+
+#    set adrToken [pg_exec $db "SELECT ts from invoice where f_number=$invNo"]
+#    set adrNo [pg_result $adrToken -list]
+
+#TODO: reportResult here?
+    if {[pg_result $invToken -error] != ""} {
+      NewsHandler::QueryNews "Konnte Rechnungsdaten Nr. $invNo nicht wiederherstellen.\n[pg_result $invToken -error]" red
+      return 1
+    }
+
+    set vat [pg_result $invToken -getTuple 1]
+    set ref [pg_result $invToken -getTuple 2]
+    set cond [pg_result $invToken -getTuple 3]
+    set auftrDat [pg_result $invToken -getTuple 4]
+    set itemList [pg_result $invToken -getTuple 5]
+
+
+
+#neue Rechnung
+ } else {
+
+	set adrNo [$adrSpin get]
   set ref $::ref
   set ref [.invrefE get]
-
   set cond [.invcondSB get]
   set auftrDat [.invauftrdatE get]
   set subtot [.subtotalL cget -text]
@@ -714,10 +758,7 @@ proc saveInv2TeX {{invNo} args} {
   source $confFile
   if {![string is digit $vat]} {set vat 0.0}
 
-  if {$currency=="$"} {set currency \\textdollar}
-  if {$currency=="£"} {set currency \\textsterling}
-  if {$currency=="€"} {set currency \\texteuro}
-  if {$currency=="CHF"} {set currency {Fr.}}
+
   
   #1.set itemList for itemFile
   foreach w [namespace children rows] {
@@ -741,32 +782,10 @@ proc saveInv2TeX {{invNo} args} {
     }
   } ;#END foreach w
 
-  lappend custAdr $::name1 {\\} $::name2 {\\} $::street {\\} $::zip { } $::city
+
 
   #2. reset vars retrieved for old invoice
-  if [info exists args] {
 
-    set invToken [pg_exec $db "SELECT vat,comm,cond,f_date,items FROM invoice WHERE f_number=$invNo"]
-    set adrToken [pg_exec $db "SELECT name1,name2,street,zip,city FROM address WHERE ts=$invNo"]
-
-#TODO: reportResult here?
-    if {[pg_result $invToken -error] != ""} {
-      NewsHandler::QueryNews "Konnte Rechnungsdaten Nr. $invNo nicht wiederherstellen.\n[pg_result $invToken -error]" red
-      return 1
-    }
-
-    set vat [pg_result $invToken -getTuple 1]
-    set comm [pg_result $invToken -getTuple 2]
-    set cond [pg_result $invToken -getTuple 3]
-    set auftrDat [pg_result $invToken -getTuple 4]
-    set itemList [pg_result $invToken -getTuple 5]
-
-    lappend custAdr [pg_result $adrToken -getTuple 1] {\\}
-    lappend custAdr [pg_result $adrToken -getTuple 2] {\\}
-    lappend custAdr [pg_result $adrToken -getTuple 3] {\\}
-    lappend custAdr [pg_result $adrToken -getTuple 4]
-    lappend custAdr [pg_result $adrToken -getTuple 5]  
-  }
 
   #3.set dataList for usepackage letter
   append dataList \\newcommand\{\\ref\} \{ $ref \} \n
@@ -780,6 +799,8 @@ proc saveInv2TeX {{invNo} args} {
   append dataList \\newcommand\{\\myPhone\} \{ $myPhone \} \n
   append dataList \\newcommand\{\\vat\} \{ $vat \} \n
   append dataList \\newcommand\{\\currency\} \{ $currency \} \n
+
+} #END main cond
  
   #4.Overwrite any old data file
   set chan [open $dataFile w] 
@@ -788,7 +809,7 @@ proc saveInv2TeX {{invNo} args} {
 
   #5. Overwrite any old items file
   set chan [open $itemFile w]
-  puts $chan $itemList
+  puts f$chan $itemList
   close $chan
 
 
@@ -815,7 +836,30 @@ proc meyutar {} {
 
 } ;#END saveInv2TeX
 
+# formatTeXAddress
+##called by saveInv2TeX
+proc formatCustAdrForTeX {adrNo} {
+  global db
+  set name1 [pg_exec $db "SELECT name1 FROM address WHERE objectid=$adrNo"]
+  set name2 [pg_exec $db "SELECT name2 FROM address WHERE objectid=$adrNo"]
+  set street [pg_exec $db "SELECT street FROM address WHERE objectid=$adrNo"]
+  set zip [pg_exec $db "SELECT zip FROM address WHERE objectid=$adrNo"]
+  set city [pg_exec $db "SELECT city FROM address WHERE objectid=$adrNo"]
 
+  lappend custAdr [pg_result $name1 -list] {\\}
+  lappend custAdr [pg_result $name2 -list] {\\}
+  lappend custAdr [pg_result $street -list] {\\}
+  lappend custAdr [pg_result $zip -list] { }
+  lappend custAdr [pg_result $city -list]  
+
+  pg_result $name1 -clear
+  pg_result $name2 -clear
+  pg_result $street -clear
+  pg_result $zip -clear
+  pg_result $city -clear
+
+  return $custAdr
+}
 
 # doInvoicePdf
 ##creates invoice PDF if so desired by user
@@ -849,10 +893,33 @@ proc getInvDataFromDB {} {
 }
 
 # showInvoice
-##displays existing DVI or PS
+##(meant to display existing DVI or PS,but..)
+##gets invoice data from DB & recreates TeX (??>DIV>PS) > PDF
+## TODO: thought: if we just get a PDF this can be viewed by any old prog - but still must find installed PDF viewer :-
 ##called by "Ansicht" button
 proc showInvoice {invNo} {
-  global spoolDir db myComp
+  global db itemFile
+
+  #1.get itemList from DB & create itemFile
+  set token [pg_exec $db "SELECT items FROM invoice WHERE f_number=$invNo"]
+  if { [pg_result $token -error] != "" || [pg_result $token -list == ""] } {
+    set itemList ""  
+  } else {
+    set thex [pg_result $token -list]
+    set itemList [binary decode hex $thex]
+  }
+  set chan [open $itemFile w]
+  puts $chan $itemList
+  close $chan
+
+  #2.get dataFile details from $config + DB (VAT, cond, ref) & create dataFile
+
+  #3.execute latex on $vorlage
+
+
+
+
+  global spoolDir myComp
   set compShortname [lindex $myComp 0]
   append invName invoice _ $compShortname $invNo
   append invDviName $invName . dvi
