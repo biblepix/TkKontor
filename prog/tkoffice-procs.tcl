@@ -111,18 +111,21 @@ proc fillAdrInvWin {adrId} {
     set nTuples [pg_result $invNo -numTuples]
   	if {$nTuples == -1} {return 1}
 
-    set invDat [pg_exec $db "SELECT f_date FROM invoice WHERE customeroid = $custId"]
-	  set beschr [pg_exec $db "SELECT shortdescription FROM invoice WHERE customeroid = $custId"]
+    set invDat   [pg_exec $db "SELECT f_date FROM invoice WHERE customeroid = $custId"]
+	  set beschr   [pg_exec $db "SELECT shortdescription FROM invoice WHERE customeroid = $custId"]
 	  set sumtotal [pg_exec $db "SELECT finalsum FROM invoice WHERE customeroid = $custId"]
 	  set payedsum [pg_exec $db "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
-	  set status [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
+	  set status   [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
+
+set itemsT   [pg_exec $db "SELECT doc FROM invoice WHERE doc IS NOT NULL AND customeroid = $custId"]
+puts "Items: $itemsT"
 
     for {set n 0} {$n<$nTuples} {incr n} {
     
       namespace eval $n {
 
         set n [namespace tail [namespace current]]
-        puts $n
+        #puts $n
         set invF $::invF
         set invNo $::verbucht::invNo
 
@@ -153,9 +156,11 @@ proc fillAdrInvWin {adrId} {
         $invF.$n.payedsumL conf -text $bezahlt
         catch {entry $invF.$n.payedsumE -text Eingabe -bg beige -fg grey -width 7 -justify right}
 
-        ##create showInvoice button
-        catch {button $invF.$n.invShowB}
-        $invF.$n.invShowB conf -text "Ansicht" -command "showInvoice $invno"
+        ##create showInvoice button if inv not empty
+        catch {button $invF.$n.invshowB}
+
+
+
 
 			#PAYEDSUM label/entry
 			#If 3 (payed) make label
@@ -165,7 +170,7 @@ proc fillAdrInvWin {adrId} {
         $invF.$n.payedsumL conf -fg green
         $invF.$n.statusL conf -fg green
         pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL $invF.$n.statusL -side left
-        pack $invF.$n.invShowB -side right
+ #       pack $invF.$n.invShowB -side right
 			
       #If 1 or 2 make entry
 			} else {
@@ -177,8 +182,10 @@ proc fillAdrInvWin {adrId} {
         $invF.$n.payedsumE conf -validate focusout -validatecommand "saveEntry %P %W $n" 
         $invF.$n.statusL conf -fg red
 				pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL $invF.$n.statusL -side left
-        pack $invF.$n.invShowB $invF.$n.zahlenL $invF.$n.payedsumE  -side right
-			
+        pack $invF.$n.zahlenL $invF.$n.payedsumE -side right
+
+
+		
       #if 2 (Teilzahlung) include payed amount
 			#WARUM IST payedsum LEER - can't use -textvariable with -validatecommand!
 				if {$ts==2} {
@@ -187,9 +194,20 @@ proc fillAdrInvWin {adrId} {
           $invF.$n.statusL conf -fg orange
 					set zahlen "Restbetrag eingeben und mit Tab-Taste quittieren"
 				}
+
 			}
 
-  		pack $invF.$n.invShowB -side right 
+      #Create Show button if items not empty
+set items $::verbucht::itemsT
+catch {      set itemlist [pg_result $items -getTuple $n] }
+#      puts $itemlist
+
+      if {[pg_result $items -error] == "" && [info exists itemlist]} {
+
+        $invF.$n.invshowB conf -bg lightblue -activebackground beige -command "showInvoice $invno" -height -1 -width -1
+        pack $invF.$n.invshowB -side right
+      }
+
 	
   		} ;#end for loop
     } ;#END namspace $rowNo
@@ -616,7 +634,7 @@ proc addInvRow {} {
 ##saveInv2TeX must have run!
 proc saveInv2DB {} {
   global db adrSpin ref comm auftrdat env msg vat
-  global artName artPrice cond artUnit rowtot
+  global artName artPrice cond artUnit rowtot itemlist
 
   #1. Get current vars - TODO: incorporate in DB as 'SERIAL', starting with %YY
 	set invNo [createNewNumber invoice]
@@ -630,6 +648,12 @@ proc saveInv2DB {} {
   set custOID [pg_result $custID -list]
   set cond $::cond
   set auftrDat $::auftrDat
+
+  #Get itemList: open latest $itemFile & convert to Hex
+  set chan [open $itemFile]
+  set itemList [read $chan]
+  close $chan
+  set itemListHex [binary encode hex $itemList]
 
   #2. Set payedsum=finalsum and ts=3 if cond="bar"
 	if {$cond=="bar"} {
@@ -646,14 +670,7 @@ proc saveInv2DB {} {
     set vatlesssum [expr ($vat * $finalsum)/100]
   }
 
-#Create item text - todo set var $itemfile!
-set chan [open $itemFile]
-set t [read $chan]
-close $chan
-set itemList [binary encode hex $t]
-
-
-  #3. Save new invoice to DB - TODO: add items,vat,reference !
+  #3. Save new invoice to DB
   set token [pg_exec $db "INSERT INTO invoice 
     (
     objectid,
@@ -667,8 +684,9 @@ set itemList [binary encode hex $t]
     f_number, 
     f_date, 
     f_comment
-items,
-
+    items,
+    ref,
+    cond
     ) 
   VALUES 
     (
@@ -683,35 +701,31 @@ items,
     $invNo, 
     to_date('$auftrDat','DD MM YYYY'), 
     '$comm',
-'$itemList',
-
+    '$itemListHex',
+    '$ref',
+    '$cond'
    )
   RETURNING objectid"	]
 
   if {[pg_result $token -error] != ""} {
-    	NewsHandler::QueryNews "Rechnung $invNo nicht gespeichert:\n[pg_result $token -error ]" red
-
-    } else {
-
-     	NewsHandler::QueryNews "Rechnung $invNo gespeichert" green
-    #  saveInv2TeX
-      fillAdrInvWin $custOID
-      #Reconfigure Button for Printing
-      .saveInvB conf -text "Rechnung drucken" -command {printInvoice $invNo}
-    } 
+    NewsHandler::QueryNews "Rechnung $invNo nicht gespeichert:\n[pg_result $token -error ]" red
+  } else {
+   	NewsHandler::QueryNews "Rechnung $invNo gespeichert" green
+    fillAdrInvWin $custOID
+    .saveInvB conf -text "Rechnung drucken" -command {printInvoice $invNo}
+  } 
 
 } ;#END saveInv2DB
 
 
 # saveInv2TeX
 ##called by saveInv2DB (new) & showInvoice (old)
-##with args (=invNo) retrieve data from DB
+##with args(=invNo): retrieve data from DB
 ##witout args: get data from new invoice dialogue
 proc saveInv2TeX {args} {
   global db adrSpin spoolDir texVorlage texDir confFile env
   set itemFile [file join $texDir invitems.tex]
   set dataFile [file join $texDir invdata.tex]
-
 
   #1.get some vars from config
   source $confFile
@@ -726,10 +740,7 @@ proc saveInv2TeX {args} {
   if [info exists args] {
 
     set invNo $args
-    set invToken [pg_exec $db "SELECT vat,ref,cond,f_date,items FROM invoice WHERE f_number=$invNo"]
-
-#    set adrToken [pg_exec $db "SELECT ts from invoice where f_number=$invNo"]
-#    set adrNo [pg_result $adrToken -list]
+    set invToken [pg_exec $db "SELECT ref,cond,f_date,items FROM invoice WHERE f_number=$invNo"]
 
 #TODO: reportResult here?
     if {[pg_result $invToken -error] != ""} {
@@ -737,55 +748,46 @@ proc saveInv2TeX {args} {
       return 1
     }
 
-    set vat [pg_result $invToken -getTuple 1]
-    set ref [pg_result $invToken -getTuple 2]
-    set cond [pg_result $invToken -getTuple 3]
-    set auftrDat [pg_result $invToken -getTuple 4]
-    set itemList [pg_result $invToken -getTuple 5]
-
+    set ref [lindex [pg_result $invToken -list] 1]
+    set cond [lindex [pg_result $invToken -list] 2]
+    set auftrDat [lindex [pg_result $invToken -list] 3]
+    set itemList [lindex [pg_result $invToken -list] 4]
 
 
 #neue Rechnung
- } else {
+  } else {
 
-	set adrNo [$adrSpin get]
-  set ref $::ref
-  set ref [.invrefE get]
-  set cond [.invcondSB get]
-  set auftrDat [.invauftrdatE get]
-  set subtot [.subtotalL cget -text]
+	  set adrNo [$adrSpin get]
+    set ref $::ref
+    set ref [.invrefE get]
+    set cond [.invcondSB get]
+    set auftrDat [.invauftrdatE get]
+    set subtot [.subtotalL cget -text]
 
-  source $confFile
-  if {![string is digit $vat]} {set vat 0.0}
-
-
-  
-  #1.set itemList for itemFile
-  foreach w [namespace children rows] {
-  
-    set artUnit [.artunitL[namespace tail $w] cget -text]
-    set artPrice [.artpriceL[namespace tail $w] cget -text]
-    set artType [.arttypeL[namespace tail $w] cget -text]
-    set artName [.artnameL[namespace tail $w] cget -text]
-    set menge [.mengeL[namespace tail $w] cget -text]
+    source $confFile
+    if {![string is digit $vat]} {set vat 0.0}
     
-    #Check if Discount
-    if {$artType==""} {
-      append itemList \\Fee\{ $artName { } \( pro { } $artUnit \) \} \{ $artPrice \} \{ $menge \} \n
-    } elseif {$artType=="R"} {
+    #1.set itemList for itemFile
+    foreach w [namespace children rows] {
+    
+      set artUnit [.artunitL[namespace tail $w] cget -text]
+      set artPrice [.artpriceL[namespace tail $w] cget -text]
+      set artType [.arttypeL[namespace tail $w] cget -text]
+      set artName [.artnameL[namespace tail $w] cget -text]
+      set menge [.mengeL[namespace tail $w] cget -text]
+      
+      #Check if Discount
+      if {$artType==""} {
+        append itemList \\Fee\{ $artName { } \( pro { } $artUnit \) \} \{ $artPrice \} \{ $menge \} \n
+      } elseif {$artType=="R"} {
+        append itemList \\Discount\{ $artName \} \{ $::rabatt \} \n
 
-#TODO: get Prozentsatz !
-      append itemList \\Discount\{ $artName \} \{ $::rabatt \} \n
-    #Check if Auslage - TODO change save2DB 
-    } elseif {$artType=="A"} {
-      append itemList \\EBC\{ $artName \} \{ $artPrice \} \n
-    }
-  } ;#END foreach w
-
-
-
-  #2. reset vars retrieved for old invoice
-
+      #Check if Auslage - TODO? change save2DB (no entry for Auslagen?)
+      } elseif {$artType=="A"} {
+        append itemList \\EBC\{ $artName \} \{ $artPrice \} \n
+      }
+    } ;#END foreach w
+  } #END main cond
 
   #3.set dataList for usepackage letter
   append dataList \\newcommand\{\\ref\} \{ $ref \} \n
@@ -800,8 +802,6 @@ proc saveInv2TeX {args} {
   append dataList \\newcommand\{\\vat\} \{ $vat \} \n
   append dataList \\newcommand\{\\currency\} \{ $currency \} \n
 
-} #END main cond
- 
   #4.Overwrite any old data file
   set chan [open $dataFile w] 
   puts $chan $dataList
@@ -809,32 +809,33 @@ proc saveInv2TeX {args} {
 
   #5. Overwrite any old items file
   set chan [open $itemFile w]
-  puts f$chan $itemList
+  puts $chan $itemList
   close $chan
 
+  #3. PdfLaTex > texDir -TODO: needs clear exit code!
+  eval exec pdflatex -no-file-line-error $texVorlage
 
+  append invOrigPdfName [file root $texVorlage] . pdf
+  append invOrigPdfPath [file join $texDir $invOrigPdfName]
+  set invNewPdfPath [getInvPdfPath $invNo]
 
-  #3. LaTex $vorlage & save invoice to $spool
-  ##1. overwrite any old vorlage.dvi - TODO gehört das hierher???
-  eval exec latex -draftmode $texVorlage
-
-proc meyutar {} {
-  ##2. Create $invName DVI - same in showInvoice!
-  append vorlageDvi [file root $texVorlage] . dvi
-  set compShortname [lindex $myComp 0]
-  append invName invoice _ $compShortname $invNo
-
-  #3. Save invoice DVI to Spooldir
-  append invDviPath [file join $spoolDir] / $invName . dvi
-  file copy $vorlageDvi $invDviPath
-
-  reportResult $token "Rechnung $invNo in $invDviPath gespeichert." lightblue
-}
+  #4. Rechnung.pdf > spoolDir
+  file copy $invOrigPdfPath $invNewPdfPath
 
   #Change "Rechnung speichern" button to "Rechnung drucken" button
   .saveInvB configure -text "Rechnung drucken" -command {printInvoice}
 
 } ;#END saveInv2TeX
+
+proc getInvPdfPath {invNo} {
+  global spoolDir myComp
+
+  set compShortname [lindex $myComp 0]
+  append invPdfName invoice _ $compShortname - $invNo .pdf
+  set invPdfPath [file join $spoolDir $invPdfName]
+
+  return $invPdfPath
+}
 
 # formatTeXAddress
 ##called by saveInv2TeX

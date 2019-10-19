@@ -120,13 +120,13 @@ label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -widt
 label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 10
 label .invPayedH -text "Bezahlt" -font TkCaptionFont -justify right -anchor w -width 10
 label .invStatusH -text "Status" -font TkCaptionFont -justify right -anchor w -width 10
+label .invShowH -text "Ansicht" -font TkCaptionFont -justify right -anchor w -justify right -width 10
 
-#pack .titel2 -in .n.f0 -anchor nw
-pack [frame .n.t1.headF -padx $px] -anchor nw
+pack [frame .n.t1.headF -padx $px] -anchor nw -fill x
 pack [frame .n.t1.invF -padx $px] -anchor nw -fill x
 set invF .n.t1.invF
 pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invStatusH -in .n.t1.headF -side left
-
+pack .invShowH -in .n.t1.headF -side right
 
 ########################################################################################
 # T A B  2 :   N E W   I N V O I C E
