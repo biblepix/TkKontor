@@ -187,20 +187,21 @@ label .invArtTypeL -textvar artType -padx 20
 label .subtotalL -width 7 -textvariable subtot -bg lightblue
 message .subtotalM -width 200 -text "Zwischensumme: "
 pack .subtotalM .subtotalL -side left -in .n.t2.bottomF
-
-button .saveInvB -text "Rechnung verbuchen" -command {saveInv2DB}
+##configured later by resetNewInvDialog:
+button .saveInvB -text "Rechnung verbuchen"
+button .abbruchInvB -text "Abbruch"
 pack .saveInvB -in .n.t2.bottomF -side right
+
 
 ####################################################################################
 # P a c k   b o t t o m 
 ###################################################################################
 pack [frame .bottomF] -side bottom -fill x
-button .abbruch -text "Programm beenden" -activebackground red -command {
+button .abbruchB -text "Programm beenden" -activebackground red -command {
 	catch {pg_disconnect $dbname}
 	exit
 	}
-
-pack .abbruch -in .bottomF -side right
+pack .abbruchB -in .bottomF -side right
 
 
 ######################################################################################

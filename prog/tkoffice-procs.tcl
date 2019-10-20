@@ -446,6 +446,7 @@ proc deleteAddress {adrNo} {
 proc resetNewInvDialog {} {
   pack forget [pack slaves .invoiceFrame]
   set invNo 0
+
   catch {namespace delete rows}
   catch {unset ::shortdescr}
 
@@ -473,10 +474,11 @@ set menge ""
   pack .invArtNumSB .invArtNameL .invArtPriceL .mengeE .invArtUnitL -in .n.t2.f2 -side left -fill x
   pack .addrowB -in .n.t2.f2 -side right -fill x
   
-  #Reset .saveInvB to "Rechnung verbuchen" - TODO: make sure below commands are executed in this order!!!! check return codes!!!
-  .saveInvB conf -text "Rechung verbuchen" -command "
+  #Reset .saveInvB to "Rechnung verbuchen"
+  .saveInvB conf -state disabled -command "
     if ![catch {saveInv2TeX $invNo}] {
       saveInv2DB
+      %W conf -activebackground #ececec -state normal
     }
     "
 } ;#END resetNewInvDialog
@@ -545,15 +547,16 @@ proc addInvRow {} {
   namespace eval rows {}
   
   #Create Abbruch button
-  catch {button .abbruchInvB}
-  pack .abbruchInvB -in .n.t2.bottomF -side right
-  .abbruchInvB conf -text "Abbruch" -activebackground red -command {
+  pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
+  .saveInvB conf -activebackground skyblue -state normal
+  .abbruchInvB conf -activebackground red -command {
     pack forget .abbruchInvB
     namespace delete rows
     foreach w [pack slaves .invoiceFrame] {
       pack forget $w
     }
     resetNewInvDialog
+    .saveInvB conf -activebackground #cecece
     }
 
   if {[namespace children rows] == ""} {
