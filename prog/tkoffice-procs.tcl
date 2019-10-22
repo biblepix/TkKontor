@@ -105,35 +105,32 @@ proc fillAdrInvWin {adrId} {
   namespace eval verbucht {
 
     set adrId [.adrSB get]
-    set token [pg_exec $::db "SELECT ts FROM address WHERE objectid = $adrId"]
-    set custId [pg_result $token -list]
-    set invNo [pg_exec $::db "SELECT f_number FROM invoice WHERE customeroid = $custId"]
+    set idToken [pg_exec $db "SELECT ts FROM address WHERE objectid = $adrId"]
+    set custId [pg_result $idToken -list]
+    set invNo [pg_exec $db "SELECT f_number FROM invoice WHERE customeroid = $custId"]
     set nTuples [pg_result $invNo -numTuples]
+
   	if {$nTuples == -1} {return 1}
 
-    set invDat   [pg_exec $db "SELECT f_date FROM invoice WHERE customeroid = $custId"]
-	  set beschr   [pg_exec $db "SELECT shortdescription FROM invoice WHERE customeroid = $custId"]
-	  set sumtotal [pg_exec $db "SELECT finalsum FROM invoice WHERE customeroid = $custId"]
-	  set payedsum [pg_exec $db "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
-	  set status   [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
-
-set itemsT   [pg_exec $db "SELECT doc FROM invoice WHERE doc IS NOT NULL AND customeroid = $custId"]
-puts "Items: $itemsT"
+    set invDatT   [pg_exec $db "SELECT f_date FROM invoice WHERE customeroid = $custId"]
+	  set beschrT   [pg_exec $db "SELECT shortdescription FROM invoice WHERE customeroid = $custId"]
+	  set sumtotalT [pg_exec $db "SELECT finalsum FROM invoice WHERE customeroid = $custId"]
+	  set payedsumT [pg_exec $db "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
+	  set statusT   [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
+    set itemsT    [pg_exec $db "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
 
     for {set n 0} {$n<$nTuples} {incr n} {
     
       namespace eval $n {
 
         set n [namespace tail [namespace current]]
-        #puts $n
         set invF $::invF
         set invNo $::verbucht::invNo
-
-			  set total [pg_result $::verbucht::sumtotal -getTuple $n] 
-			  set ts [pg_result $::verbucht::status -getTuple $n]
+			  set total [pg_result $::verbucht::sumtotalT -getTuple $n] 
+			  set ts [pg_result $::verbucht::statusT -getTuple $n]
 			  set invno [pg_result $::verbucht::invNo -getTuple $n]
-        set invdat [pg_result $::verbucht::invDat -getTuple $n]
-			  set desc [pg_result $::verbucht::beschr -getTuple $n]
+        set invdat [pg_result $::verbucht::invDatT -getTuple $n]
+			  set beschr [pg_result $::verbucht::beschrT -getTuple $n]
 
 			  #increase but don't overwrite frames per line	
 			  catch {frame $invF.$n}
@@ -145,70 +142,60 @@ puts "Items: $itemsT"
         catch {label $invF.$n.invDatL -width 10 -anchor w}
         $invF.$n.invDatL configure -text $invdat
 			  catch {label $invF.$n.beschr -width 20 -justify left -anchor w}
-			  $invF.$n.beschr configure -text $desc
+			  $invF.$n.beschr configure -text $beschr
 			  catch {label $invF.$n.sumtotal -width 10 -justify right -anchor e}
 			  $invF.$n.sumtotal configure -text $total
 			  catch {label $invF.$n.statusL -width 10 -justify right -anchor e}
 			  $invF.$n.statusL configure -text $ts
         #create label/entry for Bezahlt, packed later
-        set bezahlt [pg_result $::verbucht::payedsum -getTuple $n]
+        set bezahlt [pg_result $::verbucht::payedsumT -getTuple $n]
         catch {label $invF.$n.payedsumL -width 10 -justify right -anchor e}
         $invF.$n.payedsumL conf -text $bezahlt
         catch {entry $invF.$n.payedsumE -text Eingabe -bg beige -fg grey -width 7 -justify right}
 
-        ##create showInvoice button if inv not empty
+        ##create showInvoice button, to show up only if inv not empty
         catch {button $invF.$n.invshowB}
 
+			  #PAYEDSUM label/entry
+			  #If 3 (payed) make label
+			  if {$ts==3} {
+				  set zahlen ""
+				  #catch {label $invF.$n.payedsumL -width 10}
+          $invF.$n.payedsumL conf -fg green
+          $invF.$n.statusL conf -fg green
+          pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL $invF.$n.statusL -side left
+			  
+        #If 1 or 2 make entry
+			  } else {
 
+				  catch {label $invF.$n.zahlenL -textvar zahlen -fg red -width 50}
+				  set zahlen "Zahlbetrag eingeben und mit Tab-Taste quittieren"
+          #create entry widget providing amount, entry name & NS to calling prog
+          $invF.$n.payedsumE delete 0 end
+          $invF.$n.payedsumE conf -validate focusout -validatecommand "saveEntry %P %W $n" 
+          $invF.$n.statusL conf -fg red
+				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL $invF.$n.statusL -side left
+          pack $invF.$n.zahlenL $invF.$n.payedsumE -side right
+		  
+        #if 2 (Teilzahlung) include payed amount
+			  #WARUM IST payedsum LEER - can't use -textvariable with -validatecommand!
+				  if {$ts==2} {
+					  $invF.$n.payedsumE configure -bg orange
+					  $invF.$n.zahlenL conf -bg orange -fg white -width 50 -textvar zahlen
+            $invF.$n.statusL conf -fg orange
+					  set zahlen "Restbetrag eingeben und mit Tab-Taste quittieren"
+				  }
 
+			  }
 
-			#PAYEDSUM label/entry
-			#If 3 (payed) make label
-			if {$ts==3} {
-				set zahlen ""
-				#catch {label $invF.$n.payedsumL -width 10}
-        $invF.$n.payedsumL conf -fg green
-        $invF.$n.statusL conf -fg green
-        pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL $invF.$n.statusL -side left
- #       pack $invF.$n.invShowB -side right
-			
-      #If 1 or 2 make entry
-			} else {
+        #Create Show button if items not empty
+        set itemsT $::verbucht::itemsT
+        catch {set itemlist [pg_result $itemsT -getTuple $n] }
+        if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
+          $invF.$n.invshowB conf -bg lightblue -activebackground beige -command "showInvoice $invno" -height -1 -width -1
+          pack $invF.$n.invshowB -side right
+        }
 
-				catch {label $invF.$n.zahlenL -textvariable zahlen -fg red -width 50}
-				set zahlen "Zahlbetrag eingeben und mit Tab-Taste quittieren"
-        #create entry widget providing amount, entry name & NS to calling prog
-        $invF.$n.payedsumE delete 0 end
-        $invF.$n.payedsumE conf -validate focusout -validatecommand "saveEntry %P %W $n" 
-        $invF.$n.statusL conf -fg red
-				pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL $invF.$n.statusL -side left
-        pack $invF.$n.zahlenL $invF.$n.payedsumE -side right
-
-
-		
-      #if 2 (Teilzahlung) include payed amount
-			#WARUM IST payedsum LEER - can't use -textvariable with -validatecommand!
-				if {$ts==2} {
-					$invF.$n.payedsumE configure -bg orange
-					$invF.$n.zahlenL conf -bg orange -fg white -width 50 -textvariable zahlen
-          $invF.$n.statusL conf -fg orange
-					set zahlen "Restbetrag eingeben und mit Tab-Taste quittieren"
-				}
-
-			}
-
-      #Create Show button if items not empty
-set items $::verbucht::itemsT
-catch {      set itemlist [pg_result $items -getTuple $n] }
-#      puts $itemlist
-
-      if {[pg_result $items -error] == "" && [info exists itemlist]} {
-
-        $invF.$n.invshowB conf -bg lightblue -activebackground beige -command "showInvoice $invno" -height -1 -width -1
-        pack $invF.$n.invshowB -side right
-      }
-
-	
   		} ;#end for loop
     } ;#END namspace $rowNo
   } ;#END namespace verbucht
@@ -246,12 +233,10 @@ proc searchAddress {s} {
   pack .adrClearSelB -in .adrF1
   }
 
-#  set ::suche "Adresssuche (mit Tab quittieren)"
-
   #Reset adrSearch widget & address list (called by .adrClearSelB)
   $adrSearch conf -fg grey -validate focusin -validatecommand {
     set ::suche ""
-    %W config -fg black -validate focusout -validatecommand {
+    %W conf -fg black -validate focusout -validatecommand {
       searchAddress %s
       return 0
     }
@@ -268,7 +253,7 @@ proc clearAdrWin {} {
   foreach e "[pack slaves .adrF2] [pack slaves .adrF4]" {
     $e conf -bg beige -fg silver -state normal -validate focusin -validatecommand {
     %W delete 0 end
-    %W conf -fg black
+  catch {  %W conf -fg black}
     return 0
     }
   }
@@ -446,40 +431,35 @@ proc deleteAddress {adrNo} {
 proc resetNewInvDialog {} {
   pack forget [pack slaves .invoiceFrame]
   set invNo 0
+  set ::subtot 0
 
   catch {namespace delete rows}
-  catch {unset ::shortdescr}
+  catch {unset ::beschr}
 
   #create Addrow button
-  catch {button .addrowB -text "Hinzufügen" -command {addInvRow}}
+  catch {button .addrowB -text "Hinzufügen" -command addInvRow}
   catch {message .einheit -textvariable unit}
   catch {message .einzel -textvariable einzel}
 
   #Create Menge entry
   catch {entry .mengeE -width 7 -bg yellow -fg grey -textvar menge}
   set menge "Menge"
-  
-#TODO: validation geht nicht immer!
   .mengeE configure -validate focusin -validatecommand {
     %W conf -fg black
-    #%W delete 0 end
-set menge ""
+    set menge ""
     return 0
     }
-
-  set ::subtot 0
 
   pack .invcondL .invcondSB .invauftrdatL .invauftrdatE .invrefL .invrefE .invcomL .invcomE -in .n.t2.f1 -side left -fill x 
   pack .invArtlistL -in .n.t2.f1 -before .n.t2.f2 -anchor w 
   pack .invArtNumSB .invArtNameL .invArtPriceL .mengeE .invArtUnitL -in .n.t2.f2 -side left -fill x
   pack .addrowB -in .n.t2.f2 -side right -fill x
   
-  #Reset .saveInvB to "Rechnung verbuchen"
+  #Reset Buttons
+  .abbruchInvB conf -state disabled
   .saveInvB conf -state disabled -command "
-    if ![catch {saveInv2TeX $invNo}] {
-      saveInv2DB
-      %W conf -activebackground #ececec -state normal
-    }
+    .saveInvB conf -activebackground #ececec -state normal
+    doSaveInv $invNo
     "
 } ;#END resetNewInvDialog
 
@@ -502,7 +482,6 @@ proc setArticleLine tab {
     focus .invArtNumSB
     .mengeE configure -validate focusin -validatecommand {
       %W conf -fg black
-      #%W delete 0 end
       set menge ""
       return 0
     }
@@ -546,11 +525,11 @@ proc addInvRow {} {
   #Create Row Frame
   namespace eval rows {}
   
-  #Create Abbruch button
+  #Configure Abbruch button
   pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
   .saveInvB conf -activebackground skyblue -state normal
-  .abbruchInvB conf -activebackground red -command {
-    pack forget .abbruchInvB
+  .abbruchInvB conf -activebackground red -state normal -command {
+    .abbruchInvB conf -state disabled
     namespace delete rows
     foreach w [pack slaves .invoiceFrame] {
       pack forget $w
@@ -619,25 +598,42 @@ proc addInvRow {} {
       #Export subtot with 2 decimal points
       set ::subtot [expr {double(round(100*$subtot))/100}]
 
-      #Export shortdescr cumulatively for use in saveInv2DB & fillAdrInvWin
+      #Export beschr cumulatively for use in saveInv2DB & fillAdrInvWin
       set separator {}
-      if [info exists ::shortdescr] {
+      if [info exists ::beschr] {
         set separator { /}
       }
-      append ::shortdescr $separator $menge $artName
+      append ::beschr $separator $menge $artName
 
     }
   }
 
 } ;#END addInvRow
 
+# doSaveInv
+##coordinates invoice saving + printing progs
+##evaluates exit codes
+##called by .saveInvB button
+proc doSaveInv {invNo} {
+  catch saveInv2DB res1
+  if {$res1 != 0} {
+    return 1
+  } 
+  catch {latexInv $invNo} res2
+  if {$res2 != 0} {
+    return 1
+  }
+  doViewInv
+  return 0
+}
 
 # saveInv2DB
-##called by "Rechnung speichern" button
-##saveInv2TeX must have run!
+##called by doSaveInv
 proc saveInv2DB {} {
-  global db adrSpin ref comm auftrdat env msg vat
-  global artName artPrice cond artUnit rowtot itemlist
+  global db adrNo env msg texDir
+  global cond ref subtot beschr ref comm auftrDat vat
+
+  set itemFile [file join $texDir invitems.tex]
 
   #1. Get current vars - TODO: incorporate in DB as 'SERIAL', starting with %YY
 	set invNo [createNewNumber invoice]
@@ -645,23 +641,35 @@ proc saveInv2DB {} {
 	#Get current address from GUI
   set shortAdr "$::name1 $::name2, $::city"
 
-  #	set custOID [$adrSpin get]
-  set custObjID [$adrSpin get]
-  set custID [pg_exec $db "SELECT ts FROM address WHERE objectid=$custObjID"]
-  set custOID [pg_result $custID -list]
-  set cond $::cond
-  set auftrDat $::auftrDat
+  #Create itemList for itemFile (needed for LaTeX)
+  foreach w [namespace children rows] {
+    set artUnit [.artunitL[namespace tail $w] cget -text]
+    set artPrice [.artpriceL[namespace tail $w] cget -text]
+    set artType [.arttypeL[namespace tail $w] cget -text]
+    set artName [.artnameL[namespace tail $w] cget -text]
+    set menge [.mengeL[namespace tail $w] cget -text]
+    #Check if Discount
+    if {$artType==""} {
+      append itemList \\Fee\{ $artName { } \( pro { } $artUnit \) \} \{ $artPrice \} \{ $menge \} \n
+    } elseif {$artType=="R"} {
+      append itemList \\Discount\{ $artName \} \{ $::rabatt \} \n
+    #Check if Auslage
+    } elseif {$artType=="A"} {
+      append itemList \\EBC\{ $artName \} \{ $artPrice \} \n
+    }
+  } ;#END foreach w
 
-  #Get itemList: open latest $itemFile & convert to Hex
-  set chan [open $itemFile]
-  set itemList [read $chan]
+  #1. Save itemList to ItemFile for Latex
+  set chan [open $itemFile w]
+  puts $chan $itemList
   close $chan
+  ##convert to Hex for DB
   set itemListHex [binary encode hex $itemList]
 
   #2. Set payedsum=finalsum and ts=3 if cond="bar"
 	if {$cond=="bar"} {
     set ts 3
-    set payedsum $finalsum
+    set payedsum $subtot
   } else {
     set ts 1
     set payedsum 0
@@ -677,61 +685,62 @@ proc saveInv2DB {} {
   set token [pg_exec $db "INSERT INTO invoice 
     (
     objectid,
-    ts, 
+    ts,
     customeroid, 
     addressheader, 
     shortdescription, 
     finalsum, 
     payedsum,
     vatlesssum,
-    f_number, 
-    f_date, 
-    f_comment
+    f_number,
+    f_date,
+    f_comment,
     items,
     ref,
     cond
     ) 
   VALUES 
     (
-    $invNo, 
-    $ts, 
-    $custOID, 
+    $invNo,
+    $ts,
+    $$adrNo,
     '$shortAdr',
-    '$::shortdescr', 
-    $::subtot,
+    '$beschr',
+    $subtot,
     $payedsum,
     $vatlesssum,
-    $invNo, 
-    to_date('$auftrDat','DD MM YYYY'), 
+    $invNo,
+    to_date('$auftrDat','DD MM YYYY'),
     '$comm',
     '$itemListHex',
     '$ref',
     '$cond'
-   )
-  RETURNING objectid"	]
+    )"]
 
   if {[pg_result $token -error] != ""} {
     NewsHandler::QueryNews "Rechnung $invNo nicht gespeichert:\n[pg_result $token -error ]" red
+    return 1
   } else {
    	NewsHandler::QueryNews "Rechnung $invNo gespeichert" green
     fillAdrInvWin $custOID
     .saveInvB conf -text "Rechnung drucken" -command {printInvoice $invNo}
+    return 0
   } 
 
 } ;#END saveInv2DB
 
 
-# saveInv2TeX
+# latexInv
 ##called by saveInv2DB (new) & showInvoice (old)
 ##with args(=invNo): retrieve data from DB
 ##witout args: get data from new invoice dialogue
-proc saveInv2TeX {args} {
+proc latexInv {} {
   global db adrSpin spoolDir texVorlage texDir confFile env
-  set itemFile [file join $texDir invitems.tex]
   set dataFile [file join $texDir invdata.tex]
 
   #1.get some vars from config
   source $confFile
+  if {![string is digit $vat]} {set vat 0.0}
   if {$currency=="$"} {set currency \\textdollar}
   if {$currency=="£"} {set currency \\textsterling}
   if {$currency=="€"} {set currency \\texteuro}
@@ -739,98 +748,54 @@ proc saveInv2TeX {args} {
 
   #2.Get more data from DB
   set custAdr [formatCustAdrForTeX]
-
-  if [info exists args] {
-
-    set invNo $args
-    set invToken [pg_exec $db "SELECT ref,cond,f_date,items FROM invoice WHERE f_number=$invNo"]
-
-#TODO: reportResult here?
-    if {[pg_result $invToken -error] != ""} {
-      NewsHandler::QueryNews "Konnte Rechnungsdaten Nr. $invNo nicht wiederherstellen.\n[pg_result $invToken -error]" red
-      return 1
-    }
-
-    set ref [lindex [pg_result $invToken -list] 1]
-    set cond [lindex [pg_result $invToken -list] 2]
-    set auftrDat [lindex [pg_result $invToken -list] 3]
-    set itemList [lindex [pg_result $invToken -list] 4]
-
-
-#neue Rechnung
-  } else {
-
-	  set adrNo [$adrSpin get]
-    set ref $::ref
-    set ref [.invrefE get]
-    set cond [.invcondSB get]
-    set auftrDat [.invauftrdatE get]
-    set subtot [.subtotalL cget -text]
-
-    source $confFile
-    if {![string is digit $vat]} {set vat 0.0}
+  set invToken [pg_exec $db "SELECT ref,cond,f_date,f_number,items FROM invoice WHERE f_number=$invNo"]
+  if {[pg_result $invToken -error] != ""} {
+    NewsHandler::QueryNews "Konnte Rechnungsdaten Nr. $invNo nicht wiederherstellen.\n[pg_result $invToken -error]" red
+    return 1
+  }
+  set ref [lindex [pg_result $invToken -list] 1]
+  set cond [lindex [pg_result $invToken -list] 2]
+  set auftrDat [lindex [pg_result $invToken -list] 3]
+  set invNo [lindex [pg_result $invToken -list] 4]
+  set itemList [lindex [pg_result $invToken -list] 5]
     
-    #1.set itemList for itemFile
-    foreach w [namespace children rows] {
-    
-      set artUnit [.artunitL[namespace tail $w] cget -text]
-      set artPrice [.artpriceL[namespace tail $w] cget -text]
-      set artType [.arttypeL[namespace tail $w] cget -text]
-      set artName [.artnameL[namespace tail $w] cget -text]
-      set menge [.mengeL[namespace tail $w] cget -text]
-      
-      #Check if Discount
-      if {$artType==""} {
-        append itemList \\Fee\{ $artName { } \( pro { } $artUnit \) \} \{ $artPrice \} \{ $menge \} \n
-      } elseif {$artType=="R"} {
-        append itemList \\Discount\{ $artName \} \{ $::rabatt \} \n
-
-      #Check if Auslage - TODO? change save2DB (no entry for Auslagen?)
-      } elseif {$artType=="A"} {
-        append itemList \\EBC\{ $artName \} \{ $artPrice \} \n
-      }
-    } ;#END foreach w
-  } #END main cond
-
   #3.set dataList for usepackage letter
   append dataList \\newcommand\{\\ref\} \{ $ref \} \n
   append dataList \\newcommand\{\\cond\} \{ $cond \} \n
   append dataList \\newcommand\{\\dat\} \{ $auftrDat \} \n
   append dataList \\newcommand\{\\invNo\} \{ $invNo \} \n
   append dataList \\newcommand\{\\custAdr\} \{ $custAdr \} \n
-  append dataList \\newcommand\{\\bank\} \{ $myBank \} \n
+  append dataList \\newcommand\{\\myBank\} \{ $myBank \} \n
   append dataList \\newcommand\{\\myName\} \{ $myComp \} \n
   append dataList \\newcommand\{\\myAddress\} \{ $myAdr \} \n
   append dataList \\newcommand\{\\myPhone\} \{ $myPhone \} \n
   append dataList \\newcommand\{\\vat\} \{ $vat \} \n
   append dataList \\newcommand\{\\currency\} \{ $currency \} \n
-
-  #4.Overwrite any old data file
+  ##overwrite any old data file
   set chan [open $dataFile w] 
   puts $chan $dataList
   close $chan
 
-  #5. Overwrite any old items file
-  set chan [open $itemFile w]
-  puts $chan $itemList
-  close $chan
-
-  #3. PdfLaTex > texDir -TODO: needs clear exit code!
+  #4. PdfLaTex > texDir
   eval exec pdflatex -no-file-line-error $texVorlage
 
   append invOrigPdfName [file root $texVorlage] . pdf
   append invOrigPdfPath [file join $texDir $invOrigPdfName]
-  set invNewPdfPath [getInvPdfPath $invNo]
+  set invNewPdfPath [setInvPdfPath $invNo]
 
-  #4. Rechnung.pdf > spoolDir
+  ## Rechnung.pdf > spoolDir
   file copy $invOrigPdfPath $invNewPdfPath
 
   #Change "Rechnung speichern" button to "Rechnung drucken" button
-  .saveInvB configure -text "Rechnung drucken" -command {printInvoice}
+  .saveInvB conf -text "Rechnung drucken" -command {printInvoice}
 
-} ;#END saveInv2TeX
+  return 0
 
-proc getInvPdfPath {invNo} {
+} ;#END latexInv
+
+# setInvPdfPath
+##called by latexInv
+proc setInvPdfPath {invNo} {
   global spoolDir myComp
 
   set compShortname [lindex $myComp 0]
@@ -865,7 +830,7 @@ proc formatCustAdrForTeX {adrNo} {
   return $custAdr
 }
 
-# doInvoicePdf
+# doInvoicePdf  - obsolete!!! 
 ##creates invoice PDF if so desired by user
 ##called by showInvoice
 proc doInvoicPdf {invNo} {
@@ -888,14 +853,13 @@ proc doInvoicPdf {invNo} {
   }
 }
 
-# getInvDataFromDB
-##retrieve old invoice for printing existing invoice
-##called by showInvoice
-proc getInvDataFromDB {} {
-  global db
+#TODO: this is to replace below!!!
+proc doViewInv {} {
+
+puts "Noch nicht so weit..."
+
 
 }
-
 # showInvoice
 ##(meant to display existing DVI or PS,but..)
 ##gets invoice data from DB & recreates TeX (??>DIV>PS) > PDF
