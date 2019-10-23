@@ -89,7 +89,9 @@ global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
 proc fillAdrInvWin {adrId} {
   global invF db
 
-  #Delete previous frames
+
+  
+#Delete previous frames
   set slaveList [pack slaves $invF]
   foreach  w $slaveList {
     foreach w [pack slaves $w] {
@@ -118,6 +120,16 @@ proc fillAdrInvWin {adrId} {
 	  set payedsumT [pg_exec $db "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
 	  set statusT   [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
     set itemsT    [pg_exec $db "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
+
+  #Create small bitmap for printInvButton
+  set bmdata {
+    #define printInvB_width 7
+    #define printInvB_height 7
+    static unsigned char printInvB_bits[] = {
+    0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f};
+  }
+  set im [image create bitmap -data $bmdata]
+  $im conf -foreground red -background red
 
     for {set n 0} {$n<$nTuples} {incr n} {
     
@@ -192,7 +204,8 @@ proc fillAdrInvWin {adrId} {
         set itemsT $::verbucht::itemsT
         catch {set itemlist [pg_result $itemsT -getTuple $n] }
         if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
-          $invF.$n.invshowB conf -bg lightblue -activebackground beige -command "showInvoice $invno" -height -1 -width -1
+
+          $invF.$n.invshowB conf -image $::verbucht::im -command "showInvoice $invno"
           pack $invF.$n.invshowB -side right
         }
 
@@ -676,10 +689,26 @@ proc saveInv2DB {} {
   }	
 
   #3. Make entry for vatlesssum if different from finalsum
-  set vatlesssum ""
+  set vatlesssum $subtot
   if {$vat < 0} {
     set vatlesssum [expr ($vat * $finalsum)/100]
   }
+
+puts " $invNo,
+    $ts,
+    $adrNo,
+    '$shortAdr',
+    '$beschr',
+    $subtot,
+    $payedsum,
+    $vatlesssum,
+    $invNo,
+    to_date('$auftrDat','DD MM YYYY'),
+    '$comm',
+    '$ref',
+    '$itemListHex',
+"
+
 
   #3. Save new invoice to DB
   set token [pg_exec $db "INSERT INTO invoice 
@@ -695,15 +724,15 @@ proc saveInv2DB {} {
     f_number,
     f_date,
     f_comment,
-    items,
     ref,
-    cond
+    cond,
+    items
     ) 
   VALUES 
     (
     $invNo,
     $ts,
-    $$adrNo,
+    $adrNo,
     '$shortAdr',
     '$beschr',
     $subtot,
@@ -712,9 +741,9 @@ proc saveInv2DB {} {
     $invNo,
     to_date('$auftrDat','DD MM YYYY'),
     '$comm',
-    '$itemListHex',
     '$ref',
-    '$cond'
+    '$cond',
+    '$itemListHex'
     )"]
 
   if {[pg_result $token -error] != ""} {
@@ -722,7 +751,7 @@ proc saveInv2DB {} {
     return 1
   } else {
    	NewsHandler::QueryNews "Rechnung $invNo gespeichert" green
-    fillAdrInvWin $custOID
+    fillAdrInvWin $adrNo
     .saveInvB conf -text "Rechnung drucken" -command {printInvoice $invNo}
     return 0
   } 
@@ -867,6 +896,30 @@ puts "Noch nicht so weit..."
 ##called by "Ansicht" button
 proc showInvoice {invNo} {
   global db itemFile
+
+#1. latex invNo
+eval exec latex ? 
+#2. dvips $invNo
+eval dvips ?
+set invPs ?
+
+#3. create canvas + load ps
+ canvas .c -xscrollc ".x set" -yscrollc ".y set" -height 1000 -width 1000
+ scrollbar .x -ori hori -command ".c xview"
+ scrollbar .y -ori vert -command ".c yview"
+ set im [image create photo -file $invPs]
+ .c create image 0 0 -image $im -anchor nw
+ .c configure -scrollregion [.c bbox all]
+
+foreach w [pack slaves .n.t1.f2?] {pack forget $w}
+pack .c -in .n.t1
+pack .x -in .n.t1 -side right
+pack .y -in .n.t1 -side bottom
+
+button .showinvexit -text "Schliessen" -command {resetAdrInvWin}
+button .showinvpdf "PDF erzeugen" -command {doPdf}
+button .showinvprint "Drucken" -command {printInvoice}
+pack .showinvexit .showinvpdf .showinvprint -side right -in .n.t1?
 
   #1.get itemList from DB & create itemFile
   set token [pg_exec $db "SELECT items FROM invoice WHERE f_number=$invNo"]
