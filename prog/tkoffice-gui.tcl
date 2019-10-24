@@ -33,9 +33,10 @@ createTkOfficeLogo
 pack .n -fill y -expand 1
 
 #Tab 1
-pack [frame .n.t1.f2 -borderwidth 5 -relief ridge -pady 10 -padx 10] -anchor nw -fill x
-pack [frame .n.t1.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
-pack [frame .n.t1.f4] -anchor nw -padx 20 -pady 20 -fill x
+pack [frame .n.t1.mainF]
+pack [frame .n.t1.mainF.f2 -borderwidth 5 -relief ridge -pady 10 -padx 10] -anchor nw -fill x
+pack [frame .n.t1.mainF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
+pack [frame .n.t1.mainF.f4] -anchor nw -padx 20 -pady 20 -fill x
 #Tab 2
 pack [frame .n.t2.f1 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
@@ -59,18 +60,16 @@ pack [frame .n.t4.f5 -pady $py -padx $px -borderwidth 5 -highlightbackground sil
 #Pack 3 top frames seitwärts
 #Create "Adressen" title
 label .adrTitel -text "Adressverwaltung" -font TkCaptionFont -pady 5
-pack .adrTitel -in .n.t1.f2 -side top -fill x
-
-pack [frame .adrF2 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.f2 -side left
-pack [frame .adrF4 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.f2 -side left
-pack [frame .adrF1] -anchor nw -in .n.t1.f2 -side left
-pack [frame .adrF3] -anchor se -in .n.t1.f2 -expand 1 -side left
-
-#create Address number Spinbox
+pack .adrTitel -in .n.t1.mainF.f2 -side top -fill x
+##obere Frames in .n.t1.f2
+pack [frame .adrF2 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
+pack [frame .adrF4 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
+pack [frame .adrF1] -anchor nw -in .n.t1.mainF.f2 -side left
+pack [frame .adrF3] -anchor se -in .n.t1.mainF.f2 -expand 1 -side left
+##create Address number Spinbox
 set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -textvariable adrNo -bg lightblue]
 focus $adrSpin
-
-#Create search field
+##Create search field
 set suche "Adresssuche (+Tab)"
 set adrSearch [entry .adrSearchE]
   $adrSearch config -width 25 -borderwidth 3 -bg beige -fg grey -textvariable suche
@@ -112,7 +111,7 @@ pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
 
 #Create "Rechnungen" Titel
 label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont"
-pack .adrInvTitel -in .n.t1.f3
+pack .adrInvTitel -in .n.t1.mainF.f3
 
 #Create Rechnungen Kopfdaten
 label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 10
@@ -123,11 +122,12 @@ label .invPayedH -text "Bezahlt" -font TkCaptionFont -justify right -anchor w -w
 label .invStatusH -text "Status" -font TkCaptionFont -justify right -anchor w -width 10
 label .invShowH -text "Ansicht" -font TkCaptionFont -justify right -anchor w -justify right -width 10
 
-pack [frame .n.t1.headF -padx $px] -anchor nw -fill x
-pack [frame .n.t1.invF -padx $px] -anchor nw -fill x
-set invF .n.t1.invF
-pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invStatusH -in .n.t1.headF -side left
-pack .invShowH -in .n.t1.headF -side right
+pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x
+pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x
+set invF .n.t1.mainF.invF
+set headF .n.t1.mainF.headF
+pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invStatusH -in $headF -side left
+pack .invShowH -in $headF -side right
 
 ########################################################################################
 # T A B  2 :   N E W   I N V O I C E

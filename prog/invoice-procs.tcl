@@ -272,11 +272,12 @@ proc doSaveInv {invNo} {
   if {$res1 != 0} {
     return 1
   } 
-  catch {latexInv $invNo} res2
+  catch {invLatex $invNo} res2
   if {$res2 != 0} {
     return 1
   }
-  doViewInv
+
+#  doViewInv
   return 0
 }
 
@@ -334,20 +335,6 @@ proc saveInv2DB {} {
     set vatlesssum [expr ($vat * $finalsum)/100]
   }
 
-puts " $invNo,
-    $ts,
-    $adrNo,
-    '$shortAdr',
-    '$beschr',
-    $subtot,
-    $payedsum,
-    $vatlesssum,
-    $invNo,
-    to_date('$auftrDat','DD MM YYYY'),
-    '$comm',
-    '$ref',
-    '$itemListHex',
-"
   #3. Save new invoice to DB
   set token [pg_exec $db "INSERT INTO invoice 
     (
@@ -549,6 +536,7 @@ puts "Noch nicht so weit..."
 
 
 }
+
 # showInvoice
 ##(meant to display existing DVI or PS,but..)
 ##gets invoice data from DB & recreates TeX (??>DIV>PS) > PDF
@@ -557,34 +545,40 @@ puts "Noch nicht so weit..."
 proc showInvoice {invNo} {
   global db itemFile vorlageTex
 
- fetchInvItems
+  fetchInvData
+  fetchInvItems
 
-  #2.get invData (TODO: make proc!)
-
-  #3. latex invNo
+  #1. latex invNo in texDir
   eval exec latex $vorlageTex 
-#2. dvips $invNo
-eval dvips ?
-set invPs ?
 
-#3. create canvas + load ps
+  #2. dvips $invNo in texDir
+  append vorlageDvi [file root $vorlageTex] . dvi
+  eval exec dvips $vorlageDvi
+
+
+  #3. create canvas + load PS
  canvas .c -xscrollc ".x set" -yscrollc ".y set" -height 1000 -width 1000
  scrollbar .x -ori hori -command ".c xview"
  scrollbar .y -ori vert -command ".c yview"
  set im [image create photo -file $invPs]
  .c create image 0 0 -image $im -anchor nw
  .c configure -scrollregion [.c bbox all]
+  
+  #Clear main Window from all content
+  foreach w [pack slaves .n.t1.mainF] {pack forget $w}
 
-foreach w [pack slaves .n.t1.f2?] {pack forget $w}
-pack .c -in .n.t1
-pack .x -in .n.t1 -side right
-pack .y -in .n.t1 -side bottom
+  pack .c -in .n.t1.mainF
+  pack .x -in .n.t1.mainF -side right
+  pack .y -in .n.t1.mainF -side bottom
 
-button .showinvexit -text "Schliessen" -command {resetAdrInvWin}
-button .showinvpdf "PDF erzeugen" -command {doPdf}
-button .showinvprint "Drucken" -command {printInvoice}
-pack .showinvexit .showinvpdf .showinvprint -side right -in .n.t1?
+  button .showinvexit -text "Schliessen" -command {resetAdrInvWin}
+  button .showinvpdf "PDF erzeugen" -command {doPdf}
+  button .showinvprint "Drucken" -command {printInvoice}
+  pack .showinvexit .showinvpdf .showinvprint -side right -in .n.t1.mainF
 
+  return
+
+#TODO: incorporate this in fetchInvItems!
   #1.get itemList from DB & create itemFile
   set token [pg_exec $db "SELECT items FROM invoice WHERE f_number=$invNo"]
   if { [pg_result $token -error] != "" || [pg_result $token -list == ""] } {
