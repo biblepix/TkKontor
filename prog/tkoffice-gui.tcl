@@ -1,12 +1,13 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
-# Restored: 18oct19
+# Restored: 24oct19
 
 set version 1.0
 
 package require Tk
 package require Img
 source [file join $progDir tkoffice-procs.tcl]
+source [file join $progDir invoice-procs.tcl]
 source [file join $progDir pgin.tcl]
 source $confFile
 
@@ -70,7 +71,7 @@ set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -textvariable adrNo -bg light
 focus $adrSpin
 
 #Create search field
-set suche "Adresssuche (mit Tab quittieren)"
+set suche "Adresssuche (+Tab)"
 set adrSearch [entry .adrSearchE]
   $adrSearch config -width 25 -borderwidth 3 -bg beige -fg grey -textvariable suche
   $adrSearch config -validate focusin -validatecommand {
@@ -349,4 +350,4 @@ resetNewInvDialog
 updateArticleList
 setArticleLine TAB2
 setArticleLine TAB4
-
+#createPrintBitmap
