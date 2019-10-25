@@ -3,11 +3,13 @@
 # Aktualisiert: 1nov17
 # Restored: 24oct19
 
-
+source $confFile
 ################################################################################################################
 ################# I N V O I C E   P R O C S ####################################################################
 ################################################################################################################
 
+set vorlageTex [file join $texDir rechnung-vorlage.tex]
+ 
 # resetNewInvDialog
 ##called by Main + "Abbruch Rechnung"
 proc resetNewInvDialog {} {
@@ -83,8 +85,6 @@ createPrintBitmap
 	  set payedsumT [pg_exec $db "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
 	  set statusT   [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
     set itemsT    [pg_exec $db "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
-
-  
 
     for {set n 0} {$n<$nTuples} {incr n} {
     
@@ -162,7 +162,7 @@ createPrintBitmap
 
 #Bitmap should work, but donno why it doesn't
 #          $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
-           $invF.$n.invshowB conf -image $::verbucht::printBM -command "showInvoice $invno"  
+           $invF.$n.invshowB conf -image $::verbucht::printBM -command "showInvoice $invno"
           pack $invF.$n.invshowB -side right
         }
 
@@ -384,11 +384,14 @@ proc saveInv2DB {} {
 } ;#END saveInv2DB
 
 # fetchInvData
-##retrieves dataList from DB + some config vars for Latex
-##saves dataFile for Latex
-##called by invLatex
+##1.retrieves invoice data from DB
+##2.gets some vars from Config
+##3.saves dataFile & itemFile for Latex processing
+##called by invLatex & showInvoice
 proc fetchInvData {invNo} {
   global db texDir confFile
+  set dataFile [file join $texDir invdata.tex]
+  set itemFile [file join $texDir invitems.tex]
 
   #1.get some vars from config
   source $confFile
@@ -399,28 +402,41 @@ proc fetchInvData {invNo} {
   if {$currency=="CHF"} {set currency {Fr.}}
 
   #2.Get invoice data from DB
-  set dataFile [file join $texDir invdata.tex]
-  set invToken [pg_exec $db "SELECT ref,cond,f_date,f_number,items FROM invoice WHERE f_number=$invNo"]
+  set invToken [pg_exec $db "SELECT 
+    ref,
+    cond,
+    f_date,
+    items,
+    customeroid
+  FROM invoice WHERE f_number=$invNo"]
+
   if {[pg_result $invToken -error] != ""} {
     NewsHandler::QueryNews "Konnte Rechnungsdaten Nr. $invNo nicht wiederherstellen.\n[pg_result $invToken -error]" red
     return 1
   }
-  set ref [lindex [pg_result $invToken -list] 1]
-  set cond [lindex [pg_result $invToken -list] 2]
-  set auftrDat [lindex [pg_result $invToken -list] 3]
-  set invNo [lindex [pg_result $invToken -list] 4]
-  set itemList [lindex [pg_result $invToken -list] 5]
+  set ref       [lindex [pg_result $invToken -list] 0]
+  set cond      [lindex [pg_result $invToken -list] 1]
+  set auftrDat  [lindex [pg_result $invToken -list] 2]
+  set itemsHex  [lindex [pg_result $invToken -list] 3]
+  set adrNo     [lindex [pg_result $invToken -list] 4]
 
   #3.Get address data from DB & format for Latex
-  set adrToken [pg_exec $db "SELECT name1,name2,street,zip,city FROM address WHERE objectid=$adrNo"]
-  lappend custAdr [lindex [pg_result $adrToken] 1] {\\}
-  lappend custAdr [lindex [pg_result $adrToken] 2] {\\}
-  lappend custAdr [lindex [pg_result $adrToken] 3] {\\}
-  lappend custAdr [lindex [pg_result $adrToken] 4] { }
-  lappend custAdr [lindex [pg_result $adrToken] 5]
+  set adrToken [pg_exec $db "SELECT 
+    name1,
+    name2,
+    street,
+    zip,
+    city 
+  FROM address WHERE ts=$adrNo"]
+
+  lappend custAdr [lindex [pg_result $adrToken -list] 0] {\\}
+  lappend custAdr [lindex [pg_result $adrToken -list] 1] {\\}
+  lappend custAdr [lindex [pg_result $adrToken -list] 2] {\\}
+  lappend custAdr [lindex [pg_result $adrToken -list] 3] { }
+  lappend custAdr [lindex [pg_result $adrToken -list] 4]
     
   #4.set dataList for usepackage letter
-  append dataList \\newcommand\{\\ref\} \{ $ref \} \n
+  append dataList \\renewcommand\{\\referenz\} \{ $ref \} \n
   append dataList \\newcommand\{\\cond\} \{ $cond \} \n
   append dataList \\newcommand\{\\dat\} \{ $auftrDat \} \n
   append dataList \\newcommand\{\\invNo\} \{ $invNo \} \n
@@ -432,52 +448,63 @@ proc fetchInvData {invNo} {
   append dataList \\newcommand\{\\vat\} \{ $vat \} \n
   append dataList \\newcommand\{\\currency\} \{ $currency \} \n
 
-  ##overwrite any old data file
+  ##save dataList to dataFile
   set chan [open $dataFile w] 
   puts $chan $dataList
   close $chan
 
+  #save itemList to itemFile  
+  set itemList [binary decode hex $itemsHex]
+  if {$itemList == ""} {
+    reportResult "Keine Posten für Rechnung $invNo gefunden. Kann Rechnung nicht anzeigen oder ausdrucken." red 
+    return 1
+  }
+  set chan [open $itemFile w]
+  puts $chan $itemList
+  close $chan
+
+  #Cleanup
   pg_result $invToken -clear
   pg_result $adrToken -clear
 
   return 0
 } ;#END fetchInvData
 
-# fetchInvItems
-##gets item list from DB & saves to itemFile
-##called by invLatex
-proc fetchInvItems {invNo} {
-  global db texDir
-  set itemFile [file join $texDir invitems.tex]
+# latexInvoice
+##executes latex(pdflatex) on vorlageTex OR dvips on vorlageDvi
+##with args: empty(=DVI) / PS / PDF
+##called by saveInv2DB (new) & showInvoice (old)
+proc latexInvoice {args} {
+  global db adrSpin spoolDir vorlageTex texDir confFile env
 
- #1.Get invitems from DB
-  set token [pg_result $db "SELECT items FROM invoice WHERE f_number=$invNo"]
-  set tHex [pg_list $token -list]
-  set itemList [binary decode hex $thex]
-  if {$itemList == ""} {
-    return 1
+#code from DKF:
+# eval [list exec -- pdflatex --interaction=nonstopmode] $args
+
+  #A. do DVI
+  if ![info exists args] {
+    catch {
+      eval [list exec -- latex -interaction=nonstopmode -draftmode] $vorlageTex
+    }
+
+  #B. do PS
+  } elseif {$args == "ps"} {
+
+    catch {
+      eval [list exec dvips $vorlageDvi]
+    }
+
+  #C. do PDF
+  } elseif {$args == "pdf"} {
+
+  #TODO: set temporary tex/pdf path!!!
+    lappend rechnungTex [file root [setInvPdfPath]] . pdf
+  #  cp $vorlageTex [file join $tmpDir $pdfPath]
+    catch { 
+      eval [list exec -- pdflatex -interaction=nonstopmode] $rechnungTex
+    }
   }
 
-  #save to itemFile  
-  set chan [open $itemFile w]
-  puts $chan $itemList
-  close $chan
-
-  return 0
-}
-
-# invLatex
-##called by saveInv2DB (new) & showInvoice (old)
-##with args(=invNo): retrieve data from DB
-##witout args: get data from new invoice dialogue
-proc invLatex {} {
-  global db adrSpin spoolDir texVorlage texDir confFile env
-
-  fetchInvData
-  fetchInvItems
-
-  eval exec pdflatex -no-file-line-error $texVorlage
-
+#TODO: paths siehe oben!
   append invOrigPdfName [file root $texVorlage] . pdf
   append invOrigPdfPath [file join $texDir $invOrigPdfName]
   set invNewPdfPath [setInvPdfPath $invNo]
@@ -529,38 +556,89 @@ proc doInvoicPdf {invNo} {
   }
 }
 
-#TODO: Is this to replace below??!!!
-proc doViewInv {} {
-
-puts "Noch nicht so weit..."
-
-
+#Invoice view/print wrappers
+proc doViewOldInv {invNo} {
+  fetchInvData
+  latexInv
+  viewInvoice $invNo
 }
 
-# showInvoice
-##(meant to display existing DVI or PS,but..)
-##gets invoice data from DB & recreates TeX (??>DIV>PS) > PDF
-## TODO: thought: if we just get a PDF this can be viewed by any old prog - but still must find installed PDF viewer :-
-##called by "Ansicht" button
-proc showInvoice {invNo} {
-  global db itemFile vorlageTex
+proc doViewNewInv {invNo} {
+  set invPath [setInvPdfPath?]
+  set invoicePs ...
+  latexInvoice ps
+  printInvoice $invoicePs
+  after 3000 {
+    viewInvoice $invoiceDvi / $invoicePs ?
+    NewsHandler::QueryNews "Sie können über das Anzeigeprogramm die Rechnung nochmals ausdrucken bzw. zum Versand per E-Mail nach PDF umwandeln." orange
+  }
+}
 
-  fetchInvData
-  fetchInvItems
+# viewInvoice
+##checks out DVI/PS capable viewer
+##sends rechnung.dvi / rechnung.ps to prog for viewing
+##called by "Ansicht" & "Rechnung drucken" buttons
+proc viewInvoice {invNo} {
+  global db itemFile vorlageTex texDir
 
-  #1. latex invNo in texDir
-  eval exec latex $vorlageTex 
-
-  #2. dvips $invNo in texDir
+set vorlageTex [file join $texDir rechnung-vorlage.tex]
   append vorlageDvi [file root $vorlageTex] . dvi
+  append vorlagePs [file root $vorlageTex] . ps
+  append vorlagePdf [file root $vorlageTex] . pdf
+
+  #1. Get invoice data from DB - TODO: this should be somewhere else outside this proc!
+  if [catch "fetchInvData $invNo"] {
+    NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
+    return 1
+  }
+
+  #2. Produce DVI - TODO: write decent latex prog to catch output
+if [catch  {eval [list exec -- latex -draftmode -interaction=nonstopmode $vorlageTex}] {
+NewsHandler::QueryNews "Rechnung $invNo lässt sich nicht latexen! Ansicht/Ausdruck nicht möglich." red
+    return 1
+}
+
+  #3. Determine DVI capable display program
+  if {[autoexec_ok evince] != ""} {
+    set dviViewer "evince"
+  } elseif {[autoexec_ok okular] != ""} {
+    set dviViewer "okular"
+  } else {
+    NewsHandler::QueryNews "Es ist kein Anzeigeprogramm für DVI-Dateien installiert. Wenn Sie mit Windows arbeiten, können Sie den Acrobat Reader oder Sumatra probieren.\nFür Linux empfehlen wir 'evince' oder 'okular'.\nWir versuchen nun, das Dokument nach PostScript umzuwandeln..." orange
+
+  #3.Determine PS viewer
+  if {[autoexec_ok gv] != ""} {
+    set psViewer "gv"
+  } elseif {[autoexec_ok qpdfview] != ""} {
+    set psViewer "qpdfview"
+  }
+
   eval exec dvips $vorlageDvi
+
+  #3. Convert to PDF & view for printing   
+  } else {
+  
+#TODO: get PDf file path
+  dvipdf $vorlageDvi
+  $psViewer $vorlagePdf
+#TODO: set Nechnungsname + copy to spool before viewing!
+  cp $vorlagePdf [setInvPdfPath $invNo]
+  NewsHandler::QueryNews "SIEHE doPDF !!!" orange
+  }
+
+
+
+#  eval exec dvips $vorlageDvi
+catch {exec $fileViewer $vorlageDvi}
+return
 
 
   #3. create canvas + load PS
+proc lastresort {} {
  canvas .c -xscrollc ".x set" -yscrollc ".y set" -height 1000 -width 1000
  scrollbar .x -ori hori -command ".c xview"
  scrollbar .y -ori vert -command ".c yview"
- set im [image create photo -file $invPs]
+ set im [image create photo -file $vorlagePs]
  .c create image 0 0 -image $im -anchor nw
  .c configure -scrollregion [.c bbox all]
   
@@ -571,28 +649,13 @@ proc showInvoice {invNo} {
   pack .x -in .n.t1.mainF -side right
   pack .y -in .n.t1.mainF -side bottom
 
-  button .showinvexit -text "Schliessen" -command {resetAdrInvWin}
-  button .showinvpdf "PDF erzeugen" -command {doPdf}
-  button .showinvprint "Drucken" -command {printInvoice}
-  pack .showinvexit .showinvpdf .showinvprint -side right -in .n.t1.mainF
+  button .showinvexitB -text "Schliessen" -command {resetAdrInvWin}
+  button .showinvpdfB -text "PDF erzeugen" -command {doPdf}
+  button .showinvprintB -text "Drucken" -command {printInvoice}
+  pack .showinvexitB .showinvpdfB .showinvprintB -side bottom -in .n.t1.mainF
 
-  return
-
-#TODO: incorporate this in fetchInvItems!
-  #1.get itemList from DB & create itemFile
-  set token [pg_exec $db "SELECT items FROM invoice WHERE f_number=$invNo"]
-  if { [pg_result $token -error] != "" || [pg_result $token -list == ""] } {
-    set itemList ""  
-  } else {
-    set thex [pg_result $token -list]
+  return geschafft
 }
-
-  #2.get dataFile details from $config + DB (VAT, cond, ref) & create dataFile
-
-  #3.execute latex on $vorlage
-
-
-
 
   global spoolDir myComp
   set compShortname [lindex $myComp 0]
@@ -610,19 +673,8 @@ proc showInvoice {invNo} {
     return 1
   }
 
-  #2. Determine DVI capable display program
-  if {[autoexec_ok evince] != ""} {
-    set dviViewer "evince"
-  } elseif {[autoexec_ok okular] != ""} {
-    set dviViewer "okular"
-  }
 
-  #3.Determine PS capable display program
-  if {[autoexec_ok gv] != ""} {
-    set psViewer "gv"
-  } elseif {[autoexec_ok qpdfview] != ""} {
-    set psViewer "qpdfview"
-  }
+  
 
   #4. Make PDF & exit if no viewer found
   if {! [info exists dviViewer] && ! [info exists psViewer]} {
@@ -664,24 +716,18 @@ proc showInvoice {invNo} {
 
 # printInvoice
 ##prints to printer or shows in view prog
+##called after latex - TODO: what inv.name to print?
 ##called by "Rechnung drucken" button (neue Rechnung)
 proc printInvoice {invNo} {
 
-  #1. get inv from spoolDir
-#TODO: make invName global - used already in 2 previous progs!
-#TODO: make proc for viewer selection (<showInvoice) if printing not possible
-set invName ...
-set invDviPath ...(needed?)
-set invPsPath ...(PS needed for gs!)
+  #1. dvips
+  exec dvips ...
 
-#2. try direct printing PS - achtung: dvi könnte schon da sein
-  catch {eval exec dvips $invDviPath} 
-  
-  ##1. Try lpr
+  #2. try direct printing vie lpr
   if {[autoexec_ok lpr] != ""} {
-    if [catch {eval exec lpr $invPsPath}] {
+    if [catch {exec lpr $invPsPath}] {
     
-    ##2. Try gs
+    ## or Try gs
     set device "ps2write"
     set printer "/dev/usb/lp0" 
 
@@ -693,12 +739,16 @@ set invPsPath ...(PS needed for gs!)
 
 #TODO: evaluate $res and exit here if print successful
 #Maybe like this: set res [eval exec ...]
-# if {$res == ""} { gleich fail??? }
-
+   if {$res == ""} { 
+      NewsHandler::QueryNews "Die Rechnung $invNo wurde zum Drucker geschickt." orange
+   }
   }
-}
+ }
 
-#3. Try viewing PS
+#3. View PS anyway
+showInvoice $invNo
+NewsHandler::QueryNews "Sie können nun die Rechnung $invNo über das Anzeigeprogramm nochmals ausdrucken oder zwecks Versand nach PDF umwandeln." lightblue
+
   set invName $spoolDir/invoice_$compName -${invNo}.ps
 
 #Make 1 command for direct PS printing, else show file in evince/okular

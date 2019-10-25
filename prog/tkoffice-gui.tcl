@@ -1,6 +1,6 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
-# Restored: 24oct19
+# Restored: 25oct19
 
 set version 1.0
 
@@ -33,7 +33,7 @@ createTkOfficeLogo
 pack .n -fill y -expand 1
 
 #Tab 1
-pack [frame .n.t1.mainF]
+pack [frame .n.t1.mainF] -fill both
 pack [frame .n.t1.mainF.f2 -borderwidth 5 -relief ridge -pady 10 -padx 10] -anchor nw -fill x
 pack [frame .n.t1.mainF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
 pack [frame .n.t1.mainF.f4] -anchor nw -padx 20 -pady 20 -fill x
@@ -336,7 +336,7 @@ if {[string length $res] >20} {
   .confDBNameE conf -text "Datenbankname eingeben" -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
   .confDBUserE conf -text "Datenbanknutzer eingeben" -validate focusin -validatecommand {%W conf -text "Name eingeben" -bg beige -fg grey ; return 0}
   return 1
-} 
+}
 
 NewsHandler::QueryNews "Mit Datenbank verbunden" green
 set db $res
