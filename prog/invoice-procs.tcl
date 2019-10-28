@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 24oct19
+# Restored: 28oct19
 
 source $confFile
 ################################################################################################################
@@ -106,17 +106,17 @@ createPrintBitmap
     		#create entries per line, or refill present entries
 			  catch {label $invF.$n.invNoL -width 10 -anchor w}
 			  $invF.$n.invNoL configure -text $invno
-        catch {label $invF.$n.invDatL -width 10 -anchor w}
+        catch {label $invF.$n.invDatL -width 15 -anchor w -justify left}
         $invF.$n.invDatL configure -text $invdat
-			  catch {label $invF.$n.beschr -width 20 -justify left -anchor w}
+			  catch {label $invF.$n.beschr -width 50 -justify left -anchor w}
 			  $invF.$n.beschr configure -text $beschr
 			  catch {label $invF.$n.sumtotal -width 10 -justify right -anchor e}
 			  $invF.$n.sumtotal configure -text $total
-			  catch {label $invF.$n.statusL -width 10 -justify right -anchor e}
-			  $invF.$n.statusL configure -text $ts
+#			  catch {label $invF.$n.statusL -width 10 -justify right -anchor e}
+#			  $invF.$n.statusL configure -text $ts
         #create label/entry for Bezahlt, packed later
         set bezahlt [pg_result $::verbucht::payedsumT -getTuple $n]
-        catch {label $invF.$n.payedsumL -width 10 -justify right -anchor e}
+        catch {label $invF.$n.payedsumL -width 13 -justify right -anchor e}
         $invF.$n.payedsumL conf -text $bezahlt
         catch {entry $invF.$n.payedsumE -text Eingabe -bg beige -fg grey -width 7 -justify right}
 
@@ -129,8 +129,8 @@ createPrintBitmap
 				  set zahlen ""
 				  #catch {label $invF.$n.payedsumL -width 10}
           $invF.$n.payedsumL conf -fg green
-          $invF.$n.statusL conf -fg green
-          pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL $invF.$n.statusL -side left
+#         $invF.$n.statusL conf -fg green
+          pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL  -side left
 			  
         #If 1 or 2 make entry
 			  } else {
@@ -140,8 +140,8 @@ createPrintBitmap
           #create entry widget providing amount, entry name & NS to calling prog
           $invF.$n.payedsumE delete 0 end
           $invF.$n.payedsumE conf -validate focusout -validatecommand "saveInvEntry %P %W $n" 
-          $invF.$n.statusL conf -fg red
-				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL $invF.$n.statusL -side left
+#          $invF.$n.statusL conf -fg red
+				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL -side left
           pack $invF.$n.zahlenL $invF.$n.payedsumE -side right
 		  
         #if 2 (Teilzahlung) include payed amount
@@ -149,7 +149,7 @@ createPrintBitmap
 				  if {$ts==2} {
 					  $invF.$n.payedsumE configure -bg orange
 					  $invF.$n.zahlenL conf -bg orange -fg white -width 50 -textvar zahlen
-            $invF.$n.statusL conf -fg orange
+#            $invF.$n.statusL conf -fg orange
 					  set zahlen "Restbetrag eingeben und mit Tab-Taste quittieren"
 				  }
 
@@ -162,7 +162,7 @@ createPrintBitmap
 
 #Bitmap should work, but donno why it doesn't
 #          $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
-           $invF.$n.invshowB conf -image $::verbucht::printBM -command "showInvoice $invno"
+           $invF.$n.invshowB conf -image $::verbucht::printBM -command "doViewOldInv $invno"
           pack $invF.$n.invshowB -side right
         }
 
@@ -286,8 +286,6 @@ proc doSaveInv {invNo} {
 proc saveInv2DB {} {
   global db adrNo env msg texDir
   global cond ref subtot beschr ref comm auftrDat vat
-
- 
 
   #1. Get current vars - TODO: incorporate in DB as 'SERIAL', starting with %YY
 	set invNo [createNewNumber invoice]
@@ -471,66 +469,49 @@ proc fetchInvData {invNo} {
 } ;#END fetchInvData
 
 # latexInvoice
-##executes latex(pdflatex) on vorlageTex OR dvips on vorlageDvi
-##with args: empty(=DVI) / PS / PDF
-##called by saveInv2DB (new) & showInvoice (old)
-proc latexInvoice {args} {
+##executes latex/pdflatex on vorlageTex OR dvips on vorlageDvi
+##with end types: DVI / PS / PDF
+##????called by saveInv2DB (new) & showInvoice (old)
+#code from DKF: " With plenty of experience, 'nonstopmode' or 'batchmode' are most useful
+# eval [list exec -- pdflatex --interaction=nonstopmode] $args
+proc latexInvoice {type} {
   global db adrSpin spoolDir vorlageTex texDir confFile env
 
-#code from DKF:
-# eval [list exec -- pdflatex --interaction=nonstopmode] $args
+#TODO: sollte invNo hier übergeben, aber keine da!!!!
+  set invTexPath [setInvPath tex]
 
-  #A. do DVI
-  if ![info exists args] {
+  #A. do DVI > tmpDir
+  if {$type != "pdf"} {
     catch {
-      eval [list exec -- latex -interaction=nonstopmode -draftmode] $vorlageTex
+      eval [list exec -- latex -interaction=nonstopmode -draftmode] $invTexPath
     }
-
-  #B. do PS
-  } elseif {$args == "ps"} {
-
-    catch {
-      eval [list exec dvips $vorlageDvi]
+  
+    #B. do PS > tmpDir
+    if {$type == "ps"} {
+      set invPath [setInvPath ps]
+      catch {
+        eval [list exec dvips $invPath]
+      }
     }
-
-  #C. do PDF
-  } elseif {$args == "pdf"} {
-
-  #TODO: set temporary tex/pdf path!!!
-    lappend rechnungTex [file root [setInvPdfPath]] . pdf
-  #  cp $vorlageTex [file join $tmpDir $pdfPath]
-    catch { 
-      eval [list exec -- pdflatex -interaction=nonstopmode] $rechnungTex
-    }
+    return 0
   }
-
-#TODO: paths siehe oben!
-  append invOrigPdfName [file root $texVorlage] . pdf
-  append invOrigPdfPath [file join $texDir $invOrigPdfName]
-  set invNewPdfPath [setInvPdfPath $invNo]
-
-  ## Rechnung.pdf > spoolDir
-  file copy $invOrigPdfPath $invNewPdfPath
+    
+  #C. do PDF > spoolDir
+  if {$type == "pdf"} {
+    set invPath [setInvPath pdf]
+    catch { 
+      eval [list exec -- pdflatex -interaction=nonstopmode] $invTexPath
+    }
+    ##copy PDF to spoolDir
+    file copy [file root $invTexPath].pdf $invPath
+  }
 
   #Change "Rechnung speichern" button to "Rechnung drucken" button
   .saveInvB conf -text "Rechnung drucken" -command {printInvoice}
 
   return 0
 
-} ;#END invLatex
-
-
-# setInvPdfPath
-##called by latexInv
-proc setInvPdfPath {invNo} {
-  global spoolDir myComp
-
-  set compShortname [lindex $myComp 0]
-  append invPdfName invoice _ $compShortname - $invNo .pdf
-  set invPdfPath [file join $spoolDir $invPdfName]
-
-  return $invPdfPath
-}
+} ;#END latexInvoice
 
 
 # doInvoicePdf  - obsolete!!! 
@@ -558,9 +539,10 @@ proc doInvoicPdf {invNo} {
 
 #Invoice view/print wrappers
 proc doViewOldInv {invNo} {
-  fetchInvData
-  latexInv
-  viewInvoice $invNo
+  set invDviPath [setInvPath $invNo dvi]
+  fetchInvData $invNo
+  latexInvoice dvi
+  viewInvoice $invDviPath
 }
 
 proc doViewNewInv {invNo} {
@@ -574,6 +556,39 @@ proc doViewNewInv {invNo} {
   }
 }
 
+# setInvPath
+##composes invoice name from company short name & invoice number
+##returns invoice path with required ending: TEX / DVI / PS / PDF
+##called by ?viewInvoice ?doViewOldInv ?doViewNewInv
+#TODO: Yesh balagan im vars, s. Kommentar S. 480 !!!!!!!
+proc setInvPath {invNo type} {
+  global spoolDir myComp vorlageTex
+  
+  set tmpDir /tmp
+  set compShortname [lindex $myComp 0]
+  append invName invoice _ $compShortname $invNo
+
+  #Copy vorlageTex to $tmpDir/invName.tex for all types
+  if {$type == "tex"} {
+    append invTexName $invName . tex
+    file copy $vorlageTex [file join $tmpDir $invTexName]
+    
+  } elseif {$type=="dvi"} {
+    append invDviName $invName . dvi
+    set invPath [file join $tmpDir $invDviName]
+    
+  } elseif {$type="ps"} {  
+    append invPsName $invName . ps
+    set invPath [file join $tmpDir $invPsName]
+    
+  } elseif {$type=="pdf"} {  
+    append invPdfName $invName . pdf
+    set invPath [file join $spoolDir $invPdfName]
+  }
+
+  return $invPath
+}
+
 # viewInvoice
 ##checks out DVI/PS capable viewer
 ##sends rechnung.dvi / rechnung.ps to prog for viewing
@@ -581,18 +596,13 @@ proc doViewNewInv {invNo} {
 proc viewInvoice {invNo} {
   global db itemFile vorlageTex texDir
 
-set vorlageTex [file join $texDir rechnung-vorlage.tex]
-  append vorlageDvi [file root $vorlageTex] . dvi
-  append vorlagePs [file root $vorlageTex] . ps
-  append vorlagePdf [file root $vorlageTex] . pdf
-
   #1. Get invoice data from DB - TODO: this should be somewhere else outside this proc!
   if [catch "fetchInvData $invNo"] {
     NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
     return 1
   }
 
-  #2. Produce DVI - TODO: write decent latex prog to catch output
+  #2. Produce DVI
 if [catch  {eval [list exec -- latex -draftmode -interaction=nonstopmode $vorlageTex}] {
 NewsHandler::QueryNews "Rechnung $invNo lässt sich nicht latexen! Ansicht/Ausdruck nicht möglich." red
     return 1
@@ -657,15 +667,6 @@ proc lastresort {} {
   return geschafft
 }
 
-  global spoolDir myComp
-  set compShortname [lindex $myComp 0]
-  append invName invoice _ $compShortname $invNo
-  append invDviName $invName . dvi
-  append invPsName $invName . ps
-  append invPdfName $invName . pdf
-  set invDviPath [file join $spoolDir $invDviName]
-  set invPsPath [file join $spoolDir $invPsName]
-  set invPdfPath [file join $spoolDir $invPdfName]
 
   #1. Exit if DVI doesn't exist
   if {![file exists $invDviPath]} {

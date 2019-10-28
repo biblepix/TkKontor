@@ -114,20 +114,21 @@ label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont"
 pack .adrInvTitel -in .n.t1.mainF.f3
 
 #Create Rechnungen Kopfdaten
-label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 10
-label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 10
-label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 20
-label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 10
+label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 9
+label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 13
+label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 47
+label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 11
 label .invPayedH -text "Bezahlt" -font TkCaptionFont -justify right -anchor w -width 10
-label .invStatusH -text "Status" -font TkCaptionFont -justify right -anchor w -width 10
+#label .invStatusH -text "Status" -font TkCaptionFont -justify right -anchor w -width 10
 label .invShowH -text "Ansicht" -font TkCaptionFont -justify right -anchor w -justify right -width 10
 
 pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x
 pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x
 set invF .n.t1.mainF.invF
 set headF .n.t1.mainF.headF
-pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invStatusH -in $headF -side left
+pack .invNoH .invDatH .invArtH .invSumH .invPayedH -in $headF -side left
 pack .invShowH -in $headF -side right
+
 
 ########################################################################################
 # T A B  2 :   N E W   I N V O I C E
