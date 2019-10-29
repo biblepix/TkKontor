@@ -5,7 +5,7 @@
 
 source $confFile
 ################################################################################################################
-################# I N V O I C E   P R O C S ####################################################################
+################# N E W   I N V O I C E   P R O C S ####################################################################
 ################################################################################################################
 
 set vorlageTex [file join $texDir rechnung-vorlage.tex]
@@ -74,8 +74,8 @@ createPrintBitmap
     set adrId [.adrSB get]
     set idToken [pg_exec $db "SELECT ts FROM address WHERE objectid = $adrId"]
     set custId [pg_result $idToken -list]
-    set invNo [pg_exec $db "SELECT f_number FROM invoice WHERE customeroid = $custId"]
-    set nTuples [pg_result $invNo -numTuples]
+    set invNoT [pg_exec $db "SELECT f_number FROM invoice WHERE customeroid = $custId"]
+    set nTuples [pg_result $invNoT -numTuples]
 
   	if {$nTuples == -1} {return 1}
 
@@ -85,17 +85,16 @@ createPrintBitmap
 	  set payedsumT [pg_exec $db "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
 	  set statusT   [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
     set itemsT    [pg_exec $db "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
-
+    
     for {set n 0} {$n<$nTuples} {incr n} {
     
       namespace eval $n {
 
         set n [namespace tail [namespace current]]
         set invF $::invF
-        set invNo $::verbucht::invNo
 			  set total [pg_result $::verbucht::sumtotalT -getTuple $n] 
 			  set ts [pg_result $::verbucht::statusT -getTuple $n]
-			  set invno [pg_result $::verbucht::invNo -getTuple $n]
+			  set invno [pg_result $::verbucht::invNoT -getTuple $n]
         set invdat [pg_result $::verbucht::invDatT -getTuple $n]
 			  set beschr [pg_result $::verbucht::beschrT -getTuple $n]
 
@@ -162,7 +161,8 @@ createPrintBitmap
 
 #Bitmap should work, but donno why it doesn't
 #          $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
-           $invF.$n.invshowB conf -image $::verbucht::printBM -command "doViewOldInv $invno"
+puts "InvNo: $invno"
+           $invF.$n.invshowB conf -image $::verbucht::printBM -command "doPrintOldInv $invno"
           pack $invF.$n.invshowB -side right
         }
 
@@ -277,7 +277,7 @@ proc doSaveInv {invNo} {
     return 1
   }
 
-#  doViewInv
+#  doPrintInv
   return 0
 }
 
@@ -381,6 +381,12 @@ proc saveInv2DB {} {
 
 } ;#END saveInv2DB
 
+
+
+###############################################################################################
+#### O L D   I N V O I C E   P R O C S  #######################################################
+###############################################################################################
+
 # fetchInvData
 ##1.retrieves invoice data from DB
 ##2.gets some vars from Config
@@ -388,6 +394,7 @@ proc saveInv2DB {} {
 ##called by invLatex & showInvoice
 proc fetchInvData {invNo} {
   global db texDir confFile
+  
   set dataFile [file join $texDir invdata.tex]
   set itemFile [file join $texDir invitems.tex]
 
@@ -406,12 +413,14 @@ proc fetchInvData {invNo} {
     f_date,
     items,
     customeroid
-  FROM invoice WHERE f_number=$invNo"]
+  FROM invoice WHERE f_number = $invNo"
+  ]
 
-  if {[pg_result $invToken -error] != ""} {
+  if { [pg_result $invToken -error] != ""} {
     NewsHandler::QueryNews "Konnte Rechnungsdaten Nr. $invNo nicht wiederherstellen.\n[pg_result $invToken -error]" red
     return 1
   }
+  
   set ref       [lindex [pg_result $invToken -list] 0]
   set cond      [lindex [pg_result $invToken -list] 1]
   set auftrDat  [lindex [pg_result $invToken -list] 2]
@@ -425,7 +434,8 @@ proc fetchInvData {invNo} {
     street,
     zip,
     city 
-  FROM address WHERE ts=$adrNo"]
+  FROM address WHERE ts=$adrNo"
+  ]
 
   lappend custAdr [lindex [pg_result $adrToken -list] 0] {\\}
   lappend custAdr [lindex [pg_result $adrToken -list] 1] {\\}
@@ -434,7 +444,7 @@ proc fetchInvData {invNo} {
   lappend custAdr [lindex [pg_result $adrToken -list] 4]
     
   #4.set dataList for usepackage letter
-  append dataList \\renewcommand\{\\referenz\} \{ $ref \} \n
+  append dataList \\newcommand\{\\referenz\} \{ $ref \} \n
   append dataList \\newcommand\{\\cond\} \{ $cond \} \n
   append dataList \\newcommand\{\\dat\} \{ $auftrDat \} \n
   append dataList \\newcommand\{\\invNo\} \{ $invNo \} \n
@@ -466,32 +476,36 @@ proc fetchInvData {invNo} {
   pg_result $adrToken -clear
 
   return 0
+  
 } ;#END fetchInvData
 
 # latexInvoice
 ##executes latex/pdflatex on vorlageTex OR dvips on vorlageDvi
 ##with end types: DVI / PS / PDF
-##????called by saveInv2DB (new) & showInvoice (old)
+##called by doPrintNewInv & doPrintOldInv
 #code from DKF: " With plenty of experience, 'nonstopmode' or 'batchmode' are most useful
 # eval [list exec -- pdflatex --interaction=nonstopmode] $args
-proc latexInvoice {type} {
+proc latexInvoice {invNo type} {
   global db adrSpin spoolDir vorlageTex texDir confFile env
-
-#TODO: sollte invNo hier übergeben, aber keine da!!!!
-  set invTexPath [setInvPath tex]
+  set invTexPath [setInvPath $invNo tex]
+puts $invTexPath
+puts $type
 
   #A. do DVI > tmpDir
   if {$type != "pdf"} {
-    catch {
-      eval [list exec -- latex -interaction=nonstopmode -draftmode] $invTexPath
-    }
+
+#    catch {
+eval [list exec -- latex -draftmode -interaction nonstopmode] $invTexPath
+
+#    } res
+ #   return $res
   
     #B. do PS > tmpDir
     if {$type == "ps"} {
       set invPath [setInvPath ps]
-      catch {
+#      catch {
         eval [list exec dvips $invPath]
-      }
+#      }
     }
     return 0
   }
@@ -514,41 +528,25 @@ proc latexInvoice {type} {
 } ;#END latexInvoice
 
 
-# doInvoicePdf  - obsolete!!! 
-##creates invoice PDF if so desired by user
-##called by showInvoice
-proc doInvoicPdf {invNo} {
-  global invDviName invDviPath invPdfName invPdfPath 
-  global psViewer invPsPath
-
-  set reply [tk_messageBox -type yesno -message "Möchten Sie von der Rechnung Nr. $invNo ein PDF zum Versand/Ausdruck erstellen?"]
-  if {$reply == "yes"} {
-
-    if [catch {exec dvipdf $invDviPath} res] {
-      NewsHandler::QueryNews "Es konnte kein PDF der Rechnung Nr. $invNo erstellt werden: \n$res" red
-      exec dvips $invDviPath
-      exec psViewer $invPsPath
-      NewsHandler::QueryNews "Die Rechnung Nr. $invNo liegt im PostScript-Format vor. Druck/Versand über $psViewer" lightblue
-
-    } else {
-      NewsHandler::QueryNews "Das PDF der Rechnung finden Sie in $invPdfPath" green
-    }
-
-  }
-}
-
 #Invoice view/print wrappers
-proc doViewOldInv {invNo} {
-  set invDviPath [setInvPath $invNo dvi]
-  fetchInvData $invNo
-  latexInvoice dvi
-  viewInvoice $invDviPath
+proc doPrintOldInv {invNo} {
+
+  #1. Get invoice data from DB - TODO: this should be somewhere else outside this proc!
+  if [catch "fetchInvData $invNo"] {
+    NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
+    return 1
+  }
+
+  latexInvoice $invNo dvi
+  
+  catch "viewInvoice $invNo"
+  return 0
 }
 
-proc doViewNewInv {invNo} {
-  set invPath [setInvPdfPath?]
+proc doPrintNewInv {invNo} {
+?  set invPath [setInvPath $invNo pdf]
   set invoicePs ...
-  latexInvoice ps
+  latexInvoice $invNo ps
   printInvoice $invoicePs
   after 3000 {
     viewInvoice $invoiceDvi / $invoicePs ?
@@ -559,35 +557,36 @@ proc doViewNewInv {invNo} {
 # setInvPath
 ##composes invoice name from company short name & invoice number
 ##returns invoice path with required ending: TEX / DVI / PS / PDF
-##called by ?viewInvoice ?doViewOldInv ?doViewNewInv
-#TODO: Yesh balagan im vars, s. Kommentar S. 480 !!!!!!!
+##called by doPrintOldInv & doPrintNewInv
 proc setInvPath {invNo type} {
   global spoolDir myComp vorlageTex
   
   set tmpDir /tmp
   set compShortname [lindex $myComp 0]
-  append invName invoice _ $compShortname $invNo
+  append invName invoice _ $compShortname - $invNo
 
   #Copy vorlageTex to $tmpDir/invName.tex for all types
   if {$type == "tex"} {
     append invTexName $invName . tex
-    file copy $vorlageTex [file join $tmpDir $invTexName]
+    set invPath [file join $tmpDir $invTexName]
+    file copy -force $vorlageTex $invPath
     
-  } elseif {$type=="dvi"} {
+  } elseif {$type == "dvi"} {
     append invDviName $invName . dvi
     set invPath [file join $tmpDir $invDviName]
     
-  } elseif {$type="ps"} {  
+  } elseif {$type == "ps"} {  
     append invPsName $invName . ps
     set invPath [file join $tmpDir $invPsName]
     
-  } elseif {$type=="pdf"} {  
+  } elseif {$type == "pdf"} {  
     append invPdfName $invName . pdf
     set invPath [file join $spoolDir $invPdfName]
   }
 
   return $invPath
-}
+  
+} ;#END setInvPath
 
 # viewInvoice
 ##checks out DVI/PS capable viewer
@@ -596,37 +595,37 @@ proc setInvPath {invNo type} {
 proc viewInvoice {invNo} {
   global db itemFile vorlageTex texDir
 
-  #1. Get invoice data from DB - TODO: this should be somewhere else outside this proc!
-  if [catch "fetchInvData $invNo"] {
-    NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
-    return 1
+  #3. Determine DVI capable display program
+  if {[auto_execok evince] != ""} {
+    set dviViewer "evince"
+  } elseif {[auto_execok okular] != ""} {
+    set dviViewer "okular"
   }
+  
+  puts "viewInvoice $invNo"
+  
+  set invDviPath [setInvPath $invNo dvi]
+  puts "viewInvoice $invDviPath"
+  exec $dviViewer $invDviPath
+return 0
 
-  #2. Produce DVI
-if [catch  {eval [list exec -- latex -draftmode -interaction=nonstopmode $vorlageTex}] {
-NewsHandler::QueryNews "Rechnung $invNo lässt sich nicht latexen! Ansicht/Ausdruck nicht möglich." red
-    return 1
+    
+  if ![info exists dviViewer] {
+    NewsHandler::QueryNews "Es ist kein Anzeigeprogramm für DVI-Dateien installiert. Wenn Sie mit Windows arbeiten, können Sie den Acrobat Reader oder Sumatra probieren.\nFür Linux empfehlen wir 'evince' oder 'okular'.\nWir versuchen nun, das Dokument nach PostScript umzuwandeln..." orange
 }
 
-  #3. Determine DVI capable display program
-  if {[autoexec_ok evince] != ""} {
-    set dviViewer "evince"
-  } elseif {[autoexec_ok okular] != ""} {
-    set dviViewer "okular"
-  } else {
-    NewsHandler::QueryNews "Es ist kein Anzeigeprogramm für DVI-Dateien installiert. Wenn Sie mit Windows arbeiten, können Sie den Acrobat Reader oder Sumatra probieren.\nFür Linux empfehlen wir 'evince' oder 'okular'.\nWir versuchen nun, das Dokument nach PostScript umzuwandeln..." orange
 
   #3.Determine PS viewer
-  if {[autoexec_ok gv] != ""} {
+  if {[auto_execok gv] != ""} {
     set psViewer "gv"
-  } elseif {[autoexec_ok qpdfview] != ""} {
+  } elseif {[auto_execok qpdfview] != ""} {
     set psViewer "qpdfview"
   }
 
-  eval exec dvips $vorlageDvi
+#  eval exec dvips $vorlageDvi
 
   #3. Convert to PDF & view for printing   
-  } else {
+   else {
   
 #TODO: get PDf file path
   dvipdf $vorlageDvi
@@ -640,32 +639,8 @@ NewsHandler::QueryNews "Rechnung $invNo lässt sich nicht latexen! Ansicht/Ausdr
 
 #  eval exec dvips $vorlageDvi
 catch {exec $fileViewer $vorlageDvi}
-return
+return 0
 
-
-  #3. create canvas + load PS
-proc lastresort {} {
- canvas .c -xscrollc ".x set" -yscrollc ".y set" -height 1000 -width 1000
- scrollbar .x -ori hori -command ".c xview"
- scrollbar .y -ori vert -command ".c yview"
- set im [image create photo -file $vorlagePs]
- .c create image 0 0 -image $im -anchor nw
- .c configure -scrollregion [.c bbox all]
-  
-  #Clear main Window from all content
-  foreach w [pack slaves .n.t1.mainF] {pack forget $w}
-
-  pack .c -in .n.t1.mainF
-  pack .x -in .n.t1.mainF -side right
-  pack .y -in .n.t1.mainF -side bottom
-
-  button .showinvexitB -text "Schliessen" -command {resetAdrInvWin}
-  button .showinvpdfB -text "PDF erzeugen" -command {doPdf}
-  button .showinvprintB -text "Drucken" -command {printInvoice}
-  pack .showinvexitB .showinvpdfB .showinvprintB -side bottom -in .n.t1.mainF
-
-  return geschafft
-}
 
 
   #1. Exit if DVI doesn't exist
@@ -712,7 +687,7 @@ proc lastresort {} {
   #Offer PDF anyway
   after 3000 {doInvoicePdf $invNo}
 
-} ;#END showInvoice
+} ;#END viewInvoice
 
 
 # printInvoice
@@ -823,4 +798,53 @@ proc saveInvEntry {curVal curEName ns} {
   return 0
 } ;#END saveInvEntry
 
+
+### A R C H I V ################################################################################
+
+# doInvoicePdf  - obsolete!!! 
+##creates invoice PDF if so desired by user
+##called by showInvoice
+proc doInvoicPdf {invNo} {
+  global invDviName invDviPath invPdfName invPdfPath 
+  global psViewer invPsPath
+
+  set reply [tk_messageBox -type yesno -message "Möchten Sie von der Rechnung Nr. $invNo ein PDF zum Versand/Ausdruck erstellen?"]
+  if {$reply == "yes"} {
+
+    if [catch {exec dvipdf $invDviPath} res] {
+      NewsHandler::QueryNews "Es konnte kein PDF der Rechnung Nr. $invNo erstellt werden: \n$res" red
+      exec dvips $invDviPath
+      exec psViewer $invPsPath
+      NewsHandler::QueryNews "Die Rechnung Nr. $invNo liegt im PostScript-Format vor. Druck/Versand über $psViewer" lightblue
+
+    } else {
+      NewsHandler::QueryNews "Das PDF der Rechnung finden Sie in $invPdfPath" green
+    }
+
+  }
+}
+
+#create canvas + load PS - only if no viewer found!!!
+proc lastresort {} {
+ canvas .c -xscrollc ".x set" -yscrollc ".y set" -height 1000 -width 1000
+ scrollbar .x -ori hori -command ".c xview"
+ scrollbar .y -ori vert -command ".c yview"
+ set im [image create photo -file $vorlagePs]
+ .c create image 0 0 -image $im -anchor nw
+ .c configure -scrollregion [.c bbox all]
+  
+  #Clear main Window from all content
+  foreach w [pack slaves .n.t1.mainF] {pack forget $w}
+
+  pack .c -in .n.t1.mainF
+  pack .x -in .n.t1.mainF -side right
+  pack .y -in .n.t1.mainF -side bottom
+
+  button .showinvexitB -text "Schliessen" -command {resetAdrInvWin}
+  button .showinvpdfB -text "PDF erzeugen" -command {doPdf}
+  button .showinvprintB -text "Drucken" -command {printInvoice}
+  pack .showinvexitB .showinvpdfB .showinvprintB -side bottom -in .n.t1.mainF
+
+  return geschafft
+}
 
