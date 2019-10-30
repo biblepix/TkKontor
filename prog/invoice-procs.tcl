@@ -373,7 +373,7 @@ proc saveInv2DB {} {
     NewsHandler::QueryNews "Rechnung $invNo nicht gespeichert:\n[pg_result $token -error ]" red
     return 1
   } else {
-   	NewsHandler::QueryNews "Rechnung $invNo gespeichert" green
+   	NewsHandler::QueryNews "Rechnung $invNo gespeichert" lightgreen
     fillAdrInvWin $adrNo
     .saveInvB conf -text "Rechnung drucken" -command {printInvoice $invNo}
     return 0
@@ -488,30 +488,22 @@ proc fetchInvData {invNo} {
 proc latexInvoice {invNo type} {
 
   global db adrSpin spoolDir vorlageTex texDir confFile env
-  set invTexPath [setInvPath $invNo tex]
-  set tmpDir /tmp
-  
-puts $invTexPath
-puts $type
 
+  namespace eval Latex {}
+  set Latex::invTexPath [setInvPath $invNo tex]
+  set Latex::tmpDir /tmp
+  
   #A. do DVI > tmpDir
   if {$type != "pdf"} {
 
-NewsHandler::QueryNews "$invNo wird gelatext..." lightblue
-
-  #  catch {
-eval exec -- latex -draftmode -interaction nonstopmode -output-directory $tmpDir $invTexPath
-
-   # } res
-   #puts $res
- 
+  namespace eval Latex {
+    eval exec -- latex -draftmode -interaction nonstopmode -output-directory $tmpDir $invTexPath
+  }
   
     #B. do PS > tmpDir
     if {$type == "ps"} {
       set invPath [setInvPath ps]
-#      catch {
-        eval [list exec dvips $invPath]
-#      }
+      eval [list exec dvips $invPath]
     }
     return 0
   }
@@ -526,8 +518,9 @@ eval exec -- latex -draftmode -interaction nonstopmode -output-directory $tmpDir
     file copy [file root $invTexPath].pdf $invPath
   }
 
+#TODO: this must work only for Tab 2!
   #Change "Rechnung speichern" button to "Rechnung drucken" button
-  .saveInvB conf -text "Rechnung drucken" -command {printInvoice}
+#  .saveInvB conf -text "Rechnung drucken" -command {printInvoice}
 
   return 0
 
@@ -543,24 +536,20 @@ proc doPrintOldInv {invNo} {
     return 1
   }
   
-#  namespace eval print {}
-#  set ::print::invNo $invNo
-
-#  namespace eval print {
-    
- #   variable invNo
- #   upvar 1 $invNo invNo
   NewsHandler::QueryNews "Die Rechnung $invNo wird nun verfasst und angezeigt.\nEine weitere Bearbeitung (Ausdruck / E-Mail-Versand) ist  aus dem Anzeigeprogramm möglich." lightblue
 
 #TODO: returncode einbauen!
   after 6000 "latexInvoice $invNo dvi"
-    
-  if [catch {after 3000 "viewInvoice $invNo"}] {
-    NewsHandler::QueryNews "Die Rechnung kann nicht angezeigt werden. Wir empfehlen die Installation eines Programms wie 'evince', 'okular' oder 'gv' (Anzeigeprogramm von GhostScript), welches DVI oder PostScript anzeigen kann.\nDie Rechnung wird nun zur weiteren Bearbeitung (>Ansicht >E-Mail-Versand >Druck) nach PDF umgewandelt.\nSie finden das Dokument unter $invPdfPath." lightblue
-  }
-  
-  #}
 
+set invPdfPath [setInvPath $invNo pdf]
+
+  proc showDvi {invNo invPdfPath} {
+    if [catch {viewInvoice $invNo}] {
+        NewsHandler::QueryNews "Die Rechnung kann nicht angezeigt werden. Wir empfehlen die Installation eines Programms wie 'evince', 'okular' oder 'gv' (Anzeigeprogramm von GhostScript), welches DVI oder PostScript anzeigen kann.\nDie Rechnung wird nun zur weiteren Bearbeitung (>Ansicht >E-Mail-Versand >Druck) nach PDF umgewandelt.\nSie finden das Dokument unter $invPdfPath." orange
+      }
+  }
+  after 12000 "showDvi $invNo $invPdfPath"
+  
   return 0
 }
 
@@ -618,12 +607,6 @@ proc viewInvoice {invNo} {
 
     set invDviPath [setInvPath $invNo dvi]
 
-
-
-#  after 5000 
-  
-#uplevel 1 $invDviPath
-
     #A) Show DVI
     if {[auto_execok evince] != ""} {
       set dviViewer "evince"
@@ -651,9 +634,9 @@ proc viewInvoice {invNo} {
     #C) Convert to PDF and exit
     set invPdfPath [setInvPath $invNo pdf]
     dvipdf $invDviPath
-    return 0
+    
+    return 1
 
-   ;#END after
 } ;#END viewInvoice
 
 
@@ -785,7 +768,7 @@ proc doInvoicPdf {invNo} {
       NewsHandler::QueryNews "Die Rechnung Nr. $invNo liegt im PostScript-Format vor. Druck/Versand über $psViewer" lightblue
 
     } else {
-      NewsHandler::QueryNews "Das PDF der Rechnung finden Sie in $invPdfPath" green
+      NewsHandler::QueryNews "Das PDF der Rechnung finden Sie in $invPdfPath" lightgreen
     }
 
   }

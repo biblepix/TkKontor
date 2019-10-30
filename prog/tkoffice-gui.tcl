@@ -214,14 +214,14 @@ button .abschlussErstellenB -text "Abschluss erstellen" -command {abschlussErste
 button .abschlussDruckenB -text "Abschluss drucken" -command {abschlussDrucken}
 spinbox .abschlussJahrSB -values {2018 2019 2020 2021 2022 2023 2024 2025} -width 4
 
-message .news -textvariable news -width 800 -relief sunken -pady 5 -padx 10
+message .news -textvar news -width 1000 -relief sunken -pady 5 -padx 10 -justify center -anchor n
 pack [frame .n.t3.bottomF.f2] -side bottom -fill x
 pack [frame .n.t3.bottomF.f1] -side bottom -fill x
 pack .abschlussJahrSB .abschlussErstellenB .abschlussDruckenB -in .n.t3.bottomF.f1 -side right -fill x
 
 #Execute initial commands if connected to DB
 catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res
-pack .news -in .bottomF -side left -anchor nw -fill x
+pack .news -in .bottomF -side left -anchor nw -fill x -expand 1
 
 ######################################################################################
 # T A B 4 :  C O N F I G U R A T I O N
@@ -339,7 +339,7 @@ if {[string length $res] >20} {
   return 1
 }
 
-NewsHandler::QueryNews "Mit Datenbank verbunden" green
+NewsHandler::QueryNews "Mit Datenbank verbunden" lightgreen
 set db $res
 setAdrList
 resetAdrWin
