@@ -1,6 +1,6 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
-# Restored: 25oct19
+# Restored: 30oct19
 
 set version 1.0
 
@@ -120,14 +120,14 @@ label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -widt
 label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 11
 label .invPayedH -text "Bezahlt" -font TkCaptionFont -justify right -anchor w -width 10
 #label .invStatusH -text "Status" -font TkCaptionFont -justify right -anchor w -width 10
-label .invShowH -text "Ansicht" -font TkCaptionFont -justify right -anchor w -justify right -width 10
+label .invShowH -text "Anzeigen" -font TkCaptionFont -justify right -anchor e -justify right -width 20
 
 pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x
 pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x
 set invF .n.t1.mainF.invF
 set headF .n.t1.mainF.headF
 pack .invNoH .invDatH .invArtH .invSumH .invPayedH -in $headF -side left
-pack .invShowH -in $headF -side right
+pack .invShowH -in $headF -side left
 
 
 ########################################################################################

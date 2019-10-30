@@ -1,11 +1,11 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 28oct19
+# Restored: 30oct19
 
 source $confFile
 ################################################################################################################
-################# N E W   I N V O I C E   P R O C S ####################################################################
+################# N E W   I N V O I C E   P R O C S ############################################################
 ################################################################################################################
 
 set vorlageTex [file join $texDir rechnung-vorlage.tex]
@@ -486,19 +486,25 @@ proc fetchInvData {invNo} {
 #code from DKF: " With plenty of experience, 'nonstopmode' or 'batchmode' are most useful
 # eval [list exec -- pdflatex --interaction=nonstopmode] $args
 proc latexInvoice {invNo type} {
+
   global db adrSpin spoolDir vorlageTex texDir confFile env
   set invTexPath [setInvPath $invNo tex]
+  set tmpDir /tmp
+  
 puts $invTexPath
 puts $type
 
   #A. do DVI > tmpDir
   if {$type != "pdf"} {
 
-#    catch {
-eval [list exec -- latex -draftmode -interaction nonstopmode] $invTexPath
+NewsHandler::QueryNews "$invNo wird gelatext..." lightblue
 
-#    } res
- #   return $res
+  #  catch {
+eval exec -- latex -draftmode -interaction nonstopmode -output-directory $tmpDir $invTexPath
+
+   # } res
+   #puts $res
+ 
   
     #B. do PS > tmpDir
     if {$type == "ps"} {
@@ -531,15 +537,30 @@ eval [list exec -- latex -draftmode -interaction nonstopmode] $invTexPath
 #Invoice view/print wrappers
 proc doPrintOldInv {invNo} {
 
-  #1. Get invoice data from DB - TODO: this should be somewhere else outside this proc!
+  #1. Get invoice data from DB
   if [catch "fetchInvData $invNo"] {
     NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
     return 1
   }
-
-  latexInvoice $invNo dvi
   
-  catch "viewInvoice $invNo"
+#  namespace eval print {}
+#  set ::print::invNo $invNo
+
+#  namespace eval print {
+    
+ #   variable invNo
+ #   upvar 1 $invNo invNo
+  NewsHandler::QueryNews "Die Rechnung $invNo wird nun verfasst und angezeigt.\nEine weitere Bearbeitung (Ausdruck / E-Mail-Versand) ist  aus dem Anzeigeprogramm möglich." lightblue
+
+#TODO: returncode einbauen!
+  after 6000 "latexInvoice $invNo dvi"
+    
+  if [catch {after 3000 "viewInvoice $invNo"}] {
+    NewsHandler::QueryNews "Die Rechnung kann nicht angezeigt werden. Wir empfehlen die Installation eines Programms wie 'evince', 'okular' oder 'gv' (Anzeigeprogramm von GhostScript), welches DVI oder PostScript anzeigen kann.\nDie Rechnung wird nun zur weiteren Bearbeitung (>Ansicht >E-Mail-Versand >Druck) nach PDF umgewandelt.\nSie finden das Dokument unter $invPdfPath." lightblue
+  }
+  
+  #}
+
   return 0
 }
 
@@ -595,98 +616,44 @@ proc setInvPath {invNo type} {
 proc viewInvoice {invNo} {
   global db itemFile vorlageTex texDir
 
-  #3. Determine DVI capable display program
-  if {[auto_execok evince] != ""} {
-    set dviViewer "evince"
-  } elseif {[auto_execok okular] != ""} {
-    set dviViewer "okular"
-  }
+    set invDviPath [setInvPath $invNo dvi]
+
+
+
+#  after 5000 
   
-  puts "viewInvoice $invNo"
-  
-  set invDviPath [setInvPath $invNo dvi]
-  puts "viewInvoice $invDviPath"
-  exec $dviViewer $invDviPath
-return 0
+#uplevel 1 $invDviPath
 
-    
-  if ![info exists dviViewer] {
-    NewsHandler::QueryNews "Es ist kein Anzeigeprogramm für DVI-Dateien installiert. Wenn Sie mit Windows arbeiten, können Sie den Acrobat Reader oder Sumatra probieren.\nFür Linux empfehlen wir 'evince' oder 'okular'.\nWir versuchen nun, das Dokument nach PostScript umzuwandeln..." orange
-}
-
-
-  #3.Determine PS viewer
-  if {[auto_execok gv] != ""} {
-    set psViewer "gv"
-  } elseif {[auto_execok qpdfview] != ""} {
-    set psViewer "qpdfview"
-  }
-
-#  eval exec dvips $vorlageDvi
-
-  #3. Convert to PDF & view for printing   
-   else {
-  
-#TODO: get PDf file path
-  dvipdf $vorlageDvi
-  $psViewer $vorlagePdf
-#TODO: set Nechnungsname + copy to spool before viewing!
-  cp $vorlagePdf [setInvPdfPath $invNo]
-  NewsHandler::QueryNews "SIEHE doPDF !!!" orange
-  }
-
-
-
-#  eval exec dvips $vorlageDvi
-catch {exec $fileViewer $vorlageDvi}
-return 0
-
-
-
-  #1. Exit if DVI doesn't exist
-  if {![file exists $invDviPath]} {
-    NewsHandler::QueryNews "$invDviName kann nicht gefunden werden." red
-    return 1
-  }
-
-
-  
-
-  #4. Make PDF & exit if no viewer found
-  if {! [info exists dviViewer] && ! [info exists psViewer]} {
-
-    NewsHandler::QueryNews "Die Rechnung Nr. $invNo kann nicht angezeigt werden. Bitte installieren Sie ein Anzeigeprogramm wie 'evince', 'okular', 'gv' oder 'qpdfview'.\nDas entsprechende PDF finden Sie in $spoolDir" red
-    after 3000 {doInvoicePdf $invNo}
-    return 1
-  }
-
-  ##MAIN CLAUSE
-
-  #A: execute DVi viewer
-  if [info exists dviViewer] {
-    
-    if [catch {exec $dviViewer $invDviPath} res] {
-      NewsHandler::QueryNews "Die Rechnung Nr. $invNo kann nicht angezeigt werden. \n$res" red
-    } else {
-      NewsHandler::QueryNews "Benutzen Sie den Druckdialog von $dviViewer, um die Rechnung auszudrucken." green 
+    #A) Show DVI
+    if {[auto_execok evince] != ""} {
+      set dviViewer "evince"
+    } elseif {[auto_execok okular] != ""} {
+      set dviViewer "okular"
+    }
+    if [info exists dviViewer] {
+      exec $dviViewer $invDviPath
+      return 0
     }
 
-  #B: Execute PS viewer
-  } elseif [info exists psViewer] {
-    
-    exec dvips $invDviPath 
-    
-    if [catch {exec $psViewer $invPsPath} res] {
-      NewsHandler::QueryNews "Die Rechnung Nr. $invNo kann nicht angezeigt werden: \n$res" red
-    } else {
-      NewsHandler::QueryNews "Benutzen Sie den Druckdialog von $psViewer, um die Rechnung auszudrucken." green
+    #B) Convert to PS & show
+    if {[auto_execok gv] != ""} {
+      set psViewer "gv"
+    } elseif {[auto_execok qpdfview] != ""} {
+      set psViewer "qpdfview"
     }
+    if [info exists psViewer] {
+      set invPsPath [setInvPath $invNo ps]
+      eval exec dvips $invDviPath
+      exec $psViewer $invPsPath
+      return 0
+    }
+    
+    #C) Convert to PDF and exit
+    set invPdfPath [setInvPath $invNo pdf]
+    dvipdf $invDviPath
+    return 0
 
-  } ;#End main clause
-
-  #Offer PDF anyway
-  after 3000 {doInvoicePdf $invNo}
-
+   ;#END after
 } ;#END viewInvoice
 
 
