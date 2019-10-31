@@ -161,9 +161,11 @@ createPrintBitmap
 
 #Bitmap should work, but donno why it doesn't
 #          $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
-puts "InvNo: $invno"
-           $invF.$n.invshowB conf -image $::verbucht::printBM -command "doPrintOldInv $invno"
-          pack $invF.$n.invshowB -side right
+#puts "InvNo: $invno"
+
+          $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "doPrintOldInv $invno"
+#pack [frame .invshowbuttonF -width 40] -anchor e -in $invF.$n -fill x -side left
+pack $invF.$n.invshowB -anchor e -side left
         }
 
   		} ;#end for loop
@@ -372,7 +374,9 @@ proc saveInv2DB {} {
   if {[pg_result $token -error] != ""} {
     NewsHandler::QueryNews "Rechnung $invNo nicht gespeichert:\n[pg_result $token -error ]" red
     return 1
+
   } else {
+
    	NewsHandler::QueryNews "Rechnung $invNo gespeichert" lightgreen
     fillAdrInvWin $adrNo
     .saveInvB conf -text "Rechnung drucken" -command {printInvoice $invNo}
@@ -480,50 +484,45 @@ proc fetchInvData {invNo} {
 } ;#END fetchInvData
 
 # latexInvoice
-##executes latex/pdflatex on vorlageTex OR dvips on vorlageDvi
+##executes latex on vorlageTex OR dvips OR dvipdf on vorlageDvi
 ##with end types: DVI / PS / PDF
 ##called by doPrintNewInv & doPrintOldInv
 #code from DKF: " With plenty of experience, 'nonstopmode' or 'batchmode' are most useful
 # eval [list exec -- pdflatex --interaction=nonstopmode] $args
 proc latexInvoice {invNo type} {
 
-  global db adrSpin spoolDir vorlageTex texDir confFile env
-
+  global db adrSpin spoolDir vorlageTex texDir tmpDir
+    
+  #Prepare general vars & ::Latex namespace 
+  set invDviPath [setInvPath $invNo dvi]
+  
   namespace eval Latex {}
   set Latex::invTexPath [setInvPath $invNo tex]
-  set Latex::tmpDir /tmp
+  set Latex::tmpDir $tmpDir
   
   #A. do DVI > tmpDir
-  if {$type != "pdf"} {
-
-  namespace eval Latex {
-    eval exec -- latex -draftmode -interaction nonstopmode -output-directory $tmpDir $invTexPath
+  if {$type == "dvi"} {
+    namespace eval Latex {
+      eval exec -- latex -draftmode -interaction nonstopmode -output-directory $tmpDir $invTexPath
+    }
+    return 0
   }
   
-    #B. do PS > tmpDir
-    if {$type == "ps"} {
-      set invPath [setInvPath ps]
-      eval [list exec dvips $invPath]
-    }
+  #B. do PS > tmpDir
+  if {$type == "ps"} {
+    set invPsPath [setInvPath $invNo ps]
+    eval exec dvips -o $invPsPath $invDviPath
     return 0
   }
     
   #C. do PDF > spoolDir
   if {$type == "pdf"} {
-    set invPath [setInvPath pdf]
-    catch { 
-      eval [list exec -- pdflatex -interaction=nonstopmode] $invTexPath
-    }
-    ##copy PDF to spoolDir
-    file copy [file root $invTexPath].pdf $invPath
+    set invPdfPath [setInvPath $invNo pdf]
+    eval exec dvipdf $invDviPath $invPdfPath
+    return 0
   }
 
-#TODO: this must work only for Tab 2!
-  #Change "Rechnung speichern" button to "Rechnung drucken" button
-#  .saveInvB conf -text "Rechnung drucken" -command {printInvoice}
-
-  return 0
-
+  return 1
 } ;#END latexInvoice
 
 
@@ -535,21 +534,10 @@ proc doPrintOldInv {invNo} {
     NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
     return 1
   }
-  
-  NewsHandler::QueryNews "Die Rechnung $invNo wird nun verfasst und angezeigt.\nEine weitere Bearbeitung (Ausdruck / E-Mail-Versand) ist  aus dem Anzeigeprogramm möglich." lightblue
+  NewsHandler::QueryNews "Wir versuchen nun, Rechnung Nr. $invNo anzuzeigen.\nEine weitere Bearbeitung (Ausdruck / E-Mail-Versand) ist  aus dem Anzeigeprogramm möglich." lightblue
 
-#TODO: returncode einbauen!
   after 6000 "latexInvoice $invNo dvi"
-
-set invPdfPath [setInvPath $invNo pdf]
-
-  proc showDvi {invNo invPdfPath} {
-    if [catch {viewInvoice $invNo}] {
-        NewsHandler::QueryNews "Die Rechnung kann nicht angezeigt werden. Wir empfehlen die Installation eines Programms wie 'evince', 'okular' oder 'gv' (Anzeigeprogramm von GhostScript), welches DVI oder PostScript anzeigen kann.\nDie Rechnung wird nun zur weiteren Bearbeitung (>Ansicht >E-Mail-Versand >Druck) nach PDF umgewandelt.\nSie finden das Dokument unter $invPdfPath." orange
-      }
-  }
-  after 12000 "showDvi $invNo $invPdfPath"
-  
+  after 12000 "viewInvoice $invNo"
   return 0
 }
 
@@ -569,9 +557,8 @@ proc doPrintNewInv {invNo} {
 ##returns invoice path with required ending: TEX / DVI / PS / PDF
 ##called by doPrintOldInv & doPrintNewInv
 proc setInvPath {invNo type} {
-  global spoolDir myComp vorlageTex
+  global spoolDir myComp vorlageTex tmpDir
   
-  set tmpDir /tmp
   set compShortname [lindex $myComp 0]
   append invName invoice _ $compShortname - $invNo
 
@@ -614,27 +601,29 @@ proc viewInvoice {invNo} {
       set dviViewer "okular"
     }
     if [info exists dviViewer] {
-      exec $dviViewer $invDviPath
+      catch {exec $dviViewer $invDviPath} ;#catch wegen garbage output!
       return 0
     }
 
+#TODO: THESE ARE  B O T H  CRAP -FIND PROGS THAT CAN PRINT TO PDF!!!!!
     #B) Convert to PS & show
-    if {[auto_execok gv] != ""} {
-      set psViewer "gv"
-    } elseif {[auto_execok qpdfview] != ""} {
+    if {[auto_execok qpdfview] != ""} {
       set psViewer "qpdfview"
+    } elseif {[auto_execok gv] != ""} {
+      set psViewer "gv"
     }
+
     if [info exists psViewer] {
       set invPsPath [setInvPath $invNo ps]
-      eval exec dvips $invDviPath
-      exec $psViewer $invPsPath
+      catch {latexInvoice $invNo ps} ;#catch wegen garbage output!
+      catch {exec $psViewer $invPsPath}
       return 0
     }
     
     #C) Convert to PDF and exit
     set invPdfPath [setInvPath $invNo pdf]
-    dvipdf $invDviPath
-    
+    catch {latexInvoice $invNo pdf}
+ NewsHandler::QueryNews "Kein Anzeigeprogramm für Rechnung $invNo gefunden.\nDas Dokument [file tail $invPdfPath] befindet sich in $spoolDir zur weiteren Bearbeitung (Ausdruck/Versand).\nInstallieren Sie 'evince' oder 'okular' zur bequemen Anzeige." orange
     return 1
 
 } ;#END viewInvoice

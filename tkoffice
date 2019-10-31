@@ -2,7 +2,7 @@
 # ~/TktkofficeDir/tkofficeDir.tcl
 # Main launcher prog for TktkofficeDir Business Software
 # Installation requirements: Tcl/Tk library, PostgreSQL database
-# Updated: 16Sep 19
+# Updated: 1nov19
 
 set tkofficeDir [file normalize [file dirname [info script]]]
 set confDir [file join $tkofficeDir conf]
@@ -10,6 +10,7 @@ set confFile [file join $confDir config.tcl]
 set progDir [file join $tkofficeDir prog]
 set spoolDir [file join $tkofficeDir spool]
 set texDir [file join $tkofficeDir tex]
+set tmpDir /tmp
 set dumpDir [file join $tkofficeDir dumps]
 set makeConfig [file join $progDir makeConfig.tcl]
 set texVorlage [file join $texDir rechnung-vorlage.tex]
