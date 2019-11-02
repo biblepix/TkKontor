@@ -439,13 +439,16 @@ proc setArticleLine tab {
 
     }
 
+#TODO get order right! 
     if {$::artPrice == 0} {
       set ::artPrice [.invArtPriceE get]
       pack forget .invArtPriceL
-      pack .invArtNameL .invArtPriceE .invArtUnitL .invArtPriceL .invArtTypeL -in .n.t2.f2 -side left   
+      pack .invArtUnitL .invArtNameL .invArtPriceE .invArtTypeL -in .n.t2.f2 -side left   
 
     } else {
-      pack .invArtNameL .invArtPriceL .invArtUnitL .invArtTypeL -in .n.t2.f2 -side left
+    
+      pack forget .invArtPriceE
+      pack .invArtUnitL .invArtNameL .invArtPriceL .invArtTypeL -in .n.t2.f2 -side left
     }
   
   return 0

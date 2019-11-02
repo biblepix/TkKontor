@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 30oct19
+# Restored: 1nov19
 
 source $confFile
 ################################################################################################################
@@ -9,16 +9,27 @@ source $confFile
 ################################################################################################################
 
 set vorlageTex [file join $texDir rechnung-vorlage.tex]
+set dataFile [file join $texDir invdata.tex]
+set itemFile [file join $texDir invitems.tex]
+
  
 # resetNewInvDialog
 ##called by Main + "Abbruch Rechnung"
 proc resetNewInvDialog {} {
+
   pack forget [pack slaves .invoiceFrame]
   set invNo 0
   set ::subtot 0
+  set ::beschr ""
+
+#TODO: make sure all vars are deleted!!!
+#Rabatt-Abzug geht nicht nach "Abbruch" !
+
+  foreach w [pack slaves .invoiceFrame] {
+    pack forget $w
+  }
 
   catch {namespace delete rows}
-  catch {unset ::beschr}
 
   #create Addrow button
   catch {button .addrowB -text "Hinzufügen" -command addInvRow}
@@ -36,15 +47,16 @@ proc resetNewInvDialog {} {
 
   pack .invcondL .invcondSB .invauftrdatL .invauftrdatE .invrefL .invrefE .invcomL .invcomE -in .n.t2.f1 -side left -fill x 
   pack .invArtlistL -in .n.t2.f1 -before .n.t2.f2 -anchor w 
-  pack .invArtNumSB .invArtNameL .invArtPriceL .mengeE .invArtUnitL -in .n.t2.f2 -side left -fill x
+  pack .invArtNumSB .mengeE .invArtUnitL .invArtNameL .invArtPriceL -in .n.t2.f2 -side left -fill x
   pack .addrowB -in .n.t2.f2 -side right -fill x
   
   #Reset Buttons
   .abbruchInvB conf -state disabled
   .saveInvB conf -state disabled -command "
     .saveInvB conf -activebackground #ececec -state normal
-    doSaveInv $invNo
+    doSaveInv
     "
+    
 } ;#END resetNewInvDialog
 
 
@@ -184,14 +196,10 @@ proc addInvRow {} {
   pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
   .saveInvB conf -activebackground skyblue -state normal
   .abbruchInvB conf -activebackground red -state normal -command {
-    .abbruchInvB conf -state disabled
-    namespace delete rows
-    foreach w [pack slaves .invoiceFrame] {
-      pack forget $w
-    }
+  
     resetNewInvDialog
-    .saveInvB conf -activebackground #cecece
-    }
+
+  }
 
   if {[namespace children rows] == ""} {
     set lastrow 0
@@ -258,7 +266,7 @@ proc addInvRow {} {
       if [info exists ::beschr] {
         set separator { /}
       }
-      append ::beschr $separator $menge $artName
+      append ::beschr $separator ${menge}x $artName
 
     }
   }
@@ -269,28 +277,36 @@ proc addInvRow {} {
 ##coordinates invoice saving + printing progs
 ##evaluates exit codes
 ##called by .saveInvB button
-proc doSaveInv {invNo} {
-  catch saveInv2DB res1
-  if {$res1 != 0} {
+proc doSaveInv {} {
+  #1.Save to DB
+  if [catch saveInv2DB res] {
+    NewsHandler::QueryNews $res red
     return 1
   } 
-  catch {invLatex $invNo} res2
-  if {$res2 != 0} {
+  #2. LatexInvoice
+  if [catch {latexInvoice $::Latex::invNo dvi} res] {
+    NewsHandler::QueryNews $res red
     return 1
   }
+  
+  #3. ? NO! doPrintInv ?
+  # ? doViewInvoice ?
 
-#  doPrintInv
   return 0
 }
 
 # saveInv2DB
+##saves new invoice to DB
 ##called by doSaveInv
 proc saveInv2DB {} {
-  global db adrNo env msg texDir
+  global db adrNo env msg texDir itemFile
   global cond ref subtot beschr ref comm auftrDat vat
 
-  #1. Get current vars - TODO: incorporate in DB as 'SERIAL', starting with %YY
+  #1. Get invNo & export to ::Latex 
+  #TODO: incorporate in DB as 'SERIAL', starting with %YY
 	set invNo [createNewNumber invoice]
+	namespace eval Latex {}
+	set ::Latex::invNo $invNo
 	
 	#Get current address from GUI
   set shortAdr "$::name1 $::name2, $::city"
@@ -313,11 +329,10 @@ proc saveInv2DB {} {
     }
   } ;#END foreach w
 
-  #1. Save itemList to ItemFile for Latex
+  #1. Save itemList to ItemFile & convert to Hex for DB
   set chan [open $itemFile w]
   puts $chan $itemList
   close $chan
-  ##convert to Hex for DB
   set itemListHex [binary encode hex $itemList]
 
   #2. Set payedsum=finalsum and ts=3 if cond="bar"
@@ -379,12 +394,56 @@ proc saveInv2DB {} {
 
    	NewsHandler::QueryNews "Rechnung $invNo gespeichert" lightgreen
     fillAdrInvWin $adrNo
-    .saveInvB conf -text "Rechnung drucken" -command {printInvoice $invNo}
+    .saveInvB conf -text "Rechnung drucken" -command "doPrintNewInv $invNo"
     return 0
   } 
 
 } ;#END saveInv2DB
 
+# latexInvoice
+##executes latex on vorlageTex OR dvips OR dvipdf on vorlageDvi
+##with end types: DVI / PS / PDF
+##called by doPrintNewInv & doPrintOldInv
+#code from DKF: " With plenty of experience, 'nonstopmode' or 'batchmode' are most useful
+# eval [list exec -- pdflatex --interaction=nonstopmode] $args
+proc latexInvoice {invNo type} {
+
+  global db adrSpin spoolDir vorlageTex texDir tmpDir
+    
+  #Prepare general vars & ::Latex namespace 
+  set invDviPath [setInvPath $invNo dvi]
+  
+  namespace eval Latex {}
+  set Latex::invTexPath [setInvPath $invNo tex]
+  set Latex::tmpDir $tmpDir
+  
+  #A. do DVI > tmpDir
+  if {$type == "dvi"} {
+    namespace eval Latex {
+      eval exec -- latex -draftmode -interaction nonstopmode -output-directory $tmpDir $invTexPath
+    }
+    return 0
+  }
+  
+  #B. do PS > tmpDir - TODO test namespacing for all 3 functions
+  if {$type == "ps"} {
+    set Latex::invPsPath [setInvPath $invNo ps]
+    set Latex::invDviPath $invDviPath
+    namespace eval Latex {
+      eval exec dvips -o $invPsPath $invDviPath
+    }
+    return 0
+  }
+    
+  #C. do PDF > spoolDir
+  if {$type == "pdf"} {
+    set invPdfPath [setInvPath $invNo pdf]
+    eval exec dvipdf $invDviPath $invPdfPath
+    return 0
+  }
+
+  return 1
+} ;#END latexInvoice
 
 
 ###############################################################################################
@@ -397,10 +456,7 @@ proc saveInv2DB {} {
 ##3.saves dataFile & itemFile for Latex processing
 ##called by invLatex & showInvoice
 proc fetchInvData {invNo} {
-  global db texDir confFile
-  
-  set dataFile [file join $texDir invdata.tex]
-  set itemFile [file join $texDir invitems.tex]
+  global db texDir confFile itemFile dataFile
 
   #1.get some vars from config
   source $confFile
@@ -483,48 +539,6 @@ proc fetchInvData {invNo} {
   
 } ;#END fetchInvData
 
-# latexInvoice
-##executes latex on vorlageTex OR dvips OR dvipdf on vorlageDvi
-##with end types: DVI / PS / PDF
-##called by doPrintNewInv & doPrintOldInv
-#code from DKF: " With plenty of experience, 'nonstopmode' or 'batchmode' are most useful
-# eval [list exec -- pdflatex --interaction=nonstopmode] $args
-proc latexInvoice {invNo type} {
-
-  global db adrSpin spoolDir vorlageTex texDir tmpDir
-    
-  #Prepare general vars & ::Latex namespace 
-  set invDviPath [setInvPath $invNo dvi]
-  
-  namespace eval Latex {}
-  set Latex::invTexPath [setInvPath $invNo tex]
-  set Latex::tmpDir $tmpDir
-  
-  #A. do DVI > tmpDir
-  if {$type == "dvi"} {
-    namespace eval Latex {
-      eval exec -- latex -draftmode -interaction nonstopmode -output-directory $tmpDir $invTexPath
-    }
-    return 0
-  }
-  
-  #B. do PS > tmpDir
-  if {$type == "ps"} {
-    set invPsPath [setInvPath $invNo ps]
-    eval exec dvips -o $invPsPath $invDviPath
-    return 0
-  }
-    
-  #C. do PDF > spoolDir
-  if {$type == "pdf"} {
-    set invPdfPath [setInvPath $invNo pdf]
-    eval exec dvipdf $invDviPath $invPdfPath
-    return 0
-  }
-
-  return 1
-} ;#END latexInvoice
-
 
 #Invoice view/print wrappers
 proc doPrintOldInv {invNo} {
@@ -542,14 +556,22 @@ proc doPrintOldInv {invNo} {
 }
 
 proc doPrintNewInv {invNo} {
-?  set invPath [setInvPath $invNo pdf]
-  set invoicePs ...
+  
+  #1.convert DVI to PostScript
   latexInvoice $invNo ps
-  printInvoice $invoicePs
-  after 3000 {
-    viewInvoice $invoiceDvi / $invoicePs ?
-    NewsHandler::QueryNews "Sie können über das Anzeigeprogramm die Rechnung nochmals ausdrucken bzw. zum Versand per E-Mail nach PDF umwandeln." orange
+  
+  #2. try printing to lpr
+  NewsHandler::QueryNews "Sende Rechnung $invNo zum Drucker..." lightblue
+
+ #TODO test this thorougly, there may be no output at all!!!
+  if [catch {printInvoice $invNo} res] {
+    NewsHandler::QueryNews "$res\nDruck fehlgeschlagen!" red 
   }
+  
+  #3. viewInvoice anyway
+  set invPsPath [setInvPath ps]
+  after 5000 "NewsHandler::QueryNews 'Die Rechnung wird nun angezeigt. Sie können sie aus dem Anzeigeprogramm erneut ausdrucken bzw. nach PDF umwandeln.' orange"
+  after 8000 "viewInvoice $invPsPath"
 }
 
 # setInvPath
@@ -635,53 +657,35 @@ proc viewInvoice {invNo} {
 ##called by "Rechnung drucken" button (neue Rechnung)
 proc printInvoice {invNo} {
 
-  #1. dvips
-  exec dvips ...
+  #1. try direct printing to lpr  
+  eval namespace Latex {}
+  set ::Latex::invDviPath [setInvPath $invNo dvi]
+  
+  #TODO return code einbauen! - namespace nötig?
+  #TODO try Tcl channel instead! - Zis is not working :-(
+  namespace eval Latex {
+    eval exec dvips -o !lpr $invDviPath
+#    NewsHandler::QueryNews "Kein Druck!\n$res" red
+   }
+   
+  #  return 0
 
-  #2. try direct printing vie lpr
-  if {[autoexec_ok lpr] != ""} {
-    if [catch {exec lpr $invPsPath}] {
+  #2. try direct printing vie GhostScript
+#TODO: zis not working either!
+  if {[auto_execok gs] != ""} {
     
-    ## or Try gs
+    set invPsPath [setInvPath $invNo ps]
     set device "ps2write"
     set printer "/dev/usb/lp0" 
-
-#is there a better way to check?
-#Better Test lpinfo / lpstat (only works if CUPS installed) 
-    catch {
-      eval exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invPsPath
-    } res
-
-#TODO: evaluate $res and exit here if print successful
-#Maybe like this: set res [eval exec ...]
-   if {$res == ""} { 
+  #  if [catch {
+ catch {     eval exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invPsPath }
+  #    } res] {
       NewsHandler::QueryNews "Die Rechnung $invNo wurde zum Drucker geschickt." orange
-   }
+      return 1
+  #  }
   }
- }
-
-#3. View PS anyway
-showInvoice $invNo
-NewsHandler::QueryNews "Sie können nun die Rechnung $invNo über das Anzeigeprogramm nochmals ausdrucken oder zwecks Versand nach PDF umwandeln." lightblue
-
-  set invName $spoolDir/invoice_$compName -${invNo}.ps
-
-#Make 1 command for direct PS printing, else show file in evince/okular
-#TODO: for direct PS printing
-#TODO: use pipe instaed of file?
-set dviFile /tmp/$invName.dvi
-
-exec $viewer $dviFile
-
-
-  if [file exists $invName] {
-    NewsHandler::QueryNews "$invName wird ausgedruckt." lightblue
-    exec $printCmd $invName
-  } else {
-
-    NewsHandler::QueryNews "$invName kann weder angezeigt noch gedruckt werden.... $invPdf ..." red
-  }
-
+  
+  return 0
 } ;#END printInvoice
 
 
