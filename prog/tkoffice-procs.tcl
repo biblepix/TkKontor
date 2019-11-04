@@ -167,7 +167,7 @@ proc clearAdrWin {} {
 ##called by GUI (first fill) + Abbruch btn + aveAddress
 proc resetAdrWin {} {
   global adrSpin adrSearch
-
+  
   pack .name1E .name2E .streetE -in .adrF2 -anchor nw
   pack .zipE .cityE -anchor nw -in .adrF2 -side left
   pack .tel1E .tel2E .faxE .mailE .wwwE -in .adrF4

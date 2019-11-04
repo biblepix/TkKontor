@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 1nov19
+# Restored: 3nov19
 
 source $confFile
 ################################################################################################################
@@ -11,7 +11,6 @@ source $confFile
 set vorlageTex [file join $texDir rechnung-vorlage.tex]
 set dataFile [file join $texDir invdata.tex]
 set itemFile [file join $texDir invitems.tex]
-
  
 # resetNewInvDialog
 ##called by Main + "Abbruch Rechnung"
@@ -21,9 +20,6 @@ proc resetNewInvDialog {} {
   set invNo 0
   set ::subtot 0
   set ::beschr ""
-
-#TODO: make sure all vars are deleted!!!
-#Rabatt-Abzug geht nicht nach "Abbruch" !
 
   foreach w [pack slaves .invoiceFrame] {
     pack forget $w
@@ -56,7 +52,6 @@ proc resetNewInvDialog {} {
     .saveInvB conf -activebackground #ececec -state normal
     doSaveInv
     "
-    
 } ;#END resetNewInvDialog
 
 
@@ -65,6 +60,8 @@ proc resetNewInvDialog {} {
 ##Note: ts=customerOID in 'address', now identical with objectid,needed for identification with 'invoice'
 proc fillAdrInvWin {adrId} {
   global invF db
+
+#TODO reorder packing , correct colouring!
   
   #Delete previous frames
   set slaveList [pack slaves $invF]
@@ -612,42 +609,46 @@ proc setInvPath {invNo type} {
 ##sends rechnung.dvi / rechnung.ps to prog for viewing
 ##called by "Ansicht" & "Rechnung drucken" buttons
 proc viewInvoice {invNo} {
-  global db itemFile vorlageTex texDir
+  global db itemFile vorlageTex texDir spoolDir
 
-    set invDviPath [setInvPath $invNo dvi]
+  set invDviPath [setInvPath $invNo dvi]
 
-    #A) Show DVI
-    if {[auto_execok evince] != ""} {
-      set dviViewer "evince"
-    } elseif {[auto_execok okular] != ""} {
-      set dviViewer "okular"
-    }
-    if [info exists dviViewer] {
-      catch {exec $dviViewer $invDviPath} ;#catch wegen garbage output!
-      return 0
-    }
+  #A) Show DVI
+  if {[auto_execok Xevince] != ""} {
+    set dviViewer "evince"
+  } elseif {[auto_execok okular] != ""} {
+    set dviViewer "okular"
+  }
+  if [info exists dviViewer] {
+    catch {exec $dviViewer $invDviPath} ;#catch wegen garbage output!
+    return 0
+  }
 
-#TODO: THESE ARE  B O T H  CRAP -FIND PROGS THAT CAN PRINT TO PDF!!!!!
-    #B) Convert to PS & show
-    if {[auto_execok qpdfview] != ""} {
-      set psViewer "qpdfview"
-    } elseif {[auto_execok gv] != ""} {
-      set psViewer "gv"
-    }
-
-    if [info exists psViewer] {
-      set invPsPath [setInvPath $invNo ps]
-      catch {latexInvoice $invNo ps} ;#catch wegen garbage output!
-      catch {exec $psViewer $invPsPath}
-      return 0
-    }
-    
-    #C) Convert to PDF and exit
+  #B) Convert to PS & show
+  ##zathura can show & convert PS>PDf
+  if {[auto_execok Xzathura] != ""} {
+    set psViewer "zathura"
+  ##gv can show PS + PDF, not convert
+  } elseif {[auto_execok Xgv] != ""} {
+    set psViewer "gv"
+  }
+  if [info exists psViewer] {
+    set invPsPath [setInvPath $invNo ps]
+    catch {latexInvoice $invNo ps} ;#catch wegen garbage output!
+    catch {exec $psViewer $invPsPath}
+    return 0
+  }
+  
+  #C) Try showing PS on canvas OR convert to PDF
+  viewInvOnCanvas $invNo
+  if [catch {viewInvOnCanvas $invNo}] {
+   
     set invPdfPath [setInvPath $invNo pdf]
     catch {latexInvoice $invNo pdf}
- NewsHandler::QueryNews "Kein Anzeigeprogramm für Rechnung $invNo gefunden.\nDas Dokument [file tail $invPdfPath] befindet sich in $spoolDir zur weiteren Bearbeitung (Ausdruck/Versand).\nInstallieren Sie 'evince' oder 'okular' zur bequemen Anzeige." orange
+    NewsHandler::QueryNews "Kein externes Betrachtungsprogramm gefunden.\nDas Dokument '[file tail $invPdfPath]' befindet sich in $spoolDir zur weiteren Bearbeitung." orange
+    NewsHandler::QueryNews "Installieren Sie zur bequemen Anzeige/Bearbeitung von Rechnungen eines der Programme 'evince' oder 'okular'." orange
     return 1
-
+  }
 } ;#END viewInvoice
 
 
@@ -767,27 +768,44 @@ proc doInvoicPdf {invNo} {
   }
 }
 
-#create canvas + load PS - only if no viewer found!!!
-proc lastresort {} {
- canvas .c -xscrollc ".x set" -yscrollc ".y set" -height 1000 -width 1000
- scrollbar .x -ori hori -command ".c xview"
- scrollbar .y -ori vert -command ".c yview"
- set im [image create photo -file $vorlagePs]
- .c create image 0 0 -image $im -anchor nw
- .c configure -scrollregion [.c bbox all]
+# viewInvOnCanvas
+##last option if no viewer installed
+##called by viewInvoice3
+proc viewInvOnCanvas {invNo} {
+  global adrSpin
+   
+  set invPsPath [setInvPath $invNo ps]
+  catch {latexInvoice $invNo ps}
   
+  catch {canvas .invC -xscrollc ".x set" -yscrollc ".y set" -height 700 -width 1000}
+  catch {scrollbar .xScroll -ori hori -command ".invC xview"}
+  catch {scrollbar .yScroll -ori vert -command ".invC yview"}
+  set im [image create photo -file $invPsPath]
+  .invC create image 0 0 -image $im -anchor nw
+  .invC configure -scrollregion [.invC bbox all]
+  
+  button .showinvexitB -text "Schliessen"
+  button .showinvpdfB -text "PDF erzeugen"
+  button .showinvprintB -text "Drucken"
+
   #Clear main Window from all content
   foreach w [pack slaves .n.t1.mainF] {pack forget $w}
 
-  pack .c -in .n.t1.mainF
-  pack .x -in .n.t1.mainF -side right
-  pack .y -in .n.t1.mainF -side bottom
+  pack .invC -in .n.t1.mainF
+  pack .yScroll -in .n.t1.mainF -side left
+  pack .showinvexitB .showinvpdfB .showinvprintB -in .n.t1.mainF -side right
+  
 
-  button .showinvexitB -text "Schliessen" -command {resetAdrInvWin}
-  button .showinvpdfB -text "PDF erzeugen" -command {doPdf}
-  button .showinvprintB -text "Drucken" -command {printInvoice}
-  pack .showinvexitB .showinvpdfB .showinvprintB -side bottom -in .n.t1.mainF
 
-  return geschafft
+#TODO: this is crap - windows balagan !!!
+ .showinvexitB conf -command {
+    foreach w [pack slaves .n.t1.mainF] {pack forget $w}
+  resetAdrWin
+#fillAdrInvWin [$adrSpin get]
+}
+  .showinvpdfB conf -command "latexInvoice $invNo pdf ; resetAdrWin [.adrSB get]"
+  .showinvprintB conf -command "doPrintOldInv $invNo ; resetAdrWin [.adrSB get]"  
+
+  return 0
 }
 

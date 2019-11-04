@@ -343,7 +343,7 @@ NewsHandler::QueryNews "Mit Datenbank verbunden" lightgreen
 set db $res
 setAdrList
 resetAdrWin
-fillAdrInvWin [$adrSpin get]
+#fillAdrInvWin [$adrSpin get]
 .confDBNameE conf -state disabled
 .confDBUserE conf -state disabled
 .initDBB conf -state disabled
