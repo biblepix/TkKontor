@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 3nov19
+# Restored: 5nov19
 
 source $confFile
 ################################################################################################################
@@ -413,6 +413,7 @@ proc latexInvoice {invNo type} {
   namespace eval Latex {}
   set Latex::invTexPath [setInvPath $invNo tex]
   set Latex::tmpDir $tmpDir
+  set Latex::spoolDir $spoolDir
   
   #A. do DVI > tmpDir
   if {$type == "dvi"} {
@@ -434,8 +435,12 @@ proc latexInvoice {invNo type} {
     
   #C. do PDF > spoolDir
   if {$type == "pdf"} {
+  
+    namespace eval Latex {
+      eval exec -- pdflatex -draftmode -interaction nonstopmode -output-directory $spoolDir $invTexPath
+    }  
     set invPdfPath [setInvPath $invNo pdf]
-    eval exec dvipdf $invDviPath $invPdfPath
+    NewsHandler::QueryNews "Das PDF-Dokument '[file tail $invPdfPath]' befindet sich in $spoolDir zur weiteren Bearbeitung." lightblue
     return 0
   }
 
@@ -545,10 +550,10 @@ proc doPrintOldInv {invNo} {
     NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
     return 1
   }
-  NewsHandler::QueryNews "Wir versuchen nun, Rechnung Nr. $invNo anzuzeigen.\nEine weitere Bearbeitung (Ausdruck / E-Mail-Versand) ist  aus dem Anzeigeprogramm möglich." lightblue
+  NewsHandler::QueryNews "Rechnung Nr. $invNo wird nun angezeigt.\nEine weitere Bearbeitung (Ausdruck/Versand) ist  aus dem Anzeigeprogramm möglich." lightblue
 
-  after 6000 "latexInvoice $invNo dvi"
-  after 12000 "viewInvoice $invNo"
+  after 5000 "latexInvoice $invNo dvi"
+  after 9000 "viewInvoice $invNo"
   return 0
 }
 
@@ -614,41 +619,49 @@ proc viewInvoice {invNo} {
   set invDviPath [setInvPath $invNo dvi]
 
   #A) Show DVI
-  if {[auto_execok Xevince] != ""} {
+  if {[auto_execok XXevince] != ""} {
     set dviViewer "evince"
   } elseif {[auto_execok okular] != ""} {
     set dviViewer "okular"
   }
+  
   if [info exists dviViewer] {
-    catch {exec $dviViewer $invDviPath} ;#catch wegen garbage output!
-    return 0
+    if [catch {exec $dviViewer $invDviPath}] {
+      viewInvOnCanvas $invNo
+      return
+    }
   }
 
+proc meyutar! {} {
   #B) Convert to PS & show
   ##zathura can show & convert PS>PDf
-  if {[auto_execok Xzathura] != ""} {
+  if {[auto_execok XXzathura] != ""} {
     set psViewer "zathura"
   ##gv can show PS + PDF, not convert
-  } elseif {[auto_execok Xgv] != ""} {
+  } elseif {[auto_execok XXgv] != ""} {
     set psViewer "gv"
   }
   if [info exists psViewer] {
     set invPsPath [setInvPath $invNo ps]
     catch {latexInvoice $invNo ps} ;#catch wegen garbage output!
-    catch {exec $psViewer $invPsPath}
+    
+#TODO if catch funktioniert nicht, da immer grabage output! - but test if just with gv, if so throw out!!!!
+    if [catch {exec $psViewer $invPsPath}] {
+      viewInvOnCanvas $invNo
+    }
     return 0
   }
-  
-  #C) Try showing PS on canvas OR convert to PDF
+}
+
+  #B) Last resort: Try showing PS on canvas OR convert to PDF
   viewInvOnCanvas $invNo
-  if [catch {viewInvOnCanvas $invNo}] {
-   
-    set invPdfPath [setInvPath $invNo pdf]
-    catch {latexInvoice $invNo pdf}
-    NewsHandler::QueryNews "Kein externes Betrachtungsprogramm gefunden.\nDas Dokument '[file tail $invPdfPath]' befindet sich in $spoolDir zur weiteren Bearbeitung." orange
-    NewsHandler::QueryNews "Installieren Sie zur bequemen Anzeige/Bearbeitung von Rechnungen eines der Programme 'evince' oder 'okular'." orange
-    return 1
+  
+  if [catch {XXviewInvOnCanvas $invNo}] {
+   # set invPdfPath [setInvPath $invNo pdf]
+   # catch {latexInvoice $invNo pdf}
+   # return 1
   }
+  
 } ;#END viewInvoice
 
 
@@ -659,34 +672,43 @@ proc viewInvoice {invNo} {
 proc printInvoice {invNo} {
 
   #1. try direct printing to lpr  
-  eval namespace Latex {}
-  set ::Latex::invDviPath [setInvPath $invNo dvi]
-  
-  #TODO return code einbauen! - namespace nötig?
-  #TODO try Tcl channel instead! - Zis is not working :-(
-  namespace eval Latex {
-    eval exec dvips -o !lpr $invDviPath
-#    NewsHandler::QueryNews "Kein Druck!\n$res" red
-   }
-   
-  #  return 0
+  set invPsPath [setInvPath $invNo ps]
+  NewsHandler::QueryNews "Die Rechnung $invNo wird zum Drucker geschickt." orange
+
+#TODO Hängt wenn lpr auf Drucker wartet!
+  if {[auto_execok lpr] != ""} {
+    
+    set printChan [open |/usr/bin/lpr w]
+    set textChan [open $invPsPath]
+    set t [read $textChan]
+    puts $printChan $t
+catch {close $textChan}
+catch {close $printChan}
+    return 0
+    #after 5000 {return 1}
+ #   catch {exec lpr $invPsPath}
+        
+  } 
 
   #2. try direct printing vie GhostScript
-#TODO: zis not working either!
+#TODO: zis not working yet!
   if {[auto_execok gs] != ""} {
     
     set invPsPath [setInvPath $invNo ps]
     set device "ps2write"
     set printer "/dev/usb/lp0" 
-  #  if [catch {
- catch {     eval exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invPsPath }
-  #    } res] {
-      NewsHandler::QueryNews "Die Rechnung $invNo wurde zum Drucker geschickt." orange
-      return 1
-  #  }
-  }
-  
+    catch {
+      eval exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invPsPath 
+    }
   return 0
+  }
+
+  NewsHandler::QueryNews "Die Rechnung $invNo kann nicht gedruckt werden." red
+  NewsHandler::QueryNews "Installieren Sie ein Betrachtungsprogramm wie 'evince' oder 'okular' für besseres Druck-Handling." orange
+  
+  latexInvoice pdf
+  
+  return 1
 } ;#END printInvoice
 
 
@@ -769,42 +791,47 @@ proc doInvoicPdf {invNo} {
 }
 
 # viewInvOnCanvas
-##last option if no viewer installed
-##called by viewInvoice3
+##shows invoice in toplevel window
+##called by viewInvoice if no viewer found
 proc viewInvOnCanvas {invNo} {
   global adrSpin
-   
+ 
+  NewsHandler::QueryNews "Kein externes Betrachtungsprogramm gefunden." orange
+  NewsHandler::QueryNews "Installieren Sie zur bequemen Anzeige/Bearbeitung von Rechnungen eines der Programme 'evince' oder 'okular'." orange  
+
   set invPsPath [setInvPath $invNo ps]
   catch {latexInvoice $invNo ps}
   
-  catch {canvas .invC -xscrollc ".x set" -yscrollc ".y set" -height 700 -width 1000}
-  catch {scrollbar .xScroll -ori hori -command ".invC xview"}
-  catch {scrollbar .yScroll -ori vert -command ".invC yview"}
+  #Create toplevel window with canvas & buttons
+  catch {toplevel .topW -borderwidth 7 -relief sunken}
+  catch {button .topW.showinvexitB -text "Schliessen"}
+  catch {button .topW.showinvpdfB -text "PDF erzeugen"}
+  catch {button .topW.showinvprintB -text "Drucken"}
+  catch {canvas .topW.invC -yscrollc ".topW.yScroll set"}
+  catch {scrollbar .topW.yScroll -ori vert -command ".topW.invC yview"}
   set im [image create photo -file $invPsPath]
-  .invC create image 0 0 -image $im -anchor nw
-  .invC configure -scrollregion [.invC bbox all]
+  .topW.invC create image 0 0 -image $im -anchor nw
+  .topW.invC configure -scrollregion [.topW.invC bbox all]
+  .topW.invC conf -width [image width $im] -height [image height $im]
+    
+    pack .topW.invC
+  pack .topW.yScroll -side left
+  pack .topW.showinvexitB .topW.showinvpdfB .topW.showinvprintB -side right
+
+  .topW.showinvexitB conf -command "wm forget .topW"
   
-  button .showinvexitB -text "Schliessen"
-  button .showinvpdfB -text "PDF erzeugen"
-  button .showinvprintB -text "Drucken"
-
-  #Clear main Window from all content
-  foreach w [pack slaves .n.t1.mainF] {pack forget $w}
-
-  pack .invC -in .n.t1.mainF
-  pack .yScroll -in .n.t1.mainF -side left
-  pack .showinvexitB .showinvpdfB .showinvprintB -in .n.t1.mainF -side right
+#TODO export to function - what about ps2pdf in latexPdf???
+  .topW.showinvpdfB conf -command "doPdf $invNo"
   
-
-
-#TODO: this is crap - windows balagan !!!
- .showinvexitB conf -command {
-    foreach w [pack slaves .n.t1.mainF] {pack forget $w}
-  resetAdrWin
-#fillAdrInvWin [$adrSpin get]
-}
-  .showinvpdfB conf -command "latexInvoice $invNo pdf ; resetAdrWin [.adrSB get]"
-  .showinvprintB conf -command "doPrintOldInv $invNo ; resetAdrWin [.adrSB get]"  
+  proc doPdf {invNo} {
+    set invPsPath [setInvPath $invNo ps]
+    set invPdfPath [setInvPath $invNo pdf]  
+    exec ps2pdf $invPsPath $invPdfPath
+    NewsHandler::QueryNews "Das PDF finden Sie unter $invPdfPath." lightgreen
+    return 0
+  }
+  
+  .topW.showinvprintB conf -command "printInvoice $invNo"  
 
   return 0
 }
