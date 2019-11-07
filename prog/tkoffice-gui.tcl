@@ -119,15 +119,15 @@ label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width
 label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 47
 label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 11
 label .invPayedH -text "Bezahlt" -font TkCaptionFont -justify right -anchor w -width 10
-#label .invStatusH -text "Status" -font TkCaptionFont -justify right -anchor w -width 10
-label .invShowH -text "Anzeigen" -font TkCaptionFont -justify right -anchor e -justify right -width 20
+label .invEntryH -text "Zahlung eingeben" -font TkCaptionFont -bg lightblue -justify right -anchor w -width 20
+label .invShowH -text "Rechnung anzeigen" -font TkCaptionFont -bg lightblue -justify right -anchor e -justify right -width 20
 
 pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x
 pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x
 set invF .n.t1.mainF.invF
 set headF .n.t1.mainF.headF
-pack .invNoH .invDatH .invArtH .invSumH .invPayedH -in $headF -side left
-pack .invShowH -in $headF -side left
+pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invEntryH -in $headF -side left
+pack .invShowH -in $headF -side right
 
 
 ########################################################################################
@@ -186,7 +186,7 @@ label .invArtNameL -textvar artName -padx 50
 label .invArtUnitL -textvar artUnit -padx 20
 label .invArtTypeL -textvar artType -padx 20
 
-label .subtotalL -width 7 -textvar subtot -bg lightblue
+label .subtotalL -width 7 -bg lightblue
 message .subtotalM -width 200 -text "Zwischensumme: "
 pack .subtotalM .subtotalL -side left -in .n.t2.bottomF
 ##configured later by resetNewInvDialog:

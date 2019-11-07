@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 5nov19
+# Restored: 6nov19
 
 source $confFile
 ################################################################################################################
@@ -15,17 +15,12 @@ set itemFile [file join $texDir invitems.tex]
 # resetNewInvDialog
 ##called by Main + "Abbruch Rechnung"
 proc resetNewInvDialog {} {
-
-  pack forget [pack slaves .invoiceFrame]
-  set invNo 0
-  set ::subtot 0
-  set ::beschr ""
-
+  
+  #Cleanup ::rows & frame
+  catch {namespace delete rows}
   foreach w [pack slaves .invoiceFrame] {
     pack forget $w
   }
-
-  catch {namespace delete rows}
 
   #create Addrow button
   catch {button .addrowB -text "Hinzufügen" -command addInvRow}
@@ -39,7 +34,7 @@ proc resetNewInvDialog {} {
     %W conf -fg black
     set menge ""
     return 0
-    }
+  }
 
   pack .invcondL .invcondSB .invauftrdatL .invauftrdatE .invrefL .invrefE .invcomL .invcomE -in .n.t2.f1 -side left -fill x 
   pack .invArtlistL -in .n.t2.f1 -before .n.t2.f2 -anchor w 
@@ -61,8 +56,6 @@ proc resetNewInvDialog {} {
 proc fillAdrInvWin {adrId} {
   global invF db
 
-#TODO reorder packing , correct colouring!
-  
   #Delete previous frames
   set slaveList [pack slaves $invF]
   foreach  w $slaveList {
@@ -78,7 +71,10 @@ proc fillAdrInvWin {adrId} {
   #Add new namespace no.
   namespace eval verbucht {
 
-createPrintBitmap
+    createPrintBitmap
+    ##set ::verbucht vars to manipulate header visibility
+    set eingabe 0
+    set anzeige 0
 
     set adrId [.adrSB get]
     set idToken [pg_exec $db "SELECT ts FROM address WHERE objectid = $adrId"]
@@ -118,47 +114,51 @@ createPrintBitmap
         $invF.$n.invDatL configure -text $invdat
 			  catch {label $invF.$n.beschr -width 50 -justify left -anchor w}
 			  $invF.$n.beschr configure -text $beschr
-			  catch {label $invF.$n.sumtotal -width 10 -justify right -anchor e}
+			  catch {label $invF.$n.sumtotal -width 20 -justify right -anchor e}
 			  $invF.$n.sumtotal configure -text $total
 #			  catch {label $invF.$n.statusL -width 10 -justify right -anchor e}
 #			  $invF.$n.statusL configure -text $ts
         #create label/entry for Bezahlt, packed later
         set bezahlt [pg_result $::verbucht::payedsumT -getTuple $n]
-        catch {label $invF.$n.payedsumL -width 13 -justify right -anchor e}
-        $invF.$n.payedsumL conf -text $bezahlt
-        catch {entry $invF.$n.payedsumE -text Eingabe -bg beige -fg grey -width 7 -justify right}
+        catch {label $invF.$n.bezahltL -width 23 -justify right -anchor e}
+        $invF.$n.bezahltL conf -text $bezahlt
+        catch {entry $invF.$n.zahlenE -text Eingabe -bg beige -fg grey -width 7 -justify right}
 
         ##create showInvoice button, to show up only if inv not empty
         catch {button $invF.$n.invshowB}
 
 			  #PAYEDSUM label/entry
 			  #If 3 (payed) make label
+			  set zahlen ""
+			  
 			  if {$ts==3} {
-				  set zahlen ""
-				  #catch {label $invF.$n.payedsumL -width 10}
-          $invF.$n.payedsumL conf -fg green
+			  
+			    $invF.$n.bezahltL conf -fg green
 #         $invF.$n.statusL conf -fg green
-          pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL  -side left
+          pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.bezahltL -side left
 			  
         #If 1 or 2 make entry
 			  } else {
-
-				  catch {label $invF.$n.zahlenL -textvar zahlen -fg red -width 50}
-				  set zahlen "Zahlbetrag eingeben und mit Tab-Taste quittieren"
+			  
+			    set ::verbucht::eingabe 1
+          set restbetrag "Restbetrag eingeben und mit Tab-Taste quittieren"
+          set gesamtbetrag "Zahlbetrag eingeben und mit Tab-Taste quittieren"
+          $invF.$n.bezahltL conf -fg red
+				  catch {label $invF.$n.zahlenM -width 50}
+				 
           #create entry widget providing amount, entry name & NS to calling prog
-          $invF.$n.payedsumE delete 0 end
-          $invF.$n.payedsumE conf -validate focusout -validatecommand "saveInvEntry %P %W $n" 
-#          $invF.$n.statusL conf -fg red
-				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.payedsumL -side left
-          pack $invF.$n.zahlenL $invF.$n.payedsumE -side right
+          $invF.$n.zahlenE delete 0 end
+          $invF.$n.zahlenE conf -validate focusout -validatecommand "saveInvEntry %P %W $n" 
+          $invF.$n.zahlenM conf -fg red -textvar gesamtbetrag
+				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.bezahltL $invF.$n.zahlenE $invF.$n.zahlenM -side left
+
 		  
         #if 2 (Teilzahlung) include payed amount
 			  #WARUM IST payedsum LEER - can't use -textvariable with -validatecommand!
 				  if {$ts==2} {
-					  $invF.$n.payedsumE configure -bg orange
-					  $invF.$n.zahlenL conf -bg orange -fg white -width 50 -textvar zahlen
-#            $invF.$n.statusL conf -fg orange
-					  set zahlen "Restbetrag eingeben und mit Tab-Taste quittieren"
+
+					  $invF.$n.zahlenM conf -fg maroon -textvar restbetrag
+					  $invF.$n.bezahltL conf -fg maroon
 				  }
 
 			  }
@@ -171,14 +171,17 @@ createPrintBitmap
 #Bitmap should work, but donno why it doesn't
 #          $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
 #puts "InvNo: $invno"
-
-          $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "doPrintOldInv $invno"
-#pack [frame .invshowbuttonF -width 40] -anchor e -in $invF.$n -fill x -side left
-pack $invF.$n.invshowB -anchor e -side left
+        set ::verbucht::anzeige 1
+        $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "doPrintOldInv $invno"
+        pack $invF.$n.invshowB -anchor e -side right
         }
 
   		} ;#end for loop
     } ;#END namspace $rowNo
+    
+    if {$eingabe} {.invEntryH conf -state normal -bg lightblue} {.invEntryH conf -state disabled -bg #d9d9d9}
+    if {$anzeige} {.invShowH conf -state normal -bg lightblue} {.invShowH conf -state disabled -bg #d9d9d9}
+    
   } ;#END namespace verbucht
 
 } ;#END fillAdrInvWin
@@ -188,15 +191,12 @@ pack $invF.$n.invshowB -anchor e -side left
 proc addInvRow {} {
   #Create Row Frame
   namespace eval rows {}
-  
+  .subtotalL conf -textvar rows::subtot 
+   
   #Configure Abbruch button
   pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
   .saveInvB conf -activebackground skyblue -state normal
-  .abbruchInvB conf -activebackground red -state normal -command {
-  
-    resetNewInvDialog
-
-  }
+  .abbruchInvB conf -activebackground red -state normal -command {resetNewInvDialog}
 
   if {[namespace children rows] == ""} {
     set lastrow 0
@@ -208,7 +208,9 @@ proc addInvRow {} {
 
   #add new namespace no.
   namespace eval rows {
-    
+    #set subtot 0
+    #set rabatt 0
+    #catch {unset beschr}
     set rowNo [incr lastrow 1]
 
     namespace eval $rowNo  {
@@ -244,27 +246,28 @@ proc addInvRow {} {
 
         #Export for saveInv2TeX
         set subtot [expr $subtot - $rabatt]        
-        set ::rabatt $rabatt
+        set rows::rabatt $rabatt
+
+
 
       } else {
-        set subtot [expr $::subtot + $rowtot]
+#      set subtot $::rows::subtot
+        set subtot [expr $::rows::subtot + $rowtot]
       }
-
 
       catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
       pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
       pack .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
 
       #Export subtot with 2 decimal points
-      set ::subtot [expr {double(round(100*$subtot))/100}]
+      set rows::subtot [expr {double(round(100*$subtot))/100}]
 
       #Export beschr cumulatively for use in saveInv2DB & fillAdrInvWin
       set separator {}
-      if [info exists ::beschr] {
+      if [info exists ::rows::beschr] {
         set separator { /}
       }
-      append ::beschr $separator ${menge}x $artName
-
+      append ::rows::beschr $separator ${menge}x $artName
     }
   }
 
@@ -297,7 +300,7 @@ proc doSaveInv {} {
 ##called by doSaveInv
 proc saveInv2DB {} {
   global db adrNo env msg texDir itemFile
-  global cond ref subtot beschr ref comm auftrDat vat
+  global cond ref comm auftrDat vat
 
   #1. Get invNo & export to ::Latex 
   #TODO: incorporate in DB as 'SERIAL', starting with %YY
@@ -335,14 +338,14 @@ proc saveInv2DB {} {
   #2. Set payedsum=finalsum and ts=3 if cond="bar"
 	if {$cond=="bar"} {
     set ts 3
-    set payedsum $subtot
+    set payedsum $rows::subtot
   } else {
     set ts 1
     set payedsum 0
   }	
 
   #3. Make entry for vatlesssum if different from finalsum
-  set vatlesssum $subtot
+  set vatlesssum $rows::subtot
   if {$vat < 0} {
     set vatlesssum [expr ($vat * $finalsum)/100]
   }
@@ -713,7 +716,7 @@ catch {close $printChan}
 
 
 # saveInvEntry
-###called by fillAdrInvWin by $invF.$n.payedsumE entry widget
+###called by fillAdrInvWin by $invF.$n.zahlenE entry widget
 proc saveInvEntry {curVal curEName ns} {
   global db invF
   set curNS "verbucht::${ns}"
@@ -722,7 +725,7 @@ proc saveInvEntry {curVal curEName ns} {
 	#2. get invNo
   set invNo [$invF.$rowNo.invNoL cget -text]
 	
-  #2. Betrag lesen & in DB einfügen überschreiben! / status ändern set newPayedsum [$rowNo::payedsumE get]
+  #2. Betrag lesen & in DB einfügen überschreiben! / status ändern set newPayedsum [$rowNo::zahlenE get]
   set newPayedsum [$curEName get]  
   set finalsum [pg_result [pg_exec $db "SELECT finalsum FROM invoice WHERE f_number=$invNo"] -list]
   set oldPayedsum [pg_result [pg_exec $db "SELECT payedsum FROM invoice WHERE f_number=$invNo"] -list]
@@ -757,7 +760,7 @@ proc saveInvEntry {curVal curEName ns} {
 
     $invF.$rowNo.zahlenL conf -fg green -textvariable $zahlen
 		$invF.$rowNo.statusL conf -text [pg_result $status -list]
-		$invF.$rowNo.payedsumL conf -text $totalPayedsum
+		$invF.$rowNo.bezahltL conf -text $totalPayedsum
     pack forget $curEName
     set $payedsum ""
 	} 
@@ -809,12 +812,13 @@ proc viewInvOnCanvas {invNo} {
   catch {button .topW.showinvprintB -text "Drucken"}
   catch {canvas .topW.invC -yscrollc ".topW.yScroll set"}
   catch {scrollbar .topW.yScroll -ori vert -command ".topW.invC yview"}
-  set im [image create photo -file $invPsPath]
-  .topW.invC create image 0 0 -image $im -anchor nw
+  #Create PostScript image (height/width nicht beeinflussbar!)
+  image create photo psIm -file $invPsPath
+  .topW.invC create image 0 0 -image psIm -anchor nw
   .topW.invC configure -scrollregion [.topW.invC bbox all]
-  .topW.invC conf -width [image width $im] -height [image height $im]
+  .topW.invC conf -width [image width psIm] -height [image height psIm]
     
-    pack .topW.invC
+  pack .topW.invC
   pack .topW.yScroll -side left
   pack .topW.showinvexitB .topW.showinvpdfB .topW.showinvprintB -side right
 
