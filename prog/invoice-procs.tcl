@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 6nov19
+# Restored: 9nov19
 
 source $confFile
 ################################################################################################################
@@ -122,14 +122,15 @@ proc fillAdrInvWin {adrId} {
         set bezahlt [pg_result $::verbucht::payedsumT -getTuple $n]
         catch {label $invF.$n.bezahltL -width 23 -justify right -anchor e}
         $invF.$n.bezahltL conf -text $bezahlt
-        catch {entry $invF.$n.zahlenE -text Eingabe -bg beige -fg grey -width 7 -justify right}
+        
+
 
         ##create showInvoice button, to show up only if inv not empty
         catch {button $invF.$n.invshowB}
 
 			  #PAYEDSUM label/entry
 			  #If 3 (payed) make label
-			  set zahlen ""
+			  #set zahlen ""
 			  
 			  if {$ts==3} {
 			  
@@ -140,21 +141,21 @@ proc fillAdrInvWin {adrId} {
         #If 1 or 2 make entry
 			  } else {
 			  
+          $invF.$n.bezahltL conf -fg red			    
+          catch {entry $invF.$n.zahlenE -bg beige -fg black -width 7 -justify left}
+          $invF.$n.zahlenE conf -validate focusout -vcmd "saveInvEntry %P %W $n"
+				  catch {label $invF.$n.zahlenM -width 50}
+
 			    set ::verbucht::eingabe 1
           set restbetrag "Restbetrag eingeben und mit Tab-Taste quittieren"
           set gesamtbetrag "Zahlbetrag eingeben und mit Tab-Taste quittieren"
-          $invF.$n.bezahltL conf -fg red
-				  catch {label $invF.$n.zahlenM -width 50}
-				 
-          #create entry widget providing amount, entry name & NS to calling prog
-          $invF.$n.zahlenE delete 0 end
-          $invF.$n.zahlenE conf -validate focusout -validatecommand "saveInvEntry %P %W $n" 
+			 
           $invF.$n.zahlenM conf -fg red -textvar gesamtbetrag
+
 				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.bezahltL $invF.$n.zahlenE $invF.$n.zahlenM -side left
 
 		  
         #if 2 (Teilzahlung) include payed amount
-			  #WARUM IST payedsum LEER - can't use -textvariable with -validatecommand!
 				  if {$ts==2} {
 
 					  $invF.$n.zahlenM conf -fg maroon -textvar restbetrag
@@ -732,38 +733,52 @@ proc saveInvEntry {curVal curEName ns} {
   set totalPayedsum [expr $oldPayedsum + $newPayedsum]
 
 	#Insert payedsum if digit, avoiding errors
-	if {[regexp {[[:digit:]]} $newPayedsum]} {
-	
-		if {$totalPayedsum == $finalsum} {
-			set status 3
-		} else {
-			set status 2
-		}
+	if ![string is double $newPayedsum] {
+    $curEName delete 0 end
+    $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
+    NewsHandler::QueryNews "Fehler: Konnte Zahlbetrag nicht speichern." red
+    return 1
+  }
 
-		#Save to DB
-    set totalPayedsum 
-    set token [pg_exec $db "UPDATE invoice 
-      SET payedsum = $totalPayedsum, 
-          ts = $status 
-      WHERE f_number=$invNo"]
+	if {$totalPayedsum == $finalsum} {
+		set status 3
+	} else {
+		set status 2
+	}
 
-    reportResult $token "Betrag CHF $newPayedsum verbucht"
+	# S a v e  totalPayedsum  t o   D B 
+  set token [pg_exec $db "UPDATE invoice 
+    SET payedsum = $totalPayedsum, 
+    ts = $status 
+    WHERE f_number=$invNo"]
+  reportResult $token "Betrag CHF $newPayedsum verbucht"
 
-		#update GUI
-    set zahlen [set curNS]::zahlen
-    set payedsum [set curNS]::payedsum
+	# U p d a t e   G U I 
+#  set zahlen [set curNS]::zahlen
+#  set payedsum [set curNS]::payedsum
 
 #TODO: brauchen wir dieses Label?
-		set $zahlen "Betrag CHF $newPayedsum verbucht"
-    set $payedsum $totalPayedsum		
-		set status [pg_exec $db "SELECT ts FROM invoice WHERE f_number=$invNo"]
+#		set $zahlen "Betrag CHF $newPayedsum verbucht"
+#    set $payedsum $totalPayedsum		
+#		set status [pg_exec $db "SELECT ts FROM invoice WHERE f_number=$invNo"]
 
-    $invF.$rowNo.zahlenL conf -fg green -textvariable $zahlen
-		$invF.$rowNo.statusL conf -text [pg_result $status -list]
-		$invF.$rowNo.bezahltL conf -text $totalPayedsum
-    pack forget $curEName
-    set $payedsum ""
-	} 
+
+    
+    #Delete OR reset zahlen entry
+    if {$status == 3} {
+      pack forget $curEName
+   		$invF.$rowNo.bezahltL conf -text $totalPayedsum -fg green
+      pack forget $invF.$rowNo.zahlenM
+      
+    } else {
+    
+      $curEName delete 0 end
+      $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
+   		$invF.$rowNo.bezahltL conf -text $totalPayedsum -fg maroon
+    }
+    
+#  set $payedsum ""
+
   return 0
 } ;#END saveInvEntry
 
