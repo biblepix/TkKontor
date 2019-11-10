@@ -1,6 +1,6 @@
 # ~/Kontor/auftrag-gui.tcl
 # Updated: 1nov17 
-# Restored: 30oct19
+# Restored: 9nov19
 
 set version 1.0
 
@@ -186,12 +186,16 @@ label .invArtNameL -textvar artName -padx 50
 label .invArtUnitL -textvar artUnit -padx 20
 label .invArtTypeL -textvar artType -padx 20
 
-label .subtotalL -width 7 -bg lightblue
-message .subtotalM -width 200 -text "Zwischensumme: "
-pack .subtotalM .subtotalL -side left -in .n.t2.bottomF
-##configured later by resetNewInvDialog:
+label .subtotalL -text "Rechnungssumme: "
+message .subtotalM -width 70 -bg lightblue -padx 20 -anchor w
+label .abzugL -text "Auslagen: "
+message .abzugM -width 70 -bg lightblue -padx 20 -anchor w
+label .totalL -text "Buchungssumme: "
+message .totalM -width 70 -bg lightblue -padx 20 -anchor w
+
 button .saveInvB -text "Rechnung verbuchen"
 button .abbruchInvB -text "Abbruch"
+pack .subtotalL .subtotalM .abzugL .abzugM .totalL .totalM -side left -in .n.t2.bottomF
 pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
 
 
@@ -231,26 +235,27 @@ pack .news -in .bottomF -side left -anchor nw -fill x -expand 1
 label .confArtT -text "Artikel erfassen" -font "TkHeadingFont"
 message .confArtM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B. Std.) dürfen nicht leer sein.\nDie Kontrollkästchen 'Auslage' und 'Rabatt' für den Artikeltyp können leer sein. Wenn 'Rabatt' ein Häkchen bekommt, gilt der Artikel als Abzugswert in Prozent (im Feld 'Preis' Prozentzahl ohne %-Zeichen eingeben, z.B. 5.5). Der Rabatt wird in der Rechnung vom Gesamtbetrag abgezogen.\nFalls das Feld 'Auslage' angehakt wird (z.B. für Artikel 'Zugfahrt'), wird der Artikel in der Rechnung separat als Auslage aufgeführt, unterliegt nicht der Mehrwertsteuerpflicht und wird nicht als Einnahme verbucht."
 
-#TODO: move?
+#TODO: da chasch nöd mache - 1. create all widgets outside this proc 2. pack/unpack them inside this proc!!!
 proc rebuildArticleWin {} {
-label .confArtL -text "Artikel Nr."
-spinbox .confArtNumSB -width 5 -command {setArticleLine TAB4}
-label .confArtNameL -padx 10 -textvar artName
-label .confArtPriceL -padx 10 -textvar artPrice
-label .confArtUnitL -padx 10 -textvar artUnit
-label .confArtTypeL -padx 10 -textvar artType
-button .confArtSaveB -text "Artikel speichern" -command {saveArticle}
-button .confArtDeleteB -text "Artikel löschen" -command {deleteArticle} -activebackground red
-button .confArtCreateB -text "Artikel erfassen" -command {createArticle}
-pack .confArtT .confArtM -in .n.t4.f1 -anchor w
-pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArtTypeL -in .n.t4.f1 -side left
-pack .confArtSaveB .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
+  label .confArtL -text "Artikel Nr."
+  spinbox .confArtNumSB -width 5 -command {setArticleLine TAB4}
+  label .confArtNameL -padx 10 -textvar artName
+  label .confArtPriceL -padx 10 -textvar artPrice
+  label .confArtUnitL -padx 10 -textvar artUnit
+  label .confArtTypeL -padx 10 -textvar artType
+  button .confArtSaveB -text "Artikel speichern" -command {saveArticle}
+  button .confArtDeleteB -text "Artikel löschen" -command {deleteArticle} -activebackground red
+  button .confArtCreateB -text "Artikel erfassen" -command {createArticle}
+  pack .confArtT .confArtM -in .n.t4.f1 -anchor w
+  pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArtTypeL -in .n.t4.f1 -side left
+  pack .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
+  pack forget .confArtSaveB
 }
 rebuildArticleWin
 
 #DATENBANK SICHERN
 label .dumpDBT -text "Datenbank sichern" -font "TkHeadingFont"
-message .dumpDBM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner [file join $tkofficeDir dumps] abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando \n\tsu postgres -c 'psql $dbname < $dbname-\[DATUM\].sql' \n wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
+message .dumpDBM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner $dumpDir abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando \n\tsu postgres -c 'psql $dbname < $dbname-\[DATUM\].sql' \n wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
 button .dumpDBB -text "Datenbank sichern" -command {dumpDB}
 pack .dumpDBT -in .n.t4.f2 -anchor nw
 pack .dumpDBM -in .n.t4.f2 -anchor nw -side left

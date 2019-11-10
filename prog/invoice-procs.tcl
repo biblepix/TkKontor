@@ -190,18 +190,20 @@ proc fillAdrInvWin {adrId} {
 # addInvRow
 ##called by setupNewInvDialog
 proc addInvRow {} {
+
   #Create Row Frame
-  namespace eval rows {}
-  .subtotalL conf -textvar rows::subtot 
-   
+#  namespace eval rows {
+
+ # }
+  
   #Configure Abbruch button
   pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
   .saveInvB conf -activebackground skyblue -state normal
   .abbruchInvB conf -activebackground red -state normal -command {resetNewInvDialog}
 
-  if {[namespace children rows] == ""} {
+  if [catch {namespace children rows}] {
     set lastrow 0
-    set rowtot 0
+ #   set rowtot 0
   }  else {
     #get last namespace no.
     set lastrow [namespace tail [lindex [namespace children rows] end]]
@@ -209,9 +211,16 @@ proc addInvRow {} {
 
   #add new namespace no.
   namespace eval rows {
-    #set subtot 0
-    #set rabatt 0
-    #catch {unset beschr}
+    if ![info exists subtot] {
+      set subtot 0
+    } ;#Rechnungsbetrag
+    variable abzug  ;#abzüglich A-Typ
+    variable total  ;#Buchungsbetrag
+    variable rowtot
+    variable rabatt
+    .subtotalM conf -textvar ::rows::subtot 
+    .abzugM conf -textvar ::rows::abzug
+    .totalM conf -textvar ::rows::total
     set rowNo [incr lastrow 1]
 
     namespace eval $rowNo  {
@@ -238,22 +247,30 @@ proc addInvRow {} {
 
       #Handle "R" types
       set type [.arttypeL${rowNo} cget -text] 
+      set subtot $rows::subtot
+      #set total $rows::total
       
       ##deduce Rabatt from subtot (for GUI + DB, Invoice makes its own calculation)
       if {$type == "R"} {
         set rabatt [expr ($subtot * $artPrice / 100)]
         .arttypeL${rowNo} conf -bg orange    
         .artpriceL${rowNo} conf -text "-${rabatt}" 
-
-        #Export for saveInv2TeX
-        set subtot [expr $subtot - $rabatt]        
-        set rows::rabatt $rabatt
-
-
-
+        set ::rows::total $subtot
+        set subtot [expr $subtot - $rabatt]
+        set ::rows::rabatt $rabatt
+     
       } else {
-#      set subtot $::rows::subtot
-        set subtot [expr $::rows::subtot + $rowtot]
+
+        set subtot [expr $rows::subtot + $rowtot]
+        set ::rows::total $subtot
+
+        ##deduce auslagen from total        
+        if {$type == "A"} {
+          set subtot [expr $rows::subtot + $subtot]
+          set ::rows::abzug -${rowtot}
+          set ::rows::total [expr $subtot - $rowtot]  
+        }
+        
       }
 
       catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
@@ -261,7 +278,7 @@ proc addInvRow {} {
       pack .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
 
       #Export subtot with 2 decimal points
-      set rows::subtot [expr {double(round(100*$subtot))/100}]
+      set ::rows::subtot [expr {double(round(100*$subtot))/100}]
 
       #Export beschr cumulatively for use in saveInv2DB & fillAdrInvWin
       set separator {}

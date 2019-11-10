@@ -458,9 +458,11 @@ proc setArticleLine tab {
 proc createArticle {} {
   global db
 
- #clear previous entries
+ #clear previous entries & add .confArtSaveB
   .confArtNumSB set ""
   .confArtNumSB conf -bg lightgrey
+  pack .confArtSaveB -in .n.t4.f1 -side right
+   
 #TODO:move to GUI?
   catch {entry .confartnameE -bg beige}
   catch {entry .confartunitE -bg beige -textvar rabatt}
