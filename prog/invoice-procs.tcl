@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 9nov19
+# Restored: 11nov19
 
 source $confFile
 ################################################################################################################
@@ -109,21 +109,19 @@ proc fillAdrInvWin {adrId} {
 
     		#create entries per line, or refill present entries
 			  catch {label $invF.$n.invNoL -width 10 -anchor w}
-			  $invF.$n.invNoL configure -text $invno
+			  $invF.$n.invNoL conf -text $invno
         catch {label $invF.$n.invDatL -width 15 -anchor w -justify left}
-        $invF.$n.invDatL configure -text $invdat
+        $invF.$n.invDatL conf -text $invdat
 			  catch {label $invF.$n.beschr -width 50 -justify left -anchor w}
-			  $invF.$n.beschr configure -text $beschr
-			  catch {label $invF.$n.sumtotal -width 20 -justify right -anchor e}
-			  $invF.$n.sumtotal configure -text $total
+			  $invF.$n.beschr conf -text $beschr
+			  catch {label $invF.$n.sumL -width 10 -justify right -anchor e}
+			  $invF.$n.sumL conf -text $total
 #			  catch {label $invF.$n.statusL -width 10 -justify right -anchor e}
 #			  $invF.$n.statusL configure -text $ts
         #create label/entry for Bezahlt, packed later
         set bezahlt [pg_result $::verbucht::payedsumT -getTuple $n]
-        catch {label $invF.$n.bezahltL -width 23 -justify right -anchor e}
-        $invF.$n.bezahltL conf -text $bezahlt
-        
-
+        catch {label $invF.$n.payedL -width 13 -justify right -anchor e}
+        $invF.$n.payedL conf -text $bezahlt
 
         ##create showInvoice button, to show up only if inv not empty
         catch {button $invF.$n.invshowB}
@@ -134,14 +132,14 @@ proc fillAdrInvWin {adrId} {
 			  
 			  if {$ts==3} {
 			  
-			    $invF.$n.bezahltL conf -fg green
+			    $invF.$n.payedL conf -fg green
 #         $invF.$n.statusL conf -fg green
-          pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.bezahltL -side left
+          pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumL $invF.$n.payedL -side left
 			  
         #If 1 or 2 make entry
 			  } else {
 			  
-          $invF.$n.bezahltL conf -fg red			    
+          $invF.$n.payedL conf -fg red			    
           catch {entry $invF.$n.zahlenE -bg beige -fg black -width 7 -justify left}
           $invF.$n.zahlenE conf -validate focusout -vcmd "saveInvEntry %P %W $n"
 				  catch {label $invF.$n.zahlenM -width 50}
@@ -152,14 +150,14 @@ proc fillAdrInvWin {adrId} {
 			 
           $invF.$n.zahlenM conf -fg red -textvar gesamtbetrag
 
-				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumtotal $invF.$n.bezahltL $invF.$n.zahlenE $invF.$n.zahlenM -side left
+				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumL $invF.$n.payedL $invF.$n.zahlenE $invF.$n.zahlenM -side left
 
 		  
         #if 2 (Teilzahlung) include payed amount
 				  if {$ts==2} {
 
 					  $invF.$n.zahlenM conf -fg maroon -textvar restbetrag
-					  $invF.$n.bezahltL conf -fg maroon
+					  $invF.$n.payedL conf -fg maroon
 				  }
 
 			  }
@@ -190,11 +188,6 @@ proc fillAdrInvWin {adrId} {
 # addInvRow
 ##called by setupNewInvDialog
 proc addInvRow {} {
-
-  #Create Row Frame
-#  namespace eval rows {
-
- # }
   
   #Configure Abbruch button
   pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
@@ -211,6 +204,7 @@ proc addInvRow {} {
 
   #add new namespace no.
   namespace eval rows {
+
     if ![info exists subtot] {
       set subtot 0
     } ;#Rechnungsbetrag
@@ -255,18 +249,18 @@ proc addInvRow {} {
         set rabatt [expr ($subtot * $artPrice / 100)]
         .arttypeL${rowNo} conf -bg orange    
         .artpriceL${rowNo} conf -text "-${rabatt}" 
-        set ::rows::total $subtot
         set subtot [expr $subtot - $rabatt]
+        set ::rows::total $subtot
         set ::rows::rabatt $rabatt
      
       } else {
 
-        set subtot [expr $rows::subtot + $rowtot]
+        set subtot [expr $subtot + $rowtot]
         set ::rows::total $subtot
 
         ##deduce auslagen from total        
         if {$type == "A"} {
-          set subtot [expr $rows::subtot + $subtot]
+ #         set subtot [expr $rows::subtot + $subtot]
           set ::rows::abzug -${rowtot}
           set ::rows::total [expr $subtot - $rowtot]  
         }
@@ -326,9 +320,11 @@ proc saveInv2DB {} {
 	namespace eval Latex {}
 	set ::Latex::invNo $invNo
 	
-	#Get current address from GUI
+	#Get current vars from GUI
   set shortAdr "$::name1 $::name2, $::city"
-
+  set beschr $rows::beschr
+  set subtot $rows::subtot
+  
   #Create itemList for itemFile (needed for LaTeX)
   foreach w [namespace children rows] {
     set artUnit [.artunitL[namespace tail $w] cget -text]
@@ -340,7 +336,7 @@ proc saveInv2DB {} {
     if {$artType==""} {
       append itemList \\Fee\{ $artName { } \( pro { } $artUnit \) \} \{ $artPrice \} \{ $menge \} \n
     } elseif {$artType=="R"} {
-      append itemList \\Discount\{ $artName \} \{ $::rabatt \} \n
+      append itemList \\Discount\{ $artName \} \{ $rows::rabatt \} \n
     #Check if Auslage
     } elseif {$artType=="A"} {
       append itemList \\EBC\{ $artName \} \{ $artPrice \} \n
@@ -356,14 +352,14 @@ proc saveInv2DB {} {
   #2. Set payedsum=finalsum and ts=3 if cond="bar"
 	if {$cond=="bar"} {
     set ts 3
-    set payedsum $rows::subtot
+    set payedsum $subtot
   } else {
     set ts 1
     set payedsum 0
   }	
 
   #3. Make entry for vatlesssum if different from finalsum
-  set vatlesssum $rows::subtot
+  set vatlesssum $subtot
   if {$vat < 0} {
     set vatlesssum [expr ($vat * $finalsum)/100]
   }
@@ -784,14 +780,14 @@ proc saveInvEntry {curVal curEName ns} {
     #Delete OR reset zahlen entry
     if {$status == 3} {
       pack forget $curEName
-   		$invF.$rowNo.bezahltL conf -text $totalPayedsum -fg green
+   		$invF.$rowNo.payedL conf -text $totalPayedsum -fg green
       pack forget $invF.$rowNo.zahlenM
       
     } else {
     
       $curEName delete 0 end
       $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
-   		$invF.$rowNo.bezahltL conf -text $totalPayedsum -fg maroon
+   		$invF.$rowNo.payedL conf -text $totalPayedsum -fg maroon
     }
     
 #  set $payedsum ""
