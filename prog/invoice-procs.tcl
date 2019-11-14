@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 11nov19
+# Restored: 12nov19
 
 source $confFile
 ################################################################################################################
@@ -48,142 +48,6 @@ proc resetNewInvDialog {} {
     doSaveInv
     "
 } ;#END resetNewInvDialog
-
-
-# fillAdrInvWin
-##called by .adrSB 
-##Note: ts=customerOID in 'address', now identical with objectid,needed for identification with 'invoice'
-proc fillAdrInvWin {adrId} {
-  global invF db
-
-  #Delete previous frames
-  set slaveList [pack slaves $invF]
-  foreach  w $slaveList {
-    foreach w [pack slaves $w] {
-      pack forget $w
-    }
-  }
-  #Clear old window+namespace
-  if [namespace exists verbucht] {
-    namespace delete verbucht
-  }
-
-  #Add new namespace no.
-  namespace eval verbucht {
-
-    createPrintBitmap
-    ##set ::verbucht vars to manipulate header visibility
-    set eingabe 0
-    set anzeige 0
-
-    set adrId [.adrSB get]
-    set idToken [pg_exec $db "SELECT ts FROM address WHERE objectid = $adrId"]
-    set custId [pg_result $idToken -list]
-    set invNoT [pg_exec $db "SELECT f_number FROM invoice WHERE customeroid = $custId"]
-    set nTuples [pg_result $invNoT -numTuples]
-
-  	if {$nTuples == -1} {return 1}
-
-    set invDatT   [pg_exec $db "SELECT f_date FROM invoice WHERE customeroid = $custId"]
-	  set beschrT   [pg_exec $db "SELECT shortdescription FROM invoice WHERE customeroid = $custId"]
-	  set sumtotalT [pg_exec $db "SELECT finalsum FROM invoice WHERE customeroid = $custId"]
-	  set payedsumT [pg_exec $db "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
-	  set statusT   [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
-    set itemsT    [pg_exec $db "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
-    
-    for {set n 0} {$n<$nTuples} {incr n} {
-    
-      namespace eval $n {
-
-        set n [namespace tail [namespace current]]
-        set invF $::invF
-			  set total [pg_result $::verbucht::sumtotalT -getTuple $n] 
-			  set ts [pg_result $::verbucht::statusT -getTuple $n]
-			  set invno [pg_result $::verbucht::invNoT -getTuple $n]
-        set invdat [pg_result $::verbucht::invDatT -getTuple $n]
-			  set beschr [pg_result $::verbucht::beschrT -getTuple $n]
-
-			  #increase but don't overwrite frames per line	
-			  catch {frame $invF.$n}
-			  pack $invF.$n -anchor nw -side top -fill x
-
-    		#create entries per line, or refill present entries
-			  catch {label $invF.$n.invNoL -width 10 -anchor w}
-			  $invF.$n.invNoL conf -text $invno
-        catch {label $invF.$n.invDatL -width 15 -anchor w -justify left}
-        $invF.$n.invDatL conf -text $invdat
-			  catch {label $invF.$n.beschr -width 50 -justify left -anchor w}
-			  $invF.$n.beschr conf -text $beschr
-			  catch {label $invF.$n.sumL -width 10 -justify right -anchor e}
-			  $invF.$n.sumL conf -text $total
-#			  catch {label $invF.$n.statusL -width 10 -justify right -anchor e}
-#			  $invF.$n.statusL configure -text $ts
-        #create label/entry for Bezahlt, packed later
-        set bezahlt [pg_result $::verbucht::payedsumT -getTuple $n]
-        catch {label $invF.$n.payedL -width 13 -justify right -anchor e}
-        $invF.$n.payedL conf -text $bezahlt
-
-        ##create showInvoice button, to show up only if inv not empty
-        catch {button $invF.$n.invshowB}
-
-			  #PAYEDSUM label/entry
-			  #If 3 (payed) make label
-			  #set zahlen ""
-			  
-			  if {$ts==3} {
-			  
-			    $invF.$n.payedL conf -fg green
-#         $invF.$n.statusL conf -fg green
-          pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumL $invF.$n.payedL -side left
-			  
-        #If 1 or 2 make entry
-			  } else {
-			  
-          $invF.$n.payedL conf -fg red			    
-          catch {entry $invF.$n.zahlenE -bg beige -fg black -width 7 -justify left}
-          $invF.$n.zahlenE conf -validate focusout -vcmd "saveInvEntry %P %W $n"
-				  catch {label $invF.$n.zahlenM -width 50}
-
-			    set ::verbucht::eingabe 1
-          set restbetrag "Restbetrag eingeben und mit Tab-Taste quittieren"
-          set gesamtbetrag "Zahlbetrag eingeben und mit Tab-Taste quittieren"
-			 
-          $invF.$n.zahlenM conf -fg red -textvar gesamtbetrag
-
-				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumL $invF.$n.payedL $invF.$n.zahlenE $invF.$n.zahlenM -side left
-
-		  
-        #if 2 (Teilzahlung) include payed amount
-				  if {$ts==2} {
-
-					  $invF.$n.zahlenM conf -fg maroon -textvar restbetrag
-					  $invF.$n.payedL conf -fg maroon
-				  }
-
-			  }
-
-        #Create Show button if items not empty
-        set itemsT $::verbucht::itemsT
-        catch {set itemlist [pg_result $itemsT -getTuple $n] }
-        if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
-
-#Bitmap should work, but donno why it doesn't
-#          $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
-#puts "InvNo: $invno"
-        set ::verbucht::anzeige 1
-        $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "doPrintOldInv $invno"
-        pack $invF.$n.invshowB -anchor e -side right
-        }
-
-  		} ;#end for loop
-    } ;#END namspace $rowNo
-    
-    if {$eingabe} {.invEntryH conf -state normal -bg lightblue} {.invEntryH conf -state disabled -bg #d9d9d9}
-    if {$anzeige} {.invShowH conf -state normal -bg lightblue} {.invShowH conf -state disabled -bg #d9d9d9}
-    
-  } ;#END namespace verbucht
-
-} ;#END fillAdrInvWin
 
 # addInvRow
 ##called by setupNewInvDialog
@@ -279,7 +143,7 @@ proc addInvRow {} {
       if [info exists ::rows::beschr] {
         set separator { /}
       }
-      append ::rows::beschr $separator ${menge}x $artName
+      append ::rows::beschr $separator ${menge} $artName
     }
   }
 
@@ -322,7 +186,7 @@ proc saveInv2DB {} {
 	
 	#Get current vars from GUI
   set shortAdr "$::name1 $::name2, $::city"
-  set beschr $rows::beschr
+  set shortDesc $rows::beschr
   set subtot $rows::subtot
   
   #Create itemList for itemFile (needed for LaTeX)
@@ -388,7 +252,7 @@ proc saveInv2DB {} {
     $ts,
     $adrNo,
     '$shortAdr',
-    '$beschr',
+    '$shortDesc',
     $subtot,
     $payedsum,
     $vatlesssum,
@@ -400,12 +264,18 @@ proc saveInv2DB {} {
     '$itemListHex'
     )"]
 
+#TODO geht noch nicht?
+  #Update credit
+  set adrId [pg_result [pg_exec $db "SELECT customeroid FROM invoice WHERE f_number=$invNo"] -list]
+  set creditT [pg_exec $db "UPDATE address SET credit = credit + $subtot WHERE objectid=$adrId"]
+  reportResult $creditT "Kundenguthaben aktualisiert." 
+
+  
+#TODO does this belong here? should we use reportResult instead?
   if {[pg_result $token -error] != ""} {
     NewsHandler::QueryNews "Rechnung $invNo nicht gespeichert:\n[pg_result $token -error ]" red
     return 1
-
   } else {
-
    	NewsHandler::QueryNews "Rechnung $invNo gespeichert" lightgreen
     fillAdrInvWin $adrNo
     .saveInvB conf -text "Rechnung drucken" -command "doPrintNewInv $invNo"
@@ -468,6 +338,139 @@ proc latexInvoice {invNo type} {
 ###############################################################################################
 #### O L D   I N V O I C E   P R O C S  #######################################################
 ###############################################################################################
+
+# fillAdrInvWin
+##called by .adrSB 
+##Note: ts=customerOID in 'address', now identical with objectid,needed for identification with 'invoice'
+proc fillAdrInvWin {adrId} {
+  global invF db
+
+  #Delete previous frames
+  set slaveList [pack slaves $invF]
+  foreach  w $slaveList {
+    foreach w [pack slaves $w] {
+      pack forget $w
+    }
+  }
+  #Clear old window+namespace
+  if [namespace exists verbucht] {
+    namespace delete verbucht
+  }
+
+  #Set Kundenguthaben
+  set token [pg_exec $db "SELECT credit FROM address WHERE objectid=$adrId"]
+  set ::credit [pg_result $token -list]
+
+  #Add new namespace no.
+  namespace eval verbucht {
+
+    createPrintBitmap
+    ##set ::verbucht vars to manipulate header visibility
+    set eingabe 0
+    set anzeige 0
+
+    set adrId [.adrSB get]
+    set idToken [pg_exec $db "SELECT ts FROM address WHERE objectid = $adrId"]
+    set custId [pg_result $idToken -list]
+    set invNoT [pg_exec $db "SELECT f_number FROM invoice WHERE customeroid = $custId"]
+    set nTuples [pg_result $invNoT -numTuples]
+
+  	if {$nTuples == -1} {return 1}
+
+    set invDatT   [pg_exec $db "SELECT f_date FROM invoice WHERE customeroid = $custId"]
+	  set beschrT   [pg_exec $db "SELECT shortdescription FROM invoice WHERE customeroid = $custId"]
+	  set sumtotalT [pg_exec $db "SELECT finalsum FROM invoice WHERE customeroid = $custId"]
+	  set payedsumT [pg_exec $db "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
+	  set statusT   [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
+    set itemsT    [pg_exec $db "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
+    set commT     [pg_exec $db "SELECT f_comment FROM invoice WHERE customeroid = $custId"]
+    
+    for {set n 0} {$n<$nTuples} {incr n} {
+    
+      namespace eval $n {
+
+        set n [namespace tail [namespace current]]
+        set invF $::invF
+			  set total [pg_result $::verbucht::sumtotalT -getTuple $n] 
+			  set ts [pg_result $::verbucht::statusT -getTuple $n]
+			  set invno [pg_result $::verbucht::invNoT -getTuple $n]
+        set invdat [pg_result $::verbucht::invDatT -getTuple $n]
+			  set beschr [pg_result $::verbucht::beschrT -getTuple $n]
+        set comment [pg_result $::verbucht::commT -getTuple $n]
+
+			  #increase but don't overwrite frames per line	
+			  catch {frame $invF.$n}
+			  pack $invF.$n -anchor nw -side top -fill x
+
+    		#create entries per line, or refill present entries
+			  catch {label $invF.$n.invNoL -width 10 -anchor w}
+			  $invF.$n.invNoL conf -text $invno
+        catch {label $invF.$n.invDatL -width 15 -anchor w -justify left}
+        $invF.$n.invDatL conf -text $invdat
+			  catch {label $invF.$n.beschr -width 50 -justify left -anchor w}
+			  $invF.$n.beschr conf -text $beschr
+			  catch {label $invF.$n.sumL -width 10 -justify right -anchor e}
+			  $invF.$n.sumL conf -text $total
+
+        #create label/entry for Bezahlt, packed later
+        set bezahlt [pg_result $::verbucht::payedsumT -getTuple $n]
+        catch {label $invF.$n.payedL -width 13 -justify right -anchor e}
+        $invF.$n.payedL conf -text $bezahlt
+
+        ##create showInvoice button, to show up only if inv not empty
+        catch {button $invF.$n.invshowB}
+			  catch {label $invF.$n.commM -width 50 -justify left -anchor w -padx 35}
+
+			  if {$ts==3} {
+			  
+			    $invF.$n.payedL conf -fg green
+				  $invF.$n.commM conf -fg grey -text $comment -textvar {}
+          pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumL $invF.$n.payedL $invF.$n.commM -side left
+			  
+        #If 1 or 2 make entry
+			  } else {
+			  
+          $invF.$n.payedL conf -fg red			    
+          catch {entry $invF.$n.zahlenE -bg beige -fg black -width 7 -justify left}
+          $invF.$n.zahlenE conf -validate focusout -vcmd "saveInvEntry %P %W $n"
+
+			    set ::verbucht::eingabe 1
+          set restbetrag "Restbetrag eingeben und mit Tab-Taste quittieren"
+          set gesamtbetrag "Zahlbetrag eingeben und mit Tab-Taste quittieren"
+          $invF.$n.commM conf -fg red -textvar gesamtbetrag
+				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumL $invF.$n.payedL $invF.$n.zahlenE $invF.$n.commM -side left
+		  
+        #if 2 (Teilzahlung) include payed amount
+				  if {$ts==2} {
+
+					  $invF.$n.commM conf -fg maroon -textvar restbetrag
+					  $invF.$n.payedL conf -fg maroon
+				  }
+
+			  }
+
+        #Create Show button if items not empty
+        set itemsT $::verbucht::itemsT
+        catch {set itemlist [pg_result $itemsT -getTuple $n] }
+        if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
+
+#Bitmap should work, but donno why it doesn't
+#          $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
+#puts "InvNo: $invno"
+        set ::verbucht::anzeige 1
+        $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "doPrintOldInv $invno"
+        pack $invF.$n.invshowB -anchor e -side right
+        }
+
+  		} ;#end for loop
+    } ;#END namspace $rowNo
+    
+#    if {$eingabe} {.invEntryH conf -state normal -bg lightblue} {.invEntryH conf -state disabled -bg #d9d9d9}
+    if {$anzeige} {.invShowH conf -state normal} {.invShowH conf -state disabled -bg #d9d9d9}
+    
+  } ;#END namespace verbucht
+
+} ;#END fillAdrInvWin
 
 # fetchInvData
 ##1.retrieves invoice data from DB
@@ -581,6 +584,10 @@ proc doPrintNewInv {invNo} {
   
   #2. try printing to lpr
   NewsHandler::QueryNews "Sende Rechnung $invNo zum Drucker..." lightblue
+printInvoice $invNo
+return
+
+
 
  #TODO test this thorougly, there may be no output at all!!!
   if [catch {printInvoice $invNo} res] {
@@ -695,17 +702,23 @@ proc printInvoice {invNo} {
 #TODO Hängt wenn lpr auf Drucker wartet!
   if {[auto_execok lpr] != ""} {
     
-    set printChan [open |/usr/bin/lpr w]
     set textChan [open $invPsPath]
     set t [read $textChan]
+    close $textChan
+
+    set printChan [open |/usr/bin/lpr w]    
     puts $printChan $t
-catch {close $textChan}
-catch {close $printChan}
-    return 0
+    close $rintChan
+#    catch {close $printChan}
+  NewsHandler::QueryNews "Die Rechnung $invNo wurde zum Drucker geschickt." orange
+#    return 0
     #after 5000 {return 1}
  #   catch {exec lpr $invPsPath}
         
   } 
+return 
+
+
 
   #2. try direct printing vie GhostScript
 #TODO: zis not working yet!
@@ -741,8 +754,15 @@ proc saveInvEntry {curVal curEName ns} {
 	
   #2. Betrag lesen & in DB einfügen überschreiben! / status ändern set newPayedsum [$rowNo::zahlenE get]
   set newPayedsum [$curEName get]  
-  set finalsum [pg_result [pg_exec $db "SELECT finalsum FROM invoice WHERE f_number=$invNo"] -list]
-  set oldPayedsum [pg_result [pg_exec $db "SELECT payedsum FROM invoice WHERE f_number=$invNo"] -list]
+
+  set invT [pg_exec $db "SELECT payedsum,finalsum FROM invoice WHERE f_number=$invNo"]
+  set oldPayedsum [lindex [pg_result $invT -list] 0]
+  set finalsum [lindex [pg_result $invT -list] 1]
+  
+  set adrT [pg_exec $db "SELECT customeroid,credit FROM invoice WHERE f_number=$invNo"]
+  set adrId [lindex [pg_result $adrT -list] 0]
+  set credit [lindex [pg_result $adrT -list] 1]
+  
   set totalPayedsum [expr $oldPayedsum + $newPayedsum]
 
 	#Insert payedsum if digit, avoiding errors
@@ -753,45 +773,40 @@ proc saveInvEntry {curVal curEName ns} {
     return 1
   }
 
-	if {$totalPayedsum == $finalsum} {
+	if {$totalPayedsum >= $finalsum} {
 		set status 3
 	} else {
 		set status 2
 	}
 
-	# S a v e  totalPayedsum  t o   D B 
-  set token [pg_exec $db "UPDATE invoice 
+	# S a v e  totalPayedsum  to  'invoice' 
+  set token1 [pg_exec $db "UPDATE invoice 
     SET payedsum = $totalPayedsum, 
     ts = $status 
     WHERE f_number=$invNo"]
-  reportResult $token "Betrag CHF $newPayedsum verbucht"
-
-	# U p d a t e   G U I 
-#  set zahlen [set curNS]::zahlen
-#  set payedsum [set curNS]::payedsum
-
-#TODO: brauchen wir dieses Label?
-#		set $zahlen "Betrag CHF $newPayedsum verbucht"
-#    set $payedsum $totalPayedsum		
-#		set status [pg_exec $db "SELECT ts FROM invoice WHERE f_number=$invNo"]
-
-
     
-    #Delete OR reset zahlen entry
-    if {$status == 3} {
-      pack forget $curEName
-   		$invF.$rowNo.payedL conf -text $totalPayedsum -fg green
-      pack forget $invF.$rowNo.zahlenM
-      
-    } else {
-    
-      $curEName delete 0 end
-      $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
-   		$invF.$rowNo.payedL conf -text $totalPayedsum -fg maroon
-    }
-    
-#  set $payedsum ""
+  # S a v e  credit to 'address'
+  set token2 [pg_exec $db "UPDATE address
+    SET credit = credit + $newPayedsum 
+    WHERE adroid = $adrId"]
 
+  set ::credit [expr $credit + $newPayedsum]
+  reportResult $token1 "Betrag CHF $newPayedsum verbucht"
+  reportResult $token2 "Das aktuelle Kundenguthaben beträgt ::credit"
+  
+  #Delete OR reset zahlen entry
+  if {$status == 3} {
+    pack forget $curEName
+ 		$invF.$rowNo.payedL conf -text $totalPayedsum -fg green
+    pack forget $invF.$rowNo.commM
+    
+  } else {
+  
+    $curEName delete 0 end
+    $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
+ 		$invF.$rowNo.payedL conf -text $totalPayedsum -fg maroon
+  }
+    
   return 0
 } ;#END saveInvEntry
 

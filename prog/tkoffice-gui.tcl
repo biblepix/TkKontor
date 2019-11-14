@@ -59,7 +59,7 @@ pack [frame .n.t4.f5 -pady $py -padx $px -borderwidth 5 -highlightbackground sil
 
 #Pack 3 top frames seitwärts
 #Create "Adressen" title
-label .adrTitel -text "Adressverwaltung" -font TkCaptionFont -pady 5
+label .adrTitel -text "Adressverwaltung" -font "TkCaptionFont 18" -pady 5
 pack .adrTitel -in .n.t1.mainF.f2 -side top -fill x
 ##obere Frames in .n.t1.f2
 pack [frame .adrF2 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
@@ -110,8 +110,11 @@ pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
 #########################################################################################
 
 #Create "Rechnungen" Titel
-label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont"
+label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont 18"
+label .creditL -text "Kundenguthaben: " -font "TkCaptionFont"
+message .creditM -textvar credit -relief sunken -bg lightblue
 pack .adrInvTitel -in .n.t1.mainF.f3
+pack .creditL .creditM -in .n.t1.mainF.f3 -side left -anchor n
 
 #Create Rechnungen Kopfdaten
 label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 9
@@ -119,14 +122,14 @@ label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width
 label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 47
 label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 11
 label .invPayedH -text "Bezahlt" -font TkCaptionFont -justify right -anchor w -width 10
-label .invEntryH -text "Zahlung eingeben" -font TkCaptionFont -bg lightblue -justify right -anchor w -width 20
-label .invShowH -text "Rechnung anzeigen" -font TkCaptionFont -bg lightblue -justify right -anchor e -justify right -width 20
+label .invcommH -text "Anmerkung" -font TkCaptionFont -justify right -anchor w -width 20
+label .invShowH -text "Rechnung anzeigen" -font TkCaptionFont -fg steelblue3 -justify right -anchor e -justify right -width 20
 
 pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x
 pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x
 set invF .n.t1.mainF.invF
 set headF .n.t1.mainF.headF
-pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invEntryH -in $headF -side left
+pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invcommH -in $headF -side left
 pack .invShowH -in $headF -side right
 
 
