@@ -397,6 +397,16 @@ proc abschlussDrucken {} {
 #### A R T I K E L V E R W A L T U N G
 ##################################################################################
 
+proc resetArticleWin {} {
+  pack .confArtT .confArtM -in .n.t4.f1 -anchor w
+  pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArtTypeL -in .n.t4.f1 -side left
+  pack .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
+  pack forget .confArtSaveB .confarttypeACB .confarttypeRCB
+  pack forget .confartnameE .confartunitE .confartpriceE
+  .confArtDeleteB conf -text "Artikel löschen" -command {deleteArticle}
+  .confArtCreateB conf -text "Artikel erfassen" -command {createArticle}
+}
+
 # setArticleLine
 ##sets Artikel line in New Invoice window
 ##set $args for Artikelverwaltung window
@@ -406,7 +416,8 @@ proc setArticleLine tab {
 
   .mengeE delete 0 end
   .mengeE insert 0 "Menge"
-
+  .confArtTypeL conf -bg #c3c3c3
+  
   if {$tab == "TAB4"} {
     set artNum [.confArtNumSB get]
 
@@ -415,7 +426,7 @@ proc setArticleLine tab {
 
     set artNum [.invArtNumSB get]
     focus .invArtNumSB
-    .mengeE configure -validate focusin -validatecommand {
+    .mengeE conf -validate focusin -validatecommand {
       %W conf -fg black
       set menge ""
       return 0
@@ -429,19 +440,21 @@ proc setArticleLine tab {
   set ::artUnit [lindex [pg_result $token -list] 2]
   set ::artType [lindex [pg_result $token -list] 3]
 
-  if {$tab == "TAB4"} {
-    return 0
-  }
-
-  .mengeE conf -state normal -bg beige -fg silver
-
+  
     if {$::artType == "R"} { 
      .mengeE conf -bg grey -fg silver -state readonly
       set ::menge 1
-
+     .confArtTypeL conf -bg yellow
     }
+    if {$::artType == "A"} {
+      .confArtTypeL conf -bg orange
+    }
+if {$tab == "TAB4"} {
+    return 0
+  }
 
 #TODO get order right! 
+    .mengeE conf -state normal -bg beige -fg silver
     if {$::artPrice == 0} {
       set ::artPrice [.invArtPriceE get]
       pack forget .invArtPriceL
@@ -466,11 +479,6 @@ proc createArticle {} {
   pack .confArtSaveB -in .n.t4.f1 -side right
    
 #TODO:move to GUI?
-  catch {entry .confartnameE -bg beige}
-  catch {entry .confartunitE -bg beige -textvar rabatt}
-  catch {entry .confartpriceE -bg beige}
-  catch {ttk::checkbutton .confarttypeACB -text "Auslage"}
-  catch {ttk::checkbutton .confarttypeRCB -text "Rabatt"}
   .confarttypeRCB conf -variable rabattselected -command {
     if [.confarttypeRCB instate selected] {
       set rabatt %
@@ -495,12 +503,9 @@ proc createArticle {} {
   pack forget .confArtDeleteB
 
   #Rename Button
-  .confArtCreateB conf -text "Abbruch" -activebackground red -command {
-    pack forget .confartnameE .confartunitE .confartpriceE
-    .confArtCreateB conf -text "Artikel erfassen" -activebackground #ececec -command {createArticle}
-    .confArtNumSB conf -bg white
-    pack .confArtDeleteB .confArtSaveB .confArtCreateB -in .n.t4.f1 -side right
-  }
+  .confArtCreateB conf -text "Abbruch" -activebackground red -command {resetArticleWin}
+    
+ 
 } ;#END createArticle
 
 proc saveArticle {} {
@@ -555,8 +560,11 @@ pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArt
 proc deleteArticle {} {
   global db
   set artNo [.confArtNumSB get]
-  set token [pg_exec $db "DELETE FROM artikel WHERE artnum=$artNo"]
-  reportResult $token "Artikel $artNo gelöscht."
+  set res [tk_messageBox -message "Wollen Sie Artikel $artNo wirklich löschen?" -type yesno]
+  if {$res == "yes"} {
+    set token [pg_exec $db "DELETE FROM artikel WHERE artnum=$artNo"]
+    reportResult $token "Artikel $artNo gelöscht."
+  }
   updateArticleList
 }
 

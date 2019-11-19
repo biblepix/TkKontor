@@ -236,23 +236,22 @@ pack .news -in .bottomF -side left -anchor nw -fill x -expand 1
 label .confArtT -text "Artikel erfassen" -font "TkHeadingFont"
 message .confArtM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B. Std.) dürfen nicht leer sein.\nDie Kontrollkästchen 'Auslage' und 'Rabatt' für den Artikeltyp können leer sein. Wenn 'Rabatt' ein Häkchen bekommt, gilt der Artikel als Abzugswert in Prozent (im Feld 'Preis' Prozentzahl ohne %-Zeichen eingeben, z.B. 5.5). Der Rabatt wird in der Rechnung vom Gesamtbetrag abgezogen.\nFalls das Feld 'Auslage' angehakt wird (z.B. für Artikel 'Zugfahrt'), wird der Artikel in der Rechnung separat als Auslage aufgeführt, unterliegt nicht der Mehrwertsteuerpflicht und wird nicht als Einnahme verbucht."
 
-#TODO: da chasch nöd mache - 1. create all widgets outside this proc 2. pack/unpack them inside this proc!!!
-proc rebuildArticleWin {} {
-  label .confArtL -text "Artikel Nr."
-  spinbox .confArtNumSB -width 5 -command {setArticleLine TAB4}
-  label .confArtNameL -padx 10 -textvar artName
-  label .confArtPriceL -padx 10 -textvar artPrice
-  label .confArtUnitL -padx 10 -textvar artUnit
-  label .confArtTypeL -padx 10 -textvar artType
-  button .confArtSaveB -text "Artikel speichern" -command {saveArticle}
-  button .confArtDeleteB -text "Artikel löschen" -command {deleteArticle} -activebackground red
-  button .confArtCreateB -text "Artikel erfassen" -command {createArticle}
-  pack .confArtT .confArtM -in .n.t4.f1 -anchor w
-  pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArtTypeL -in .n.t4.f1 -side left
-  pack .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
-  pack forget .confArtSaveB
-}
-rebuildArticleWin
+
+#These are packed/unpacked later by article procs
+label .confArtL -text "Artikel Nr."
+spinbox .confArtNumSB -width 5 -command {setArticleLine TAB4}
+label .confArtNameL -padx 10 -width 35 -textvar artName -anchor w
+label .confArtPriceL -padx 10 -width 7 -textvar artPrice -anchor w
+label .confArtUnitL -padx 10 -width 7 -textvar artUnit -anchor w
+label .confArtTypeL -padx 10 -width 1 -textvar artType -anchor w
+button .confArtSaveB -text "Artikel speichern" -command {saveArticle}
+button .confArtDeleteB -text "Artikel löschen" -command {deleteArticle} -activebackground red
+button .confArtCreateB -text "Artikel erfassen" -command {createArticle}
+entry .confartnameE -bg beige
+entry .confartunitE -bg beige -textvar rabatt
+entry .confartpriceE -bg beige
+ttk::checkbutton .confarttypeACB -text "Auslage"
+ttk::checkbutton .confarttypeRCB -text "Rabatt"
 
 #DATENBANK SICHERN
 label .dumpDBT -text "Datenbank sichern" -font "TkHeadingFont"
@@ -355,6 +354,7 @@ resetAdrWin
 .initDBB conf -state disabled
 resetNewInvDialog
 updateArticleList
+resetArticleWin
 setArticleLine TAB2
 setArticleLine TAB4
 #createPrintBitmap
