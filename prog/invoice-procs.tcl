@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 12nov19
+# Restored: 19nov19
 
 source $confFile
 ################################################################################################################
@@ -15,20 +15,31 @@ set itemFile [file join $texDir invitems.tex]
 # resetNewInvDialog
 ##called by Main + "Abbruch Rechnung"
 proc resetNewInvDialog {} {
-  
   #Cleanup ::rows & frame
   catch {namespace delete rows}
   foreach w [pack slaves .invoiceFrame] {
     pack forget $w
   }
 
+  #Set vars to 0
+  namespace eval rows {
+    set bill 0
+    set buch 0
+    set auslage 0
+    set rabatt 0
+  }
+  #Configure message labels & pack
+  .subtotalM conf -textvar rows::bill
+  .abzugM conf -textvar rows::auslage
+  .totalM conf -textvar rows::buch
+  pack .subtotalL .subtotalM .abzugL .abzugM .totalL .totalM -side left -in .n.t2.bottomF
+
   #create Addrow button
-  catch {button .addrowB -text "Hinzufügen" -command addInvRow}
+  catch {button .addrowB -width 100 -text "Posten hinzufügen" -command addInvRow}
   catch {message .einheit -textvariable unit}
   catch {message .einzel -textvariable einzel}
 
-  #Create Menge entry
-  catch {entry .mengeE -width 7 -bg yellow -fg grey -textvar menge}
+  #Configure Menge entry
   set menge "Menge"
   .mengeE configure -validate focusin -validatecommand {
     %W conf -fg black
@@ -39,7 +50,7 @@ proc resetNewInvDialog {} {
   pack .invcondL .invcondSB .invauftrdatL .invauftrdatE .invrefL .invrefE .invcomL .invcomE -in .n.t2.f1 -side left -fill x 
   pack .invArtlistL -in .n.t2.f1 -before .n.t2.f2 -anchor w 
   pack .invArtNumSB .mengeE .invArtUnitL .invArtNameL .invArtPriceL -in .n.t2.f2 -side left -fill x
-  pack .addrowB -in .n.t2.f2 -side right -fill x
+  pack .addrowB -in .n.t2.f2 -side right
   
   #Reset Buttons
   .abbruchInvB conf -state disabled
@@ -69,16 +80,14 @@ proc addInvRow {} {
   #add new namespace no.
   namespace eval rows {
 
-    if ![info exists subtot] {
-      set subtot 0
-    } ;#Rechnungsbetrag
-    variable abzug  ;#abzüglich A-Typ
-    variable total  ;#Buchungsbetrag
+#    variable auslage
+#    variable buch
+#    variable bill
     variable rowtot
-    variable rabatt
-    .subtotalM conf -textvar ::rows::subtot 
-    .abzugM conf -textvar ::rows::abzug
-    .totalM conf -textvar ::rows::total
+#    variable rabatt
+#    .subtotalM conf -textvar ::rows::subtot 
+#    .abzugM conf -textvar ::rows::auslage
+#    .totalM conf -textvar ::rows::total
     set rowNo [incr lastrow 1]
 
     namespace eval $rowNo  {
@@ -90,6 +99,7 @@ proc addInvRow {} {
       set artUnit [.invArtUnitL cget -text]
       set artType [.invArtTypeL cget -text]
       set rowNo $::rows::rowNo
+      
       set rowtot [expr $menge * $artPrice]
 
       #Create row frame
@@ -103,41 +113,48 @@ proc addInvRow {} {
       catch {label .artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
       catch {label .arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
 
-      #Handle "R" types
-      set type [.arttypeL${rowNo} cget -text] 
-      set subtot $rows::subtot
-      #set total $rows::total
-      
-      ##deduce Rabatt from subtot (for GUI + DB, Invoice makes its own calculation)
-      if {$type == "R"} {
-        set rabatt [expr ($subtot * $artPrice / 100)]
-        .arttypeL${rowNo} conf -bg orange    
-        .artpriceL${rowNo} conf -text "-${rabatt}" 
-        set subtot [expr $subtot - $rabatt]
-        set ::rows::total $subtot
+      #Get current values from GUI
+      set bill $rows::bill
+      set buch $rows::buch
+      set auslage $rows::auslage      
+
+      #Handle types
+      set type [.arttypeL${rowNo} cget -text]
+       
+      ##a) normal     
+      if {$type == ""} {
+        set ::rows::bill [expr $bill + $rowtot]
+        set ::rows::buch [expr $buch + $rowtot]
+
+      ##b) "Rabatt" types - compute from $buch (abzgl. Spesen)
+      } elseif {$type == "R"} {
+    
+        set rabatt [expr ($buch * $artPrice / 100)]
+        set ::rows::buch [expr $buch - $rabatt]
+        set ::rows::bill [expr $bill - $rabatt]
         set ::rows::rabatt $rabatt
-     
-      } else {
+        .arttypeL${rowNo} conf -bg yellow
+        .artpriceL${rowNo} conf -text "-${rabatt}"   
 
-        set subtot [expr $subtot + $rowtot]
-        set ::rows::total $subtot
-
-        ##deduce auslagen from total        
-        if {$type == "A"} {
- #         set subtot [expr $rows::subtot + $subtot]
-          set ::rows::abzug -${rowtot}
-          set ::rows::total [expr $subtot - $rowtot]  
-        }
+      ##c) "Auslage" types - add to $bill, not to $buch     
+      } elseif {$type == "A"} {
         
+          set ::rows::auslage "-[expr $auslage + $rowtot]"
+          set ::rows::bill [expr $bill + $rowtot]
+          .arttypeL${rowNo} conf -bg orange
       }
 
       catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
       pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
       pack .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
 
-      #Export subtot with 2 decimal points
-      set ::rows::subtot [expr {double(round(100*$subtot))/100}]
-
+      #Reduce amounts to 2 decimal points
+      set ::rows::bill [expr {double(round(100*$rows::bill))/100}]
+      set ::rows::buch [expr {double(round(100*$rows::buch))/100}]
+      if {$rows::rabatt > 0} {
+        set ::rows::rabatt [expr {double(round(100*$rows::rabatt))/100}]
+      }
+      
       #Export beschr cumulatively for use in saveInv2DB & fillAdrInvWin
       set separator {}
       if [info exists ::rows::beschr] {
@@ -187,6 +204,8 @@ proc saveInv2DB {} {
 	#Get current vars from GUI
   set shortAdr "$::name1 $::name2, $::city"
   set shortDesc $rows::beschr
+  
+#TODO: ?take rows::total ?
   set subtot $rows::subtot
   
   #Create itemList for itemFile (needed for LaTeX)

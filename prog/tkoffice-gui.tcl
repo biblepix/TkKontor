@@ -1,6 +1,6 @@
-# ~/Kontor/auftrag-gui.tcl
+# ~/TkOffice/prog/tkoffice-gui.tcl
 # Updated: 1nov17 
-# Restored: 9nov19
+# Restored: 19nov19
 
 set version 1.0
 
@@ -121,7 +121,7 @@ label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 9
 label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 13
 label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 47
 label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 11
-label .invPayedH -text "Bezahlt" -font TkCaptionFont -justify right -anchor w -width 10
+label .invPayedH -text "Bezahlt $currency" -font TkCaptionFont -justify right -anchor w -width 10
 label .invcommH -text "Anmerkung" -font TkCaptionFont -justify right -anchor w -width 20
 label .invShowH -text "Rechnung anzeigen" -font TkCaptionFont -fg steelblue3 -justify right -anchor e -justify right -width 20
 
@@ -138,7 +138,7 @@ pack .invShowH -in $headF -side right
 ########################################################################################
 
 #Main Title
-label .titel3 -text "Neue Rechnung erfassen" -font "TkCaptionFont" -pady 15
+label .titel3 -text "Neue Rechnung erfassen" -font "TkCaptionFont 18" -pady 15
 pack .titel3 -in .n.t2.f1
 
 #Get Zahlungsbedingungen from config
@@ -155,19 +155,25 @@ lappend condList $cond3
 }
 #Insert into spinbox
 spinbox .invcondSB -width 20 -values $condList -textvar cond -bg beige
-
 #Auftragsdatum: set to heute
 label .invauftrdatL -text "Auftragsdatum:"
 entry .invauftrdatE -width 9 -textvar auftrDat -bg beige
 set auftrDat [clock format [clock seconds] -format %d.%m.%Y]
-
 #Referenz
 label .invrefL -text "Ihre Referenz:"
 entry .invrefE -width 20 -bg beige -textvar ref
-
 #Int. Kommentar
 label .invcomL -text "Interne Bemerkung:"
 entry .invcomE -width 30 -bg beige -textvar comm
+
+#Packed later by resetNewInvoice
+entry .mengeE -width 7 -bg yellow -fg grey -textvar menge
+label .subtotalL -text "Rechnungssumme: "
+message .subtotalM -width 70 -bg lightblue -padx 20 -anchor w
+label .abzugL -text "abzügl. Auslagen: "
+message .abzugM -width 70 -bg orange -padx 20 -anchor w
+label .totalL -text "= Buchungssumme: "
+message .totalM -width 70 -bg lightgreen -padx 20 -anchor w
 
 #Set up Artikelliste, fill later when connected to DB
 label .invArtlistL -text "Artikelliste" -font "TkHeadingFont"
@@ -189,16 +195,8 @@ label .invArtNameL -textvar artName -padx 50
 label .invArtUnitL -textvar artUnit -padx 20
 label .invArtTypeL -textvar artType -padx 20
 
-label .subtotalL -text "Rechnungssumme: "
-message .subtotalM -width 70 -bg lightblue -padx 20 -anchor w
-label .abzugL -text "Auslagen: "
-message .abzugM -width 70 -bg lightblue -padx 20 -anchor w
-label .totalL -text "Buchungssumme: "
-message .totalM -width 70 -bg lightblue -padx 20 -anchor w
-
 button .saveInvB -text "Rechnung verbuchen"
 button .abbruchInvB -text "Abbruch"
-pack .subtotalL .subtotalM .abzugL .abzugM .totalL .totalM -side left -in .n.t2.bottomF
 pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
 
 

@@ -1,14 +1,15 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 24oct19
+# Restored: 19nov19
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
 ##################################################################################################
 
 proc createTkOfficeLogo {} {
-  canvas .logoC -width 1000 -height 130 -borderwidth 7 -bg steelblue2
+#  canvas .logoC -width 1000 -height 130 -borderwidth 7 -bg steelblue3
+  canvas .logoC -width 1400 -height 50 -borderwidth 7 -bg steelblue2
   pack .logoC -in .titelF -side left -anchor nw
 
 set blau lightblue2
@@ -26,7 +27,7 @@ set dunkelblau steelblue3
   .logoC itemconf $schrift2 -font "TkHeadingFont 20 bold" -fill orange -text "f f i c e"
 
   set schrift3 [.logoC create text 8 65 -anchor w]
-  .logoC itemconf $schrift3 -font "TkCaptionFont 18 bold" -fill $blau -text "Business Software"
+  .logoC itemconf $schrift3 -font "TkCaptionFont 18 bold" -fill $blau -text "TkOffice Business Software"
   
   set schrift4 [.logoC create text 0 110 -anchor w]
   .logoC itemconf $schrift4 -font "TkHeadingFont 80 bold" -fill $dunkelblau -text "Auftragsverwaltung" -angle 4.
@@ -402,8 +403,9 @@ proc abschlussDrucken {} {
 proc setArticleLine tab {
   global db artPrice
   #set ::menge "Menge"
-.mengeE delete 0 end
-.mengeE insert 0 "Menge"
+
+  .mengeE delete 0 end
+  .mengeE insert 0 "Menge"
 
   if {$tab == "TAB4"} {
     set artNum [.confArtNumSB get]
