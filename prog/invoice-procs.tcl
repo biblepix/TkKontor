@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 19nov19
+# Restored: 20nov19
 
 source $confFile
 ################################################################################################################
@@ -28,6 +28,9 @@ proc resetNewInvDialog {} {
     set auslage 0
     set rabatt 0
   }
+  
+  updateArticleList
+  
   #Configure message labels & pack
   .subtotalM conf -textvar rows::bill
   .abzugM conf -textvar rows::auslage
@@ -58,6 +61,7 @@ proc resetNewInvDialog {} {
     .saveInvB conf -activebackground #ececec -state normal
     doSaveInv
     "
+
 } ;#END resetNewInvDialog
 
 # addInvRow
@@ -79,15 +83,8 @@ proc addInvRow {} {
 
   #add new namespace no.
   namespace eval rows {
-
-#    variable auslage
-#    variable buch
-#    variable bill
     variable rowtot
-#    variable rabatt
-#    .subtotalM conf -textvar ::rows::subtot 
-#    .abzugM conf -textvar ::rows::auslage
-#    .totalM conf -textvar ::rows::total
+    variable rabatt
     set rowNo [incr lastrow 1]
 
     namespace eval $rowNo  {
@@ -117,7 +114,7 @@ proc addInvRow {} {
       set bill $rows::bill
       set buch $rows::buch
       set auslage $rows::auslage      
-
+            
       #Handle types
       set type [.arttypeL${rowNo} cget -text]
        
@@ -151,7 +148,7 @@ proc addInvRow {} {
       #Reduce amounts to 2 decimal points
       set ::rows::bill [expr {double(round(100*$rows::bill))/100}]
       set ::rows::buch [expr {double(round(100*$rows::buch))/100}]
-      if {$rows::rabatt > 0} {
+      if {[info exists rabatt] && $rabatt >0} {
         set ::rows::rabatt [expr {double(round(100*$rows::rabatt))/100}]
       }
       
@@ -160,7 +157,7 @@ proc addInvRow {} {
       if [info exists ::rows::beschr] {
         set separator { /}
       }
-      append ::rows::beschr $separator ${menge} $artName
+      append ::rows::beschr $separator ${menge} { } $artName
     }
   }
 
@@ -204,9 +201,7 @@ proc saveInv2DB {} {
 	#Get current vars from GUI
   set shortAdr "$::name1 $::name2, $::city"
   set shortDesc $rows::beschr
-  
-#TODO: ?take rows::total ?
-  set subtot $rows::subtot
+  set subtot $rows::buch
   
   #Create itemList for itemFile (needed for LaTeX)
   foreach w [namespace children rows] {

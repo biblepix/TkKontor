@@ -1,15 +1,16 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 19nov19
+# Restored: 20nov19
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
 ##################################################################################################
 
 proc createTkOfficeLogo {} {
+#TODO get width from main window!
 #  canvas .logoC -width 1000 -height 130 -borderwidth 7 -bg steelblue3
-  canvas .logoC -width 1400 -height 50 -borderwidth 7 -bg steelblue2
+  canvas .logoC -width 1400 -height 40 -borderwidth 7 -bg steelblue2
   pack .logoC -in .titelF -side left -anchor nw
 
 set blau lightblue2
@@ -399,7 +400,7 @@ proc abschlussDrucken {} {
 
 proc resetArticleWin {} {
   pack .confArtT .confArtM -in .n.t4.f1 -anchor w
-  pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArtTypeL -in .n.t4.f1 -side left
+  pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confartnameL .confArtTypeL -in .n.t4.f1 -side left
   pack .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
   pack forget .confArtSaveB .confarttypeACB .confarttypeRCB
   pack forget .confartnameE .confartunitE .confartpriceE
@@ -499,13 +500,13 @@ proc createArticle {} {
   set ::artName "Bezeichnung"
   set ::artPrice "Preis"
   set ::artUnit "Einheit"
-  pack .confArtNameL .confartnameE .confArtUnitL .confartunitE .confArtPriceL .confartpriceE .confarttypeACB .confarttypeRCB -in .n.t4.f1 -side left
+  pack .confartnameL .confartnameE .confArtUnitL .confartunitE .confArtPriceL .confartpriceE .confarttypeACB .confarttypeRCB -in .n.t4.f1 -side left
   pack forget .confArtDeleteB
 
   #Rename Button
   .confArtCreateB conf -text "Abbruch" -activebackground red -command {resetArticleWin}
-    
- 
+  
+#TODO: articleWin is not reset after saving!!!
 } ;#END createArticle
 
 proc saveArticle {} {
@@ -546,12 +547,13 @@ proc saveArticle {} {
     pack forget $w
   }
 
-pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confArtNameL .confArtTypeL -in .n.t4.f1 -side left
+pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confartnameL .confArtTypeL -in .n.t4.f1 -side left
 #pack .confArtSaveB .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
 #  pack .confArtNameL .confArtPriceL .confArtUnitL .confArtTypeL -in .n.t4.f1 -side left
   
   #Recreate article list
   updateArticleList
+  resetArticleWin
   reportResult $token "Artikel $artName gespeichert"
 
 } ;#END saveArticle
@@ -564,19 +566,20 @@ proc deleteArticle {} {
   if {$res == "yes"} {
     set token [pg_exec $db "DELETE FROM artikel WHERE artnum=$artNo"]
     reportResult $token "Artikel $artNo gelöscht."
+    updateArticleList
   }
-  updateArticleList
 }
 
 # updateArticleList
 ##gets articles from DB + updates spinboxes
+##called by saveArticle / ...
 proc updateArticleList {} {
   global db
 
   #set spinbox article no. lists
   set token [pg_exec $db "SELECT artnum FROM artikel"] 
-  .invArtNumSB configure -values [pg_result $token -list]
-  .confArtNumSB configure -values [pg_result $token -list]
+  .invArtNumSB conf -values [pg_result $token -list]
+  .confArtNumSB conf -values [pg_result $token -list]
 }
 
 

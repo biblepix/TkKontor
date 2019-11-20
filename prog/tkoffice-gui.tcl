@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Updated: 1nov17 
-# Restored: 19nov19
+# Restored: 20nov19
 
 set version 1.0
 
@@ -33,7 +33,7 @@ createTkOfficeLogo
 pack .n -fill y -expand 1
 
 #Tab 1
-pack [frame .n.t1.mainF] -fill both
+pack [frame .n.t1.mainF] -fill both -expand 1
 pack [frame .n.t1.mainF.f2 -borderwidth 5 -relief ridge -pady 10 -padx 10] -anchor nw -fill x
 pack [frame .n.t1.mainF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
 pack [frame .n.t1.mainF.f4] -anchor nw -padx 20 -pady 20 -fill x
@@ -108,13 +108,19 @@ pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
 #########################################################################################
 # T A B 1 :  I N V O I C E   L I S T
 #########################################################################################
+pack [frame .umsatzF] -in .n.t1 -fill x -side bottom
 
 #Create "Rechnungen" Titel
 label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont 18"
 label .creditL -text "Kundenguthaben: " -font "TkCaptionFont"
 message .creditM -textvar credit -relief sunken -bg lightblue
+label .umsatzL -text "Umsatz: " -font "TkCaptionFont"
+message .umsatzM -textvar umsatz -relief sunken -bg lightblue
 pack .adrInvTitel -in .n.t1.mainF.f3
-pack .creditL .creditM -in .n.t1.mainF.f3 -side left -anchor n
+
+#Umsatz unten
+pack .creditL .creditM -in .umsatzF -side left -anchor w
+pack .umsatzM .umsatzL -in .umsatzF -side right -anchor e
 
 #Create Rechnungen Kopfdaten
 label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 9
@@ -170,9 +176,9 @@ entry .invcomE -width 30 -bg beige -textvar comm
 entry .mengeE -width 7 -bg yellow -fg grey -textvar menge
 label .subtotalL -text "Rechnungssumme: "
 message .subtotalM -width 70 -bg lightblue -padx 20 -anchor w
-label .abzugL -text "abzügl. Auslagen: "
+label .abzugL -text "Auslagen: "
 message .abzugM -width 70 -bg orange -padx 20 -anchor w
-label .totalL -text "= Buchungssumme: "
+label .totalL -text "Buchungssumme: "
 message .totalM -width 70 -bg lightgreen -padx 20 -anchor w
 
 #Set up Artikelliste, fill later when connected to DB
@@ -240,7 +246,7 @@ message .confArtM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B.
 #These are packed/unpacked later by article procs
 label .confArtL -text "Artikel Nr."
 spinbox .confArtNumSB -width 5 -command {setArticleLine TAB4}
-label .confArtNameL -padx 10 -width 35 -textvar artName -anchor w
+label .confartnameL -padx 7 -width 25 -textvar artName -anchor w
 label .confArtPriceL -padx 10 -width 7 -textvar artPrice -anchor w
 label .confArtUnitL -padx 10 -width 7 -textvar artUnit -anchor w
 label .confArtTypeL -padx 10 -width 1 -textvar artType -anchor w
