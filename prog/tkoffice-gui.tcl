@@ -113,9 +113,9 @@ pack [frame .umsatzF] -in .n.t1 -fill x -side bottom
 #Create "Rechnungen" Titel
 label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont 18"
 label .creditL -text "Kundenguthaben: " -font "TkCaptionFont"
-message .creditM -textvar credit -relief sunken -bg lightblue
-label .umsatzL -text "Umsatz: " -font "TkCaptionFont"
-message .umsatzM -textvar umsatz -relief sunken -bg lightblue
+message .creditM -textvar credit -relief sunken -bg lightblue -width 50
+label .umsatzL -text "Kundenumsatz: " -font "TkCaptionFont"
+message .umsatzM -textvar umsatz -relief sunken -bg lightblue -width 50
 pack .adrInvTitel -in .n.t1.mainF.f3
 
 #Umsatz unten

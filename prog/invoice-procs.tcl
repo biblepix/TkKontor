@@ -278,12 +278,18 @@ proc saveInv2DB {} {
     '$itemListHex'
     )"]
 
-#TODO geht noch nicht?
-  #Update credit
+  #Update credit in 'address'
   set adrId [pg_result [pg_exec $db "SELECT customeroid FROM invoice WHERE f_number=$invNo"] -list]
-  set creditT [pg_exec $db "UPDATE address SET credit = credit + $subtot WHERE objectid=$adrId"]
-  reportResult $creditT "Kundenguthaben aktualisiert." 
-
+  set creditT [pg_exec $db "SELECT credit from address WHERE objectid=$adrId"]
+  set currCredit [pg_result $creditT -list]
+  if ![string is double $currCredit] {
+    set currCredit 0
+  }
+  ##deduce new debt from credit
+  set newCreditT [pg_exec $db "UPDATE address SET credit = (credit - $subtot) WHERE objectid=$adrId"]
+  set newCredit [pg_result $newCreditT -list]
+  reportResult $newCreditT "Kundenguthaben aktualisiert: $newCredit" 
+  
   
 #TODO does this belong here? should we use reportResult instead?
   if {[pg_result $token -error] != ""} {
@@ -763,31 +769,47 @@ proc saveInvEntry {curVal curEName ns} {
   set curNS "verbucht::${ns}"
   set rowNo [namespace tail $curNS]
 
-	#2. get invNo
+	#1)get invoice details
   set invNo [$invF.$rowNo.invNoL cget -text]
-	
-  #2. Betrag lesen & in DB einfügen überschreiben! / status ändern set newPayedsum [$rowNo::zahlenE get]
   set newPayedsum [$curEName get]  
 
-  set invT [pg_exec $db "SELECT payedsum,finalsum FROM invoice WHERE f_number=$invNo"]
-  set oldPayedsum [lindex [pg_result $invT -list] 0]
-  set finalsum [lindex [pg_result $invT -list] 1]
-  
-  set adrT [pg_exec $db "SELECT customeroid,credit FROM invoice WHERE f_number=$invNo"]
-  set adrId [lindex [pg_result $adrT -list] 0]
-  set credit [lindex [pg_result $adrT -list] 1]
-  
-  set totalPayedsum [expr $oldPayedsum + $newPayedsum]
-
-	#Insert payedsum if digit, avoiding errors
-	if ![string is double $newPayedsum] {
+  if ![string is double $newPayedsum] {
     $curEName delete 0 end
     $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
     NewsHandler::QueryNews "Fehler: Konnte Zahlbetrag nicht speichern." red
     return 1
   }
+  
+  set invT [pg_exec $db "SELECT payedsum,finalsum,customeroid FROM invoice WHERE f_number=$invNo"]
+  set oldPayedsum [lindex [pg_result $invT -list] 0]
+  set finalsum [lindex [pg_result $invT -list] 1]
+  set adrNo [lindex [pg_result $invT -list] 2]
+    
+  
+  #2)get credit details form 'address'
+  #set adrT [pg_exec $db "SELECT credit FROM address WHERE customeroid=$adrNo"]
+  #set credit [pg_result $adrT -list]
+  
+#  set newCredit [expr $newPayedsum - $curCredit]
 
-	if {$totalPayedsum >= $finalsum} {
+  
+  #  set  realPayedsum [expr $totalPayedsum + $curCredit]
+  set oldcredit [.creditM cget -text]
+  if ![string is double $oldcredit] {
+    set oldcredit 0
+  }
+
+#TODO yesh balagan!!!!!!!!¨
+  set totalPayedsum [expr $oldPayedsum + $newPayedsum + $oldcredit]
+  set newcredit [expr $finalsum - $totalPayedsum]
+  set newdebit [expr ($newPayedsum + $oldPayedsum) - $finalsum]
+
+
+#DB entries:
+#1. set credit to $newcredit
+#2. set payedsum to [$newPayedsum + $oldcredit]
+
+	if {$newdebit >= 0} {
 		set status 3
 	} else {
 		set status 2
@@ -799,16 +821,17 @@ proc saveInvEntry {curVal curEName ns} {
     ts = $status 
     WHERE f_number=$invNo"]
     
-  # S a v e  credit to 'address'
+  # S a v e  credit to 'address': add current amount to credit
   set token2 [pg_exec $db "UPDATE address
-    SET credit = credit + $newPayedsum 
-    WHERE adroid = $adrId"]
+    SET credit = $newcredit 
+    WHERE objectid = $adrNo"]
 
-  set ::credit [expr $credit + $newPayedsum]
+  #Update GUI
+  set ::credit $newcredit
   reportResult $token1 "Betrag CHF $newPayedsum verbucht"
   reportResult $token2 "Das aktuelle Kundenguthaben beträgt ::credit"
-  
-  #Delete OR reset zahlen entry
+
+  ##delete OR reset zahlen entry
   if {$status == 3} {
     pack forget $curEName
  		$invF.$rowNo.payedL conf -text $totalPayedsum -fg green
