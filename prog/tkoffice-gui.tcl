@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Updated: 1nov17 
-# Restored: 20nov19
+# Restored: 6dez19
 
 set version 1.0
 
@@ -112,14 +112,15 @@ pack [frame .umsatzF] -in .n.t1 -fill x -side bottom
 
 #Create "Rechnungen" Titel
 label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont 18"
-label .creditL -text "Kundenguthaben: " -font "TkCaptionFont"
-message .creditM -textvar credit -relief sunken -bg lightblue -width 50
+label .creditL -text "Kundenguthaben: $currency " -font "TkCaptionFont"
+label .credit2L -text "- wird bei Zahlungseingang aktualisiert" -font "TkIconFont" -fg grey
+message .creditM -textvar credit -relief sunken -width 50
 label .umsatzL -text "Kundenumsatz: " -font "TkCaptionFont"
 message .umsatzM -textvar umsatz -relief sunken -bg lightblue -width 50
 pack .adrInvTitel -in .n.t1.mainF.f3
 
 #Umsatz unten
-pack .creditL .creditM -in .umsatzF -side left -anchor w
+pack .creditL .creditM .credit2L -in .umsatzF -side left -anchor w
 pack .umsatzM .umsatzL -in .umsatzF -side right -anchor e
 
 #Create Rechnungen Kopfdaten

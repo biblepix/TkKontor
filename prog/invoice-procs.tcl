@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 20nov19
+# Restored: 6dez19
 
 source $confFile
 ################################################################################################################
@@ -92,6 +92,12 @@ proc addInvRow {} {
       #get global vars
       set artName [.invArtNameL cget -text]
       set menge [.mengeE get]
+
+#TODO bu gerek mi?
+      if ![string is double $menge] {
+        set menge 1
+      }
+      
       set artPrice [.invArtPriceL cget -text]
       set artUnit [.invArtUnitL cget -text]
       set artType [.invArtTypeL cget -text]
@@ -132,7 +138,9 @@ proc addInvRow {} {
         set ::rows::rabatt $rabatt
         .arttypeL${rowNo} conf -bg yellow
         .artpriceL${rowNo} conf -text "-${rabatt}"   
-
+        .mengeE conf -state disabled
+        set menge 1
+        
       ##c) "Auslage" types - add to $bill, not to $buch     
       } elseif {$type == "A"} {
         
@@ -168,6 +176,7 @@ proc addInvRow {} {
 ##evaluates exit codes
 ##called by .saveInvB button
 proc doSaveInv {} {
+#TODO: remove catches, getting DVIPS and LATEX errors which are NOT errors!
   #1.Save to DB
   if [catch saveInv2DB res] {
     NewsHandler::QueryNews $res red
@@ -278,18 +287,22 @@ proc saveInv2DB {} {
     '$itemListHex'
     )"]
 
-  #Update credit in 'address'
+ 
+  proc meyutar {} {
+   #4.Update credit in 'address'
   set adrId [pg_result [pg_exec $db "SELECT customeroid FROM invoice WHERE f_number=$invNo"] -list]
   set creditT [pg_exec $db "SELECT credit from address WHERE objectid=$adrId"]
   set currCredit [pg_result $creditT -list]
   if ![string is double $currCredit] {
     set currCredit 0
   }
-  ##deduce new debt from credit
-  set newCreditT [pg_exec $db "UPDATE address SET credit = (credit - $subtot) WHERE objectid=$adrId"]
-  set newCredit [pg_result $newCreditT -list]
+  ##Deduce new debit from credit -ginge auch so: SET credit = (credit - $subtot)
+  #This is not necessary, credit is updated when entry made
+  set newCredit [expr $credit - $subtot]
+  set newCreditT [pg_exec $db "UPDATE address SET credit = $newCredit WHERE objectid=$adrId"]
+  set ::credit $newCredit
   reportResult $newCreditT "Kundenguthaben aktualisiert: $newCredit" 
-  
+  }
   
 #TODO does this belong here? should we use reportResult instead?
   if {[pg_result $token -error] != ""} {
@@ -379,8 +392,18 @@ proc fillAdrInvWin {adrId} {
 
   #Set Kundenguthaben
   set token [pg_exec $db "SELECT credit FROM address WHERE objectid=$adrId"]
-  set ::credit [pg_result $token -list]
-
+  set credit [pg_result $token -list]
+  if ![string is double $credit] {
+    set credit 0.00
+    .creditM conf -bg silver
+  } elseif {$credit >0} {
+    .creditM conf -bg lightgreen
+    #set credit +${credit}
+  } elseif {$credit <0} { 
+    .creditM conf -bg red
+  }
+  set ::credit $credit
+  
   #Add new namespace no.
   namespace eval verbucht {
 
@@ -473,13 +496,9 @@ proc fillAdrInvWin {adrId} {
         set itemsT $::verbucht::itemsT
         catch {set itemlist [pg_result $itemsT -getTuple $n] }
         if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
-
-#Bitmap should work, but donno why it doesn't
-#          $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
-#puts "InvNo: $invno"
-        set ::verbucht::anzeige 1
-        $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "doPrintOldInv $invno"
-        pack $invF.$n.invshowB -anchor e -side right
+          set ::verbucht::anzeige 1
+          $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "doPrintOldInv $invno"
+          pack $invF.$n.invshowB -anchor e -side right
         }
 
   		} ;#end for loop
@@ -609,7 +628,7 @@ return
 
 
 
- #TODO test this thorougly, there may be no output at all!!!
+ #TODO test this thoroughly, there may be no output at all!!!
   if [catch {printInvoice $invNo} res] {
     NewsHandler::QueryNews "$res\nDruck fehlgeschlagen!" red 
   }
@@ -773,6 +792,7 @@ proc saveInvEntry {curVal curEName ns} {
   set invNo [$invF.$rowNo.invNoL cget -text]
   set newPayedsum [$curEName get]  
 
+  #avoid non-digit amounts
   if ![string is double $newPayedsum] {
     $curEName delete 0 end
     $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
@@ -784,52 +804,66 @@ proc saveInvEntry {curVal curEName ns} {
   set oldPayedsum [lindex [pg_result $invT -list] 0]
   set finalsum [lindex [pg_result $invT -list] 1]
   set adrNo [lindex [pg_result $invT -list] 2]
-    
-  
-  #2)get credit details form 'address'
-  #set adrT [pg_exec $db "SELECT credit FROM address WHERE customeroid=$adrNo"]
-  #set credit [pg_result $adrT -list]
-  
-#  set newCredit [expr $newPayedsum - $curCredit]
 
+  #Determine credit avoiding non-digit values
+  #TODO: which????
   
-  #  set  realPayedsum [expr $totalPayedsum + $curCredit]
-  set oldcredit [.creditM cget -text]
-  if ![string is double $oldcredit] {
-    set oldcredit 0
+  set oldCredit $::credit
+#  set oldCredit [pg_result [pg_exec $db "SELECT credit from address where objectid=$adrNo"] -list]
+  
+  if ![string is double $oldCredit] {
+    set oldCredit 0
   }
+    
+  #Compute total payedsum:
+  set totalPayedsum [expr $oldPayedsum + $newPayedsum]
+  
+  ##is identical - don't touch credit
+  if {$totalPayedsum == $finalsum} {
+    set status 3
+    set diff 0
 
-#TODO yesh balagan!!!!!!!!¨
-  set totalPayedsum [expr $oldPayedsum + $newPayedsum + $oldcredit]
-  set newcredit [expr $finalsum - $totalPayedsum]
-  set newdebit [expr ($newPayedsum + $oldPayedsum) - $finalsum]
+#diff is +
+  } elseif {$totalPayedsum > $finalsum} {
+   # set status 3
+    set totalPayedsum $finalsum
+    set diff [expr $finalsum - $totalPayedsum]
 
+#diff is -
+  } elseif {$totalPayedsum < $finalsum} {
+    #set status 2
+    set diff [expr $totalPayedsum - $finalsum]
+    
+  }
+  
+  set newCredit [expr $oldCredit + $diff]
+  if {$newCredit >0} {
+    set status 3
+    set totalPayedsum $finalsum
+  }
+    
+#TODO: testing
+puts "OldCredit $oldCredit"
+puts "NewCredit $newCredit"
+puts "OldPS $oldPayedsum"
+puts "NewPS $newPayedsum"
+puts "status $status"
+puts "diff $diff"
 
-#DB entries:
-#1. set credit to $newcredit
-#2. set payedsum to [$newPayedsum + $oldcredit]
-
-	if {$newdebit >= 0} {
-		set status 3
-	} else {
-		set status 2
-	}
-
-	# S a v e  totalPayedsum  to  'invoice' 
+	# S a v e  totalPayedsum  to 'invoice' 
   set token1 [pg_exec $db "UPDATE invoice 
     SET payedsum = $totalPayedsum, 
     ts = $status 
     WHERE f_number=$invNo"]
     
-  # S a v e  credit to 'address': add current amount to credit
+  # S a v e  credit to 'address'
   set token2 [pg_exec $db "UPDATE address
-    SET credit = $newcredit 
+    SET credit = $newCredit
     WHERE objectid = $adrNo"]
 
   #Update GUI
-  set ::credit $newcredit
   reportResult $token1 "Betrag CHF $newPayedsum verbucht"
-  reportResult $token2 "Das aktuelle Kundenguthaben beträgt ::credit"
+  reportResult $token2 "Das aktuelle Kundenguthaben beträgt $::credit"
 
   ##delete OR reset zahlen entry
   if {$status == 3} {
@@ -843,7 +877,8 @@ proc saveInvEntry {curVal curEName ns} {
     $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
  		$invF.$rowNo.payedL conf -text $totalPayedsum -fg maroon
   }
-    
+
+  set ::credit $newCredit    
   return 0
 } ;#END saveInvEntry
 

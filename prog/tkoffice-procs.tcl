@@ -1,16 +1,20 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Aktualisiert: 1nov17
-# Restored: 20nov19
+# Restored: 3dez19
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
 ##################################################################################################
 
+# createTkOfficeLogo
+##called by tkoffice-gui.tcl 
 proc createTkOfficeLogo {} {
 #TODO get width from main window!
 #  canvas .logoC -width 1000 -height 130 -borderwidth 7 -bg steelblue3
-  canvas .logoC -width 1400 -height 40 -borderwidth 7 -bg steelblue2
+#Bitmap should work, but donno why it doesn't
+#          $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
+  canvas .logoC -width 1400 -height 50 -borderwidth 7 -bg steelblue2
   pack .logoC -in .titelF -side left -anchor nw
 
 set blau lightblue2
@@ -39,8 +43,10 @@ set dunkelblau steelblue3
 }
 
 #Create small bitmap ::verbucht::im 
-##called by 
+##called by fillAdrInvWin
 #for printInvButton
+#Bitmap should work, but donno why it doesn't:
+# $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
 proc createPrintBitmap {} {
     set bmdata {
       #define printInvB_width 7
@@ -413,7 +419,6 @@ proc resetArticleWin {} {
 ##set $args for Artikelverwaltung window
 proc setArticleLine tab {
   global db artPrice
-  #set ::menge "Menge"
 
   .mengeE delete 0 end
   .mengeE insert 0 "Menge"
@@ -440,22 +445,25 @@ proc setArticleLine tab {
   set ::artPrice [lindex [pg_result $token -list] 1]
   set ::artUnit [lindex [pg_result $token -list] 2]
   set ::artType [lindex [pg_result $token -list] 3]
-
   
-    if {$::artType == "R"} { 
-     .mengeE conf -bg grey -fg silver -state readonly
-      set ::menge 1
-     .confArtTypeL conf -bg yellow
-    }
-    if {$::artType == "A"} {
+    if {$::artType == "R"} {
+      .mengeE delete 0 end
+      .mengeE insert 0 "1"
+      .mengeE conf -bg grey -fg silver -state readonly
+      .confArtTypeL conf -bg yellow
+     
+    } elseif {$::artType == "A"} {
       .confArtTypeL conf -bg orange
+    } else {
+     .mengeE conf -state normal -bg beige -fg silver
     }
-if {$tab == "TAB4"} {
+    
+  if {$tab == "TAB4"} {
     return 0
   }
 
 #TODO get order right! 
-    .mengeE conf -state normal -bg beige -fg silver
+ 
     if {$::artPrice == 0} {
       set ::artPrice [.invArtPriceE get]
       pack forget .invArtPriceL
