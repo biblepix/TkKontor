@@ -390,7 +390,7 @@ proc fillAdrInvWin {adrId} {
     namespace delete verbucht
   }
 
-  #Set Kundenguthaben
+  #Show Kundenguthaben
   set token [pg_exec $db "SELECT credit FROM address WHERE objectid=$adrId"]
   set credit [pg_result $token -list]
   if ![string is double $credit] {
@@ -428,13 +428,16 @@ proc fillAdrInvWin {adrId} {
     set itemsT    [pg_exec $db "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
     set commT     [pg_exec $db "SELECT f_comment FROM invoice WHERE customeroid = $custId"]
     
-    for {set n 0} {$n<$nTuples} {incr n} {
+    for {set n 0; set ::umsatz 0} {$n<$nTuples} {incr n} {
     
       namespace eval $n {
 
         set n [namespace tail [namespace current]]
         set invF $::invF
+			  
 			  set total [pg_result $::verbucht::sumtotalT -getTuple $n] 
+			  set ::umsatz [expr $::umsatz + $total]
+			  
 			  set ts [pg_result $::verbucht::statusT -getTuple $n]
 			  set invno [pg_result $::verbucht::invNoT -getTuple $n]
         set invdat [pg_result $::verbucht::invDatT -getTuple $n]
