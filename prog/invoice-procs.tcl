@@ -119,8 +119,8 @@ proc addInvRow {} {
       #Get current values from GUI
       set bill $rows::bill
       set buch $rows::buch
-      set auslage $rows::auslage      
-            
+      set auslage $rows::auslage
+
       #Handle types
       set type [.arttypeL${rowNo} cget -text]
        
@@ -211,6 +211,7 @@ proc saveInv2DB {} {
   set shortAdr "$::name1 $::name2, $::city"
   set shortDesc $rows::beschr
   set subtot $rows::buch
+  set auslage $rows::auslage
   
   #Create itemList for itemFile (needed for LaTeX)
   foreach w [namespace children rows] {
@@ -262,6 +263,7 @@ proc saveInv2DB {} {
     finalsum, 
     payedsum,
     vatlesssum,
+    auslage,
     f_number,
     f_date,
     f_comment,
@@ -279,6 +281,7 @@ proc saveInv2DB {} {
     $subtot,
     $payedsum,
     $vatlesssum,
+    $auslage,
     $invNo,
     to_date('$auftrDat','DD MM YYYY'),
     '$comm',
@@ -357,6 +360,7 @@ proc latexInvoice {invNo type} {
   if {$type == "pdf"} {
   
     namespace eval Latex {
+    #TODO can pdf be done in draftmode?!
       eval exec -- pdflatex -draftmode -interaction nonstopmode -output-directory $spoolDir $invTexPath
     }  
     set invPdfPath [setInvPath $invNo pdf]
@@ -427,6 +431,7 @@ proc fillAdrInvWin {adrId} {
 	  set statusT   [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
     set itemsT    [pg_exec $db "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
     set commT     [pg_exec $db "SELECT f_comment FROM invoice WHERE customeroid = $custId"]
+    set auslageT  [pg_exec $db "SELECT auslage FROM invoice WHERE customeroid = $custId"]
     
     for {set n 0; set ::umsatz 0} {$n<$nTuples} {incr n} {
     
@@ -434,9 +439,16 @@ proc fillAdrInvWin {adrId} {
 
         set n [namespace tail [namespace current]]
         set invF $::invF
-			  
-			  set total [pg_result $::verbucht::sumtotalT -getTuple $n] 
-			  set ::umsatz [expr $::umsatz + $total]
+        
+        #compute Rechnungsbetrag from sumtotal+auslage
+			  set sumtotal [pg_result $::verbucht::sumtotalT -getTuple $n]
+			  set auslage [pg_result $::verbucht::auslageT -getTuple $n]
+			  if {[string is double $auslage] && $auslage >0} {
+  			  set invTotal [expr $sumtotal + $auslage]
+			  } else {
+			    set invTotal $sumtotal
+			  } 
+			  set ::umsatz [expr $::umsatz + $invTotal]
 			  
 			  set ts [pg_result $::verbucht::statusT -getTuple $n]
 			  set invno [pg_result $::verbucht::invNoT -getTuple $n]
@@ -456,7 +468,7 @@ proc fillAdrInvWin {adrId} {
 			  catch {label $invF.$n.beschr -width 50 -justify left -anchor w}
 			  $invF.$n.beschr conf -text $beschr
 			  catch {label $invF.$n.sumL -width 10 -justify right -anchor e}
-			  $invF.$n.sumL conf -text $total
+			  $invF.$n.sumL conf -text $invTotal
 
         #create label/entry for Bezahlt, packed later
         set bezahlt [pg_result $::verbucht::payedsumT -getTuple $n]
@@ -548,7 +560,15 @@ proc fetchInvData {invNo} {
   set ref       [lindex [pg_result $invToken -list] 0]
   set cond      [lindex [pg_result $invToken -list] 1]
   set auftrDat  [lindex [pg_result $invToken -list] 2]
+  
+  #make sure below signs are escaped since they interfere with LaTex commands
   set itemsHex  [lindex [pg_result $invToken -list] 3]
+  regsub -all {%} $itemsHex {\%} itemsHex
+  regsub -all {&} $itemsHex {\&} itemsHex
+  regsub -all {$} $itemsHex {\$} itemsHex
+  regsub -all {#} $itemsHex {\#} itemsHex
+  regsub -all {_} $itemsHex {\_} itemsHex
+  
   set adrNo     [lindex [pg_result $invToken -list] 4]
 
   #3.Get address data from DB & format for Latex
@@ -803,10 +823,18 @@ proc saveInvEntry {curVal curEName ns} {
     return 1
   }
   
-  set invT [pg_exec $db "SELECT payedsum,finalsum,customeroid FROM invoice WHERE f_number=$invNo"]
+  set invT [pg_exec $db "SELECT payedsum,finalsum,auslage,customeroid FROM invoice WHERE f_number=$invNo"]
   set oldPayedsum [lindex [pg_result $invT -list] 0]
-  set finalsum [lindex [pg_result $invT -list] 1]
-  set adrNo [lindex [pg_result $invT -list] 2]
+  set buchungssumme [lindex [pg_result $invT -list] 1]
+  set auslage [lindex [pg_result $invT -list] 2]
+  set adrNo [lindex [pg_result $invT -list] 3]
+  
+  if {[string is double $auslage] && $auslage >0} {
+    set finalsum [expr $buchungssumme + $auslage]
+  } else {
+    set finalsum $buchungssumme
+  }
+  
 
   #Determine credit avoiding non-digit values
   #TODO: which????
@@ -826,26 +854,28 @@ proc saveInvEntry {curVal curEName ns} {
     set status 3
     set diff 0
 
-#diff is +
+  #diff is +
   } elseif {$totalPayedsum > $finalsum} {
    # set status 3
     set totalPayedsum $finalsum
     set diff [expr $finalsum - $totalPayedsum]
 
-#diff is -
+  #diff is -
   } elseif {$totalPayedsum < $finalsum} {
-    #set status 2
+   # set status 2
     set diff [expr $totalPayedsum - $finalsum]
     
   }
   
+  #compute remaining credit + set status
   set newCredit [expr $oldCredit + $diff]
   if {$newCredit >0} {
     set status 3
     set totalPayedsum $finalsum
+  } else {
+    set status 2
   }
-    
-#TODO: testing
+
 puts "OldCredit $oldCredit"
 puts "NewCredit $newCredit"
 puts "OldPS $oldPayedsum"
