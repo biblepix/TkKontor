@@ -451,7 +451,7 @@ proc fillAdrInvWin {adrId} {
 			  set ::umsatz [expr $::umsatz + $invTotal]
 			  
 			  set ts [pg_result $::verbucht::statusT -getTuple $n]
-			  set invno [pg_result $::verbucht::invNoT -getTuple $n]
+			  set invNo [pg_result $::verbucht::invNoT -getTuple $n]
         set invdat [pg_result $::verbucht::invDatT -getTuple $n]
 			  set beschr [pg_result $::verbucht::beschrT -getTuple $n]
         set comment [pg_result $::verbucht::commT -getTuple $n]
@@ -462,7 +462,7 @@ proc fillAdrInvWin {adrId} {
 
     		#create entries per line, or refill present entries
 			  catch {label $invF.$n.invNoL -width 10 -anchor w}
-			  $invF.$n.invNoL conf -text $invno
+			  $invF.$n.invNoL conf -text $invNo
         catch {label $invF.$n.invDatL -width 15 -anchor w -justify left}
         $invF.$n.invDatL conf -text $invdat
 			  catch {label $invF.$n.beschr -width 50 -justify left -anchor w}
@@ -512,7 +512,7 @@ proc fillAdrInvWin {adrId} {
         catch {set itemlist [pg_result $itemsT -getTuple $n] }
         if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
           set ::verbucht::anzeige 1
-          $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "doPrintOldInv $invno"
+          $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "doPrintOldInv $invNo"
           pack $invF.$n.invshowB -anchor e -side right
         }
 
@@ -563,12 +563,6 @@ proc fetchInvData {invNo} {
   
   #make sure below signs are escaped since they interfere with LaTex commands
   set itemsHex  [lindex [pg_result $invToken -list] 3]
-  regsub -all {%} $itemsHex {\%} itemsHex
-  regsub -all {&} $itemsHex {\&} itemsHex
-  regsub -all {$} $itemsHex {\$} itemsHex
-  regsub -all {#} $itemsHex {\#} itemsHex
-  regsub -all {_} $itemsHex {\_} itemsHex
-  
   set adrNo     [lindex [pg_result $invToken -list] 4]
 
   #3.Get address data from DB & format for Latex
@@ -611,6 +605,13 @@ proc fetchInvData {invNo} {
     reportResult "Keine Posten für Rechnung $invNo gefunden. Kann Rechnung nicht anzeigen oder ausdrucken." red 
     return 1
   }
+  #get rid of Latex code signs
+  regsub -all {%} $itemList {\%} itemList
+  regsub -all {&} $itemList {\&} itemList
+  regsub -all {$} $itemList {\$} itemList
+  regsub -all {#} $itemList {\#} itemList
+  regsub -all {_} $itemList {\_} itemList
+  
   set chan [open $itemFile w]
   puts $chan $itemList
   close $chan
@@ -856,24 +857,27 @@ proc saveInvEntry {curVal curEName ns} {
 
   #diff is +
   } elseif {$totalPayedsum > $finalsum} {
-   # set status 3
+
     set totalPayedsum $finalsum
     set diff [expr $finalsum - $totalPayedsum]
-
+    set newCredit [expr $oldCredit + $diff]
+  
   #diff is -
   } elseif {$totalPayedsum < $finalsum} {
-   # set status 2
+
     set diff [expr $totalPayedsum - $finalsum]
-    
+
+    set newCredit [expr $oldCredit - $diff]    
   }
   
   #compute remaining credit + set status
-  set newCredit [expr $oldCredit + $diff]
-  if {$newCredit >0} {
+  if {$newCredit >= 0} {
     set status 3
     set totalPayedsum $finalsum
+    
   } else {
     set status 2
+#    set totalPayedsum ?
   }
 
 puts "OldCredit $oldCredit"

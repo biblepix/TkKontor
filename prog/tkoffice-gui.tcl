@@ -36,7 +36,7 @@ pack .n -fill y -expand 1
 pack [frame .n.t1.mainF] -fill both -expand 1
 pack [frame .n.t1.mainF.f2 -borderwidth 5 -relief ridge -pady 10 -padx 10] -anchor nw -fill x
 pack [frame .n.t1.mainF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
-pack [frame .n.t1.mainF.f4] -anchor nw -padx 20 -pady 20 -fill x
+#pack [frame .n.t1.mainF.f4] -anchor nw -padx 20 -pady 20 -fill x
 #Tab 2
 pack [frame .n.t2.f1 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
@@ -113,7 +113,7 @@ pack [frame .umsatzF] -in .n.t1 -fill x -side bottom
 #Create "Rechnungen" Titel
 label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont 18"
 label .creditL -text "Kundenguthaben: $currency " -font "TkCaptionFont"
-label .credit2L -text "↖️wird bei Zahlungseingang aktualisiert" -font "TkIconFont" -fg grey
+label .credit2L -text "\u2196 wird bei Zahlungseingang aktualisiert" -font "TkIconFont" -fg steelblue3
 message .creditM -textvar credit -relief sunken -width 50
 label .umsatzL -text "Kundenumsatz: " -font "TkCaptionFont"
 message .umsatzM -textvar umsatz -relief sunken -bg lightblue -width 50
