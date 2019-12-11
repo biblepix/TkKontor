@@ -351,6 +351,12 @@ proc abschlussErstellen {} {
   $t delete 1.0 end
 	$t configure -tabs {2c 4c 18c numeric 20c numeric}
 	pack $t -anchor nw
+	
+#TODO : add Tags for font size!	
+	$t insert 1.0 "$myComp\n"
+  $t insert end "Erfolgsrechnung $jahr\n"
+  $t insert end "=======================================================\n"
+  $t insert end "\nE i n n a h m e n\n\nRch.Nr. \tDatum\tAdresse\tBetrag\tBezahlt\n\n"
 
 	#compute sum total & insert text lines
 	for {set no 0;set sumtotal 0} {$no <$maxTuples} {incr no} {
@@ -358,11 +364,8 @@ proc abschlussErstellen {} {
 		catch {set sumtotal [expr $sumtotal + $total]}  
 		$t insert end "\n $j($no,f_number) \t $j($no,f_date) \t $j($no,addressheader) \t $j($no,finalsum) \t $j($no,payedsum)"		
 	}
-#TODO : add Tags for font size!
-	$t insert 1.0 "$myComp"
-  $t insert end "Erfolgsrechnung $jahr"
-  $t insert end "======================================================="
-  $t insert end "\nE i n n a h m e n\n\nRch.Nr. \tDatum\tAdresse\tBetrag\tBezahlt\n\n"
+	
+
 	$t insert end "\n\n Einnahmen Total \t\t\t\t $sumtotal"
 	$t insert end "\n\nA u s l a g e n
 

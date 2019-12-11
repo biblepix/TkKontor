@@ -43,10 +43,10 @@ proc resetNewInvDialog {} {
   catch {message .einzel -textvariable einzel}
 
   #Configure Menge entry
-  set menge "Menge"
+  set mengeEValue "Menge"
   .mengeE configure -validate focusin -validatecommand {
     %W conf -fg black
-    set menge ""
+    set mengeEValue ""
     return 0
   }
 
@@ -93,7 +93,7 @@ proc addInvRow {} {
       set artName [.invArtNameL cget -text]
       set menge [.mengeE get]
 
-#TODO bu gerek mi?
+#TODO bu gerek mi? ewet!
       if ![string is double $menge] {
         set menge 1
       }
@@ -807,14 +807,14 @@ return
 
 # saveInvEntry
 ###called by fillAdrInvWin by $invF.$n.zahlenE entry widget
-proc saveInvEntry {curVal curEName ns} {
+proc saveInvEntry {newPayedsum curEName ns} {
   global db invF
   set curNS "verbucht::${ns}"
   set rowNo [namespace tail $curNS]
 
 	#1)get invoice details
   set invNo [$invF.$rowNo.invNoL cget -text]
-  set newPayedsum [$curEName get]  
+  #set newPayedsum [$curEName get]
 
   #avoid non-digit amounts
   if ![string is double $newPayedsum] {
@@ -840,67 +840,70 @@ proc saveInvEntry {curVal curEName ns} {
   #Determine credit avoiding non-digit values
   #TODO: which????
   
-  set oldCredit $::credit
+#  set oldCredit $::credit
 #  set oldCredit [pg_result [pg_exec $db "SELECT credit from address where objectid=$adrNo"] -list]
-  
-  if ![string is double $oldCredit] {
-    set oldCredit 0
-  }
+#  
+#  if ![string is double $oldCredit] {
+#    set oldCredit 0
+#  }
     
   #Compute total payedsum:
-  set totalPayedsum [expr $oldPayedsum + $newPayedsum]
+  set totalPayedsum [expr $oldPayedsum + $newPayedsum] 
+  set newCredit [expr $totalPayedsum - $finalsum]
   
-  ##is identical - don't touch credit
-  if {$totalPayedsum == $finalsum} {
-    set status 3
-    set diff 0
-
-  #diff is +
-  } elseif {$totalPayedsum > $finalsum} {
-
-    set totalPayedsum $finalsum
-    set diff [expr $finalsum - $totalPayedsum]
-    set newCredit [expr $oldCredit + $diff]
   
-  #diff is -
-  } elseif {$totalPayedsum < $finalsum} {
+  
+#  ##is identical - don't touch credit
+#  if {$totalPayedsum == $finalsum} {
+#    set status 3
+#    set diff 0
 
-    set diff [expr $totalPayedsum - $finalsum]
+#  #diff is +
+#  } elseif {$totalPayedsum > $finalsum} {
 
-    set newCredit [expr $oldCredit - $diff]    
-  }
+#    set totalPayedsum $finalsum
+#    set diff [expr $finalsum - $totalPayedsum]
+#set newCredit [expr $oldPayedsum - $diff]
+
+##    set newCredit [expr $oldCredit + $diff]
+#  
+#  
+#  
+#  #diff is -
+#  } elseif {$totalPayedsum < $finalsum} {
+
+#    set diff [expr $totalPayedsum - $finalsum]
+#  set newCredit $diff  
+#    
+#    
+#TODO zis dunno work!
+#    set newCredit [expr $oldCredit - $diff]    
+#  }
   
   #compute remaining credit + set status
   if {$newCredit >= 0} {
     set status 3
-    set totalPayedsum $finalsum
     
   } else {
     set status 2
 #    set totalPayedsum ?
   }
 
-puts "OldCredit $oldCredit"
+#puts "OldCredit $oldCredit"
 puts "NewCredit $newCredit"
 puts "OldPS $oldPayedsum"
 puts "NewPS $newPayedsum"
 puts "status $status"
-puts "diff $diff"
+#puts "diff $diff"
 
 	# S a v e  totalPayedsum  to 'invoice' 
   set token1 [pg_exec $db "UPDATE invoice 
     SET payedsum = $totalPayedsum, 
     ts = $status 
     WHERE f_number=$invNo"]
-    
-  # S a v e  credit to 'address'
-  set token2 [pg_exec $db "UPDATE address
-    SET credit = $newCredit
-    WHERE objectid = $adrNo"]
 
-  #Update GUI
+  #Update GUI    
   reportResult $token1 "Betrag CHF $newPayedsum verbucht"
-  reportResult $token2 "Das aktuelle Kundenguthaben beträgt $::credit"
 
   ##delete OR reset zahlen entry
   if {$status == 3} {
@@ -914,8 +917,24 @@ puts "diff $diff"
     $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
  		$invF.$rowNo.payedL conf -text $totalPayedsum -fg maroon
   }
+    
+  # calculate total credit
+    
+    set invoicesT [pg_exec $db "SELECT finalsum,payedsum from invoice WHERE customeroid = $adrNo"]
+    set buchungssummenList [list [pg_exec $invoicesT -list] 0]
+    set payedsumsList [list [pg_exec $invoicesT -list] 1]
+    set totalBuchungssumme [expr [join $buchungssummenList +]]
+    set totalPayedsum [expr [join $payedsumsList +]]
+    set totalCredit [expr $totalPayedsum - $totalBuchungssumme]
+    
+  # S a v e  credit to 'address'
+  set token2 [pg_exec $db "UPDATE address
+    SET credit = $totalCredit
+    WHERE objectid = $adrNo"]
 
-  set ::credit $newCredit    
+
+  set ::credit $totalCredit
+  reportResult $token2 "Das aktuelle Kundenguthaben beträgt $newCredit"
   return 0
 } ;#END saveInvEntry
 
@@ -958,12 +977,14 @@ proc viewInvOnCanvas {invNo} {
   catch {latexInvoice $invNo ps}
   
   #Create toplevel window with canvas & buttons
-  catch {toplevel .topW -borderwidth 7 -relief sunken}
-  catch {button .topW.showinvexitB -text "Schliessen"}
-  catch {button .topW.showinvpdfB -text "PDF erzeugen"}
-  catch {button .topW.showinvprintB -text "Drucken"}
-  catch {canvas .topW.invC -yscrollc ".topW.yScroll set"}
-  catch {scrollbar .topW.yScroll -ori vert -command ".topW.invC yview"}
+  destroy .topW
+  toplevel .topW -borderwidth 7 -relief sunken
+  button .topW.showinvexitB -text "Schliessen"
+  button .topW.showinvpdfB -text "PDF erzeugen"
+  button .topW.showinvprintB -text "Drucken"
+  canvas .topW.invC -yscrollc ".topW.yScroll set"
+  scrollbar .topW.yScroll -ori vert -command ".topW.invC yview"
+
   #Create PostScript image (height/width nicht beeinflussbar!)
   image create photo psIm -file $invPsPath
   .topW.invC create image 0 0 -image psIm -anchor nw

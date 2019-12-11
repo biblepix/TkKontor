@@ -36,7 +36,7 @@ pack .n -fill y -expand 1
 pack [frame .n.t1.mainF] -fill both -expand 1
 pack [frame .n.t1.mainF.f2 -borderwidth 5 -relief ridge -pady 10 -padx 10] -anchor nw -fill x
 pack [frame .n.t1.mainF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
-#pack [frame .n.t1.mainF.f4] -anchor nw -padx 20 -pady 20 -fill x
+
 #Tab 2
 pack [frame .n.t2.f1 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
@@ -60,7 +60,7 @@ pack [frame .n.t4.f5 -pady $py -padx $px -borderwidth 5 -highlightbackground sil
 #Pack 3 top frames seitwärts
 #Create "Adressen" title
 label .adrTitel -text "Adressverwaltung" -font "TkCaptionFont 18" -pady 5
-pack .adrTitel -in .n.t1.mainF.f2 -side top -fill x
+pack .adrTitel -in .n.t1.mainF.f2 -anchor w -fill x
 ##obere Frames in .n.t1.f2
 pack [frame .adrF2 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
 pack [frame .adrF4 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
@@ -117,7 +117,7 @@ label .credit2L -text "\u2196 wird bei Zahlungseingang aktualisiert" -font "TkIc
 message .creditM -textvar credit -relief sunken -width 50
 label .umsatzL -text "Kundenumsatz: " -font "TkCaptionFont"
 message .umsatzM -textvar umsatz -relief sunken -bg lightblue -width 50
-pack .adrInvTitel -in .n.t1.mainF.f3
+pack .adrInvTitel -in .n.t1.mainF.f3 -anchor w
 
 #Umsatz unten
 pack .creditL .creditM .credit2L -in .umsatzF -side left -anchor w
