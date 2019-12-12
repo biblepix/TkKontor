@@ -432,14 +432,18 @@ proc fillAdrInvWin {adrId} {
     set itemsT    [pg_exec $db "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
     set commT     [pg_exec $db "SELECT f_comment FROM invoice WHERE customeroid = $custId"]
     set auslageT  [pg_exec $db "SELECT auslage FROM invoice WHERE customeroid = $custId"]
-    
-    for {set n 0; set ::umsatz 0} {$n<$nTuples} {incr n} {
+
+    set umsatzT   [pg_exec $db "SELECT sum(finalsum) AS total from invoice WHERE customeroid = $custId"]
+    set ::umsatz [pg_result $umsatzT -list]
+        
+    for {set n 0} {$n<$nTuples} {incr n} {
     
       namespace eval $n {
 
         set n [namespace tail [namespace current]]
         set invF $::invF
         
+  #TODO warum geht das nicht immer???????????????????????????
         #compute Rechnungsbetrag from sumtotal+auslage
 			  set sumtotal [pg_result $::verbucht::sumtotalT -getTuple $n]
 			  set auslage [pg_result $::verbucht::auslageT -getTuple $n]
@@ -448,7 +452,9 @@ proc fillAdrInvWin {adrId} {
 			  } else {
 			    set invTotal $sumtotal
 			  } 
-			  set ::umsatz [expr $::umsatz + $invTotal]
+			  
+			  #compute Umsatz - jetzt oben von DB!
+			  #set ::umsatz [expr $::umsatz + $invTotal]
 			  
 			  set ts [pg_result $::verbucht::statusT -getTuple $n]
 			  set invNo [pg_result $::verbucht::invNoT -getTuple $n]
@@ -920,11 +926,12 @@ puts "status $status"
     
   # calculate total credit
     
-    set invoicesT [pg_exec $db "SELECT finalsum,payedsum from invoice WHERE customeroid = $adrNo"]
-    set buchungssummenList [list [pg_exec $invoicesT -list] 0]
-    set payedsumsList [list [pg_exec $invoicesT -list] 1]
-    set totalBuchungssumme [expr [join $buchungssummenList +]]
-    set totalPayedsum [expr [join $payedsumsList +]]
+    set invoicesT [pg_exec $db "SELECT sum(finalsum),sum(payedsum) AS total from invoice WHERE customeroid = $adrNo"]
+    
+    set buchungssummenList [lindex [pg_exec $invoicesT -list] 0]
+    set payedsumsList [lindex [pg_exec $invoicesT -list] 1]
+   # set totalBuchungssumme [expr [join $buchungssummenList +]]
+   # set totalPayedsum [expr [join $payedsumsList +]]
     set totalCredit [expr $totalPayedsum - $totalBuchungssumme]
     
   # S a v e  credit to 'address'
