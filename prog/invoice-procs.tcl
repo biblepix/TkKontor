@@ -394,7 +394,7 @@ proc fillAdrInvWin {adrId} {
     namespace delete verbucht
   }
 
-  #Show Kundenguthaben
+  #Show client credit
   set token [pg_exec $db "SELECT credit FROM address WHERE objectid=$adrId"]
   set credit [pg_result $token -list]
   if ![string is double $credit] {
@@ -408,6 +408,7 @@ proc fillAdrInvWin {adrId} {
   }
   set ::credit $credit
   
+
   #Add new namespace no.
   namespace eval verbucht {
 
@@ -433,9 +434,11 @@ proc fillAdrInvWin {adrId} {
     set commT     [pg_exec $db "SELECT f_comment FROM invoice WHERE customeroid = $custId"]
     set auslageT  [pg_exec $db "SELECT auslage FROM invoice WHERE customeroid = $custId"]
 
-    set umsatzT   [pg_exec $db "SELECT sum(finalsum) AS total from invoice WHERE customeroid = $custId"]
+    #Show client turnover
+    set umsatzT [pg_exec $db "SELECT sum(finalsum) AS total from invoice WHERE customeroid = $custId"]
     set ::umsatz [pg_result $umsatzT -list]
         
+    #Create row per invoice
     for {set n 0} {$n<$nTuples} {incr n} {
     
       namespace eval $n {
@@ -452,9 +455,6 @@ proc fillAdrInvWin {adrId} {
 			  } else {
 			    set invTotal $sumtotal
 			  } 
-			  
-			  #compute Umsatz - jetzt oben von DB!
-			  #set ::umsatz [expr $::umsatz + $invTotal]
 			  
 			  set ts [pg_result $::verbucht::statusT -getTuple $n]
 			  set invNo [pg_result $::verbucht::invNoT -getTuple $n]

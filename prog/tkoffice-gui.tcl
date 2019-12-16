@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
-# Updated: 1nov17 
-# Restored: 6dez19
+# Salvaged: 1nov17 
+# Restored: 16dez19
 
 set version 1.0
 
@@ -66,23 +66,17 @@ pack [frame .adrF2 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor
 pack [frame .adrF4 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
 pack [frame .adrF1] -anchor nw -in .n.t1.mainF.f2 -side left
 pack [frame .adrF3] -anchor se -in .n.t1.mainF.f2 -expand 1 -side left
-##create Address number Spinbox
-set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -textvariable adrNo -bg lightblue]
-focus $adrSpin
-##Create search field
-set suche "Adresssuche (+Tab)"
-set adrSearch [entry .adrSearchE]
-  $adrSearch config -width 25 -borderwidth 3 -bg beige -fg grey -textvariable suche
-  $adrSearch config -validate focusin -validatecommand {
-    set ::suche ""
-    %W config -fg black -validate focusout -validatecommand {
-      searchAddress %s
-      return 0
-    }
-  return 0
-  }
 
-#Create address entries, to be packed only when 'changeAddress' or 'newAddress' are invoked
+##create Address number Spinbox
+set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -bg lightblue]
+#$adrSpin conf -command {fillAdrWin %s} -validate focus -vcmd {puts %s;puts %S;return 0}
+focus $adrSpin
+
+##Create search field
+set adrSearch [entry .adrSearchE -width 50 -borderwidth 3 -bg beige -fg grey]
+resetAdrSearch
+
+#Create address entries, to be packed when 'changeAddress' or 'newAddress' are invoked
 entry .name1E -width 50 -textvar name1 -justify left
 entry .name2E -width 50 -textvar name2 -justify left
 entry .streetE -width 50 -textvar street -justify left

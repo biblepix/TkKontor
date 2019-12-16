@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
-# Aktualisiert: 1nov17
-# Restored: 3dez19
+# Salvaged: 1nov17
+# Restored: 16dez19
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -66,32 +66,37 @@ proc setAdrList {} {
   global db adrSpin
   $adrSpin config -bg lightblue
 	set IDlist [pg_exec $db "SELECT objectid FROM address ORDER BY objectid DESC"]
-	$adrSpin configure -values [pg_result $IDlist -list] 
-	$adrSpin configure -command {
+	$adrSpin conf -values [pg_result $IDlist -list] 
+	
+	$adrSpin conf -command {
 		fillAdrWin %s
 		fillAdrInvWin %s
-	}
+	} -validate key -vcmd {
+  	fillAdrWin %s
+  	after idle {%W config -validate %v}
+  	return 1
+	} -invcmd {}
+	
 	#set last entry at start
   fillAdrWin [$adrSpin get]
   catch {pack forget .adrClearSelB} 
 }
 
-proc fillAdrWin {adrOID} {
+proc fillAdrWin {adrId} {
 global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
   #set variables
-	set name1 [pg_result [pg_exec $db "SELECT name1 FROM address WHERE objectid=$adrOID"] -list]
-	set name2 [pg_result [pg_exec $db "SELECT name2 FROM address WHERE objectid=$adrOID"] -list]
-	set street [pg_result [pg_exec $db "SELECT street FROM address WHERE objectid=$adrOID"] -list]
-	set city [pg_result [pg_exec $db "SELECT city FROM address WHERE objectid=$adrOID"] -list]
-
-	set ::zip  [pg_result [pg_exec $db "SELECT zip FROM address WHERE objectid=$adrOID"] -list]
+	set name1 [pg_result [pg_exec $db "SELECT name1 FROM address WHERE objectid=$adrId"] -list]
+	set name2 [pg_result [pg_exec $db "SELECT name2 FROM address WHERE objectid=$adrId"] -list]
+	set street [pg_result [pg_exec $db "SELECT street FROM address WHERE objectid=$adrId"] -list]
+	set city [pg_result [pg_exec $db "SELECT city FROM address WHERE objectid=$adrId"] -list]
+	set ::zip  [pg_result [pg_exec $db "SELECT zip FROM address WHERE objectid=$adrId"] -list]
 
   #Export if not empty
-  set tel1 [pg_result [pg_exec $db "SELECT telephone FROM address WHERE objectid=$adrOID"] -list]
-  set tel2 [pg_result [pg_exec $db "SELECT mobile FROM address WHERE objectid=$adrOID"] -list]
-  set fax  [pg_result [pg_exec $db "SELECT telefax FROM address WHERE objectid=$adrOID"] -list]
-  set mail [pg_result [pg_exec $db "SELECT email FROM address WHERE objectid=$adrOID"] -list]
-  set www  [pg_result [pg_exec $db "SELECT www FROM address WHERE objectid=$adrOID"] -list]
+  set tel1 [pg_result [pg_exec $db "SELECT telephone FROM address WHERE objectid=$adrId"] -list]
+  set tel2 [pg_result [pg_exec $db "SELECT mobile FROM address WHERE objectid=$adrId"] -list]
+  set fax  [pg_result [pg_exec $db "SELECT telefax FROM address WHERE objectid=$adrId"] -list]
+  set mail [pg_result [pg_exec $db "SELECT email FROM address WHERE objectid=$adrId"] -list]
+  set www  [pg_result [pg_exec $db "SELECT www FROM address WHERE objectid=$adrId"] -list]
 
   regsub {({)(.*)(})} $name1 {\2} ::name1
   regsub {({)(.*)(})} $name2 {\2} ::name2
@@ -109,8 +114,7 @@ global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
   return 0
 } ;#END fillAdrWin
 
-
-proc searchAddress {s} {
+proc searchAddress {} {
   global db adrSpin adrSearch
   set s [$adrSearch get]
 
@@ -125,32 +129,35 @@ proc searchAddress {s} {
   "]
 
   #Get list of number(s)
-	set adrList [pg_result $token -list]
+	set adrNumList [pg_result $token -list]
   set numTuples [pg_result $token -numTuples]
+puts $adrNumList
+puts $numTuples
 
+  if {$numTuples == 0} {
+    NewsHandler::QueryNews "Suchergebnis leer!" red
+    after 5000 {resetAdrSearch}
+    return 1
+  }
+  
   #A: open address if only 1 found
   if {$numTuples == 1} {
-	  fillAdrWin $adrList
-	  fillAdrInvWin $adrList
+    $adrSpin set $adrNumList
+	  fillAdrWin $adrNumList
+	  fillAdrInvWin $adrNumList
 
   #B: fill adrSB spinbox to choose from selection
-  } else {
+  } elseif {$numTuples > 1} {
 
-	$adrSpin config -bg beige -values "$adrList"
-  catch {button .adrClearSelB -width 13 -text "^ Auswahl löschen" -command {setAdrList}}
-  pack .adrClearSelB -in .adrF1
+    $adrSpin config -bg beige -values "$adrNumList"
+    fillAdrWin [$adrSpin get]
+    fillAdrInvWin [$adrSpin get]
+    catch {button .adrClearSelB -width 13 -text "^ Auswahl löschen" -command setAdrList}
+    pack .adrClearSelB -in .adrF1
   }
 
   #Reset adrSearch widget & address list (called by .adrClearSelB)
-  $adrSearch conf -fg grey -validate focusin -validatecommand {
-    set ::suche ""
-    %W conf -fg black -validate focusout -validatecommand {
-      searchAddress %s
-      return 0
-    }
-  return 0
-  }
-
+  after 5000 {resetAdrSearch}
   return 0
 } ;# END searchAddress
 
@@ -169,6 +176,22 @@ proc clearAdrWin {} {
   $adrSearch conf -state disabled
   .adrF2 conf -bg #d9d9d9
   return 0
+}
+
+# resetAdrSearch
+##called by GUI + searchAddress
+proc resetAdrSearch {} {
+  global adrSearch
+  $adrSearch delete 0 end
+  $adrSearch insert 0 "Adresssuche (+Tab)"
+  $adrSearch config -fg grey -validate focusin -vcmd {
+    %W delete 0 end
+    %W conf -fg black
+    after idle {
+    %W conf -validate focusout -vcmd searchAddress
+    }
+    return 0
+  }
 }
 
 # resetAdrWin
@@ -212,7 +235,7 @@ proc newAddress {} {
 
   clearAdrWin
   $adrSpin delete 0 end
-  $adrSpin configure -bg #d9d9d9  
+  $adrSpin conf -bg #d9d9d9  
 
   .b1 configure -text "Anschrift speichern" -command {saveAddress}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
