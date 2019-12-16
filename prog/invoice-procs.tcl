@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
-# Aktualisiert: 1nov17
-# Restored: 6dez19
+# Restored: 1nov17
+# Updated: 6dez19
 
 source $confFile
 ################################################################################################################
@@ -92,8 +92,6 @@ proc addInvRow {} {
       #get global vars
       set artName [.invArtNameL cget -text]
       set menge [.mengeE get]
-
-#TODO bu gerek mi? ewet!
       if ![string is double $menge] {
         set menge 1
       }
@@ -144,7 +142,7 @@ proc addInvRow {} {
       ##c) "Auslage" types - add to $bill, not to $buch     
       } elseif {$type == "A"} {
         
-          set ::rows::auslage "-[expr $auslage + $rowtot]"
+          set ::rows::auslage [expr $auslage + $rowtot]
           set ::rows::bill [expr $bill + $rowtot]
           .arttypeL${rowNo} conf -bg orange
       }
@@ -212,7 +210,7 @@ proc saveInv2DB {} {
   set shortDesc $rows::beschr
   set subtot $rows::buch
   set auslage $rows::auslage
-  
+    
   #Create itemList for itemFile (needed for LaTeX)
   foreach w [namespace children rows] {
     set artUnit [.artunitL[namespace tail $w] cget -text]
@@ -240,14 +238,14 @@ proc saveInv2DB {} {
   #2. Set payedsum=finalsum and ts=3 if cond="bar"
 	if {$cond=="bar"} {
     set ts 3
-    set payedsum $subtot
+    set payedsum $invTotal
   } else {
     set ts 1
     set payedsum 0
   }	
 
   #3. Make entry for vatlesssum if different from finalsum
-  set vatlesssum $subtot
+  set vatlesssum $invTotal
   if {$vat < 0} {
     set vatlesssum [expr ($vat * $finalsum)/100]
   }
@@ -290,22 +288,6 @@ proc saveInv2DB {} {
     '$itemListHex'
     )"]
 
- 
-  proc meyutar {} {
-   #4.Update credit in 'address'
-  set adrId [pg_result [pg_exec $db "SELECT customeroid FROM invoice WHERE f_number=$invNo"] -list]
-  set creditT [pg_exec $db "SELECT credit from address WHERE objectid=$adrId"]
-  set currCredit [pg_result $creditT -list]
-  if ![string is double $currCredit] {
-    set currCredit 0
-  }
-  ##Deduce new debit from credit -ginge auch so: SET credit = (credit - $subtot)
-  #This is not necessary, credit is updated when entry made
-  set newCredit [expr $credit - $subtot]
-  set newCreditT [pg_exec $db "UPDATE address SET credit = $newCredit WHERE objectid=$adrId"]
-  set ::credit $newCredit
-  reportResult $newCreditT "Kundenguthaben aktualisiert: $newCredit" 
-  }
   
 #TODO does this belong here? should we use reportResult instead?
   if {[pg_result $token -error] != ""} {
@@ -446,10 +428,10 @@ proc fillAdrInvWin {adrId} {
         set n [namespace tail [namespace current]]
         set invF $::invF
         
-  #TODO warum geht das nicht immer???????????????????????????
         #compute Rechnungsbetrag from sumtotal+auslage
 			  set sumtotal [pg_result $::verbucht::sumtotalT -getTuple $n]
 			  set auslage [pg_result $::verbucht::auslageT -getTuple $n]
+
 			  if {[string is double $auslage] && $auslage >0} {
   			  set invTotal [expr $sumtotal + $auslage]
 			  } else {
@@ -525,7 +507,6 @@ proc fillAdrInvWin {adrId} {
   		} ;#end for loop
     } ;#END namspace $rowNo
     
-#    if {$eingabe} {.invEntryH conf -state normal -bg lightblue} {.invEntryH conf -state disabled -bg #d9d9d9}
     if {$anzeige} {.invShowH conf -state normal} {.invShowH conf -state disabled -bg #d9d9d9}
     
   } ;#END namespace verbucht
@@ -925,14 +906,10 @@ puts "status $status"
   }
     
   # calculate total credit
-    
     set invoicesT [pg_exec $db "SELECT sum(finalsum),sum(payedsum) AS total from invoice WHERE customeroid = $adrNo"]
-    
-    set buchungssummenList [lindex [pg_exec $invoicesT -list] 0]
-    set payedsumsList [lindex [pg_exec $invoicesT -list] 1]
-   # set totalBuchungssumme [expr [join $buchungssummenList +]]
-   # set totalPayedsum [expr [join $payedsumsList +]]
-    set totalCredit [expr $totalPayedsum - $totalBuchungssumme]
+    set rechnungssummenTotal [lindex [pg_result $invoicesT -list] 0]
+    set payedsumsTotal [lindex [pg_result $invoicesT -list] 1]
+    set totalCredit [expr round($payedsumsTotal - $rechnungssummenTotal)]
     
   # S a v e  credit to 'address'
   set token2 [pg_exec $db "UPDATE address

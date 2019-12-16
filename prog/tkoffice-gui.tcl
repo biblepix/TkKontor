@@ -68,7 +68,7 @@ pack [frame .adrF1] -anchor nw -in .n.t1.mainF.f2 -side left
 pack [frame .adrF3] -anchor se -in .n.t1.mainF.f2 -expand 1 -side left
 
 ##create Address number Spinbox
-set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -bg lightblue]
+set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -bg lightblue -justify right]
 #$adrSpin conf -command {fillAdrWin %s} -validate focus -vcmd {puts %s;puts %S;return 0}
 focus $adrSpin
 
