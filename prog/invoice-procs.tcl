@@ -416,9 +416,15 @@ proc fillAdrInvWin {adrId} {
     set commT     [pg_exec $db "SELECT f_comment FROM invoice WHERE customeroid = $custId"]
     set auslageT  [pg_exec $db "SELECT auslage FROM invoice WHERE customeroid = $custId"]
 
-    #Show client turnover
+    #Show client turnover, including 'auslagen'
+    set auslageTotalT [pg_exec $db "SELECT sum(auslage) FROM invoice AS total WHERE customeroid = $custId"]
     set umsatzT [pg_exec $db "SELECT sum(finalsum) AS total from invoice WHERE customeroid = $custId"]
-    set ::umsatz [pg_result $umsatzT -list]
+    
+    set auslagen [pg_result $auslageTotalT -list] 
+    if ![string is double $auslagen] {
+      set auslagen 0.00
+    }
+    set ::umsatz [expr $auslagen + [pg_result $umsatzT -list]]
         
     #Create row per invoice
     for {set n 0} {$n<$nTuples} {incr n} {
