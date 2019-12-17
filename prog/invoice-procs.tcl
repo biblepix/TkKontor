@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/invoice-procs.tcl
 # called by tkoffice-gui.tcl
-# Restored: 1nov17
-# Updated: 6dez19
+# Salvaged: 1nov17
+# Updated: 17dez19
 
 source $confFile
 ################################################################################################################
@@ -377,18 +377,18 @@ proc fillAdrInvWin {adrId} {
   }
 
   #Show client credit
-  set token [pg_exec $db "SELECT credit FROM address WHERE objectid=$adrId"]
-  set credit [pg_result $token -list]
-  if ![string is double $credit] {
-    set credit 0.00
-    .creditM conf -bg silver
-  } elseif {$credit >0} {
-    .creditM conf -bg lightgreen
-    #set credit +${credit}
-  } elseif {$credit <0} { 
-    .creditM conf -bg red
-  }
-  set ::credit $credit
+#  set token [pg_exec $db "SELECT credit FROM address WHERE objectid=$adrId"]
+#  set credit [pg_result $token -list]
+#  if ![string is double $credit] {
+#    set credit 0.00
+#    .creditM conf -bg silver
+#  } elseif {$credit >0} {
+#    .creditM conf -bg lightgreen
+#    #set credit +${credit}
+#  } elseif {$credit <0} { 
+#    .creditM conf -bg red
+#  }
+#  set ::credit $credit
   
 
   #Add new namespace no.
@@ -417,14 +417,14 @@ proc fillAdrInvWin {adrId} {
     set auslageT  [pg_exec $db "SELECT auslage FROM invoice WHERE customeroid = $custId"]
 
     #Show client turnover, including 'auslagen'
-    set auslageTotalT [pg_exec $db "SELECT sum(auslage) FROM invoice AS total WHERE customeroid = $custId"]
-    set umsatzT [pg_exec $db "SELECT sum(finalsum) AS total from invoice WHERE customeroid = $custId"]
+    set umsatzT [pg_exec $db "SELECT sum(finalsum),sum(auslage) AS total from invoice WHERE customeroid = $custId"]
+    set verbucht [lindex [pg_result $umsatzT -list] 0]
+    set auslagen [lindex [pg_result $umsatzT -list] 1]
     
-    set auslagen [pg_result $auslageTotalT -list] 
-    if ![string is double $auslagen] {
+    if {![string is double $auslagen] || $auslagen == ""} {
       set auslagen 0.00
     }
-    set ::umsatz [expr $auslagen + [pg_result $umsatzT -list]]
+    set ::umsatz [expr $verbucht + $auslagen]
         
     #Create row per invoice
     for {set n 0} {$n<$nTuples} {incr n} {
@@ -517,6 +517,8 @@ proc fillAdrInvWin {adrId} {
     
   } ;#END namespace verbucht
 
+  set ::credit [updateCredit $adrId]
+  
 } ;#END fillAdrInvWin
 
 # fetchInvData
@@ -911,24 +913,51 @@ puts "status $status"
  		$invF.$rowNo.payedL conf -text $totalPayedsum -fg maroon
   }
     
-  # calculate total credit
-    set invoicesT [pg_exec $db "SELECT sum(finalsum),sum(payedsum) AS total from invoice WHERE customeroid = $adrNo"]
-    set rechnungssummenTotal [lindex [pg_result $invoicesT -list] 0]
-    set payedsumsTotal [lindex [pg_result $invoicesT -list] 1]
-    set totalCredit [expr round($payedsumsTotal - $rechnungssummenTotal)]
+
     
   # S a v e  credit to 'address'
-  set token2 [pg_exec $db "UPDATE address
-    SET credit = $totalCredit
-    WHERE objectid = $adrNo"]
+#  set token2 [pg_exec $db "UPDATE address
+#    SET credit = $totalCredit
+#    WHERE objectid = $adrNo"]
 
 
-  set ::credit $totalCredit
-  reportResult $token2 "Das aktuelle Kundenguthaben beträgt $newCredit"
+  set ::credit [updateCredit $adrNo]
+  #reportResult $token2 "Das aktuelle Kundenguthaben beträgt $newCredit"
   return 0
 } ;#END saveInvEntry
 
-
+# updateCredit
+##calculates total credit per customer
+##called by fillAdrInvWin + saveInvEntry
+proc updateCredit {adrNo} {
+  global db
+  
+  set invoicesT [pg_exec $db "SELECT 
+    sum(finalsum),
+    sum(payedsum),
+    sum(auslage) AS total from invoice WHERE customeroid = $adrNo"
+    ]
+  
+  set verbuchtTotal [lindex [pg_result $invoicesT -list] 0]
+  set gezahltTotal  [lindex [pg_result $invoicesT -list] 1]
+  set auslagenTotal [lindex [pg_result $invoicesT -list] 2]
+  
+  if {![string is double $verbuchtTotal]  || $auslagenTotal == ""} {
+    set verbuchtTotal 0.00
+  }
+  if {![string is double $gezahltTotal]  || $auslagenTotal == ""} {
+    set gezahltTotal 0.00
+  }
+  if {![string is double $auslagenTotal] || $auslagenTotal == ""} {
+    set auslagenTotal 0.00
+  }
+  
+  set billedTotal [expr $verbuchtTotal + $auslagenTotal]
+  set totalCredit [expr round($gezahltTotal - $billedTotal)]
+  
+  return $totalCredit
+}
+    
 ### A R C H I V ################################################################################
 
 # doInvoicePdf  - obsolete!!! 
