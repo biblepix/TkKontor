@@ -107,9 +107,9 @@ pack [frame .umsatzF] -in .n.t1 -fill x -side bottom
 #Create "Rechnungen" Titel
 label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont 18"
 label .creditL -text "Kundenguthaben: $currency " -font "TkCaptionFont"
-label .credit2L -text "\u2196 wird bei Zahlungseingang aktualisiert" -font "TkIconFont" -fg steelblue3
+label .credit2L -text "\u2196 wird bei Zahlungseingang aktualisiert" -font "TkIconFont" -fg grey
 message .creditM -textvar credit -relief sunken -width 50
-label .umsatzL -text "Kundenumsatz: " -font "TkCaptionFont"
+label .umsatzL -text "Kundenumsatz: $currency " -font "TkCaptionFont"
 message .umsatzM -textvar umsatz -relief sunken -bg lightblue -width 50
 pack .adrInvTitel -in .n.t1.mainF.f3 -anchor w
 

@@ -953,9 +953,20 @@ proc updateCredit {adrNo} {
   }
   
   set billedTotal [expr $verbuchtTotal + $auslagenTotal]
-  set totalCredit [expr round($gezahltTotal - $billedTotal)]
+  set totalCredit [expr $gezahltTotal - $billedTotal]
+
+  #Configure .creditM widget
+  if {$totalCredit >0} {
+    .creditM conf -bg lightgreen
+  } elseif {$totalCredit <0} {
+    .creditM conf -bg red
+  } else { 
+    .creditM conf -bg silver
+  }
   
-  return $totalCredit
+  #Reduce amount to 2 Kommastellen - TODO getnicht
+  set credit [expr (100*$totalCredit)/100.00]
+  return $credit
 }
     
 ### A R C H I V ################################################################################
