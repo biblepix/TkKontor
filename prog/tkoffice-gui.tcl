@@ -1,20 +1,20 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 16dez19
+# Restored: 2jan20
 
 set version 1.0
 
 package require Tk
 package require Img
 source [file join $progDir tkoffice-procs.tcl]
-source [file join $progDir invoice-procs.tcl]
+source [file join $progDir tkoffice-invoice.tcl]
 source [file join $progDir pgin.tcl]
 source $confFile
 
 #Haupttitel & Frames
 set px 5
 set py 5
-pack [frame .titelF -padx 10 -pady 10] -fill x
+pack [frame .titelF -padx 10 -pady 10 -bg steelblue3] -fill x
 label .titelL -text "Auftragsverwaltung" -pady $py -padx $px -font "TkHeadingFont 80 bold" -fg silver -anchor w
 
 #Eigenes Firmenlogo falls vorhanden
@@ -168,7 +168,7 @@ label .invcomL -text "Interne Bemerkung:"
 entry .invcomE -width 30 -bg beige -textvar comm
 
 #Packed later by resetNewInvoice
-entry .mengeE -width 7 -bg yellow -fg grey -textvar menge
+entry .mengeE -width 7 -bg yellow -fg grey
 label .subtotalL -text "Rechnungssumme: "
 message .subtotalM -width 70 -bg lightblue -padx 20 -anchor w
 label .abzugL -text "Auslagen: "

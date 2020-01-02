@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 16dez19
+# Restored: 31dez19
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -10,15 +10,16 @@
 # createTkOfficeLogo
 ##called by tkoffice-gui.tcl 
 proc createTkOfficeLogo {} {
-#TODO get width from main window!
-#  canvas .logoC -width 1000 -height 130 -borderwidth 7 -bg steelblue3
 #Bitmap should work, but donno why it doesn't
-#          $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
-  canvas .logoC -width 1400 -height 50 -borderwidth 7 -bg steelblue2
-  pack .logoC -in .titelF -side left -anchor nw
+#$invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
 
-set blau lightblue2
-set dunkelblau steelblue3
+  set bildschirmbreite [winfo screenwidth .]
+  set fensterbreite [winfo width .]
+  set blau lightblue2
+  set dunkelblau steelblue3
+
+  canvas .logoC -width $bildschirmbreite -height 30 -borderwidth 7 -bg $dunkelblau
+  pack .logoC -in .titelF -side left -anchor nw
 
   set kreis [.logoC create oval 7 7 50 50]
   .logoC itemconf $kreis -fill orange -outline red
@@ -35,7 +36,7 @@ set dunkelblau steelblue3
   .logoC itemconf $schrift3 -font "TkCaptionFont 18 bold" -fill $blau -text "TkOffice Business Software"
   
   set schrift4 [.logoC create text 0 110 -anchor w]
-  .logoC itemconf $schrift4 -font "TkHeadingFont 80 bold" -fill $dunkelblau -text "Auftragsverwaltung" -angle 4.
+  .logoC itemconf $schrift4 -font "TkHeadingFont 50 bold" -fill red -text "Auftragsverwaltung" -angle 4.
   .logoC lower $schrift4
 
   set schrift5 [.logoC create text 900 128 -justify right -text TkOffice.vollmar.ch]
@@ -188,7 +189,7 @@ proc resetAdrSearch {} {
     %W delete 0 end
     %W conf -fg black
     after idle {
-    %W conf -validate focusout -vcmd searchAddress
+      %W conf -validate focusout -vcmd searchAddress
     }
     return 0
   }
@@ -443,12 +444,15 @@ proc resetArticleWin {} {
 # setArticleLine
 ##sets Artikel line in New Invoice window
 ##set $args for Artikelverwaltung window
-proc setArticleLine tab {
+##called by ? ?
+proc setArticleLine {tab} {
   global db artPrice
-
-  .mengeE delete 0 end
-  .mengeE insert 0 "Menge"
+ 
   .confArtTypeL conf -bg #c3c3c3
+  .mengeE delete 0 end
+#  .mengeE insert 0 "Menge"
+  .mengeE conf -bg beige
+
   
   if {$tab == "TAB4"} {
     set artNum [.confArtNumSB get]
@@ -458,12 +462,26 @@ proc setArticleLine tab {
 
     set artNum [.invArtNumSB get]
     focus .invArtNumSB
-    .mengeE conf -validate focusin -validatecommand {
-      %W conf -fg black
-      set menge ""
-      return 0
+
+proc warumgehtdasnicht? {} {   
+    .mengeE config -state normal -validate focusin -vcmd {
+        %W delete 0 end
+        %W conf -fg black -bg beige
+        after idle {
+          %W conf -validate key -vcmd {
+          string is digit %P
+        } 
+      }
+      #-invcmd {%W conf -validate %V}
+      
+      return 1
     }
   }
+}
+
+#.mengeE delete 0 end
+.mengeE conf -insertbackground orange -insertwidth 10 -insertborderwidth 5 -insertofftime 500 -insertontime 1000  
+.mengeE conf -state normal -validate key -vcmd {string is double %P} -invcmd {%W conf -bg red; after 2000 {%W conf -bg beige}}
 
   #Get data per line
   set token [pg_exec $db "SELECT artname,artprice,artunit,arttype FROM artikel WHERE artnum=$artNum"]
@@ -481,7 +499,7 @@ proc setArticleLine tab {
     } elseif {$::artType == "A"} {
       .confArtTypeL conf -bg orange
     } else {
-     .mengeE conf -state normal -bg beige -fg silver
+  #   .mengeE conf -state normal -bg beige -fg silver
     }
     
   if {$tab == "TAB4"} {
