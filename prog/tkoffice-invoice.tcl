@@ -1,7 +1,7 @@
-# ~/TkOffice/prog/invoice-procs.tcl
+# ~/TkOffice/prog/tkoffice-invoice.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
-# Updated: 2jan20
+# Updated: 3jan20
 
 source $confFile
 ################################################################################################################
@@ -26,10 +26,13 @@ proc resetNewInvDialog {} {
     set bill 0
     set buch 0
     set auslage 0
-    set rabatt 0
+    catch {unset rabatt}
+    catch {unset rabattProzent}
   }
   
   updateArticleList
+  #reseaArticleWin
+  .invArtNumSB invoke buttondown
   
   #Configure message labels & pack
   .subtotalM conf -textvar rows::bill
@@ -42,13 +45,6 @@ proc resetNewInvDialog {} {
   catch {message .einheit -textvariable unit}
   catch {message .einzel -textvariable einzel}
 
-  #Configure Menge entry - TODO is this somewhere else already?
-#  .mengeE conf -validate focusin -vcmd {
-#    %W delete 0 end
-#    %W conf -fg black -validate key -vcmd {string is double %s;return 0}
-#    return 0
-#  }
-
   pack .invcondL .invcondSB .invauftrdatL .invauftrdatE .invrefL .invrefE .invcomL .invcomE -in .n.t2.f1 -side left -fill x 
   pack .invArtlistL -in .n.t2.f1 -before .n.t2.f2 -anchor w 
   pack .invArtNumSB .mengeE .invArtUnitL .invArtNameL .invArtPriceL -in .n.t2.f2 -side left -fill x
@@ -60,7 +56,6 @@ proc resetNewInvDialog {} {
     .saveInvB conf -activebackground #ececec -state normal
     doSaveInv
     "
-
 } ;#END resetNewInvDialog
 
 # addInvRow
@@ -77,13 +72,11 @@ proc addInvRow {} {
     return 1
   }
 
-  
   #Configure Abbruch button
   pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
   .saveInvB conf -activebackground skyblue -state normal
   .abbruchInvB conf -activebackground red -state normal -command {resetNewInvDialog}
 
-      
   ##get last namespace no.
   if [catch {namespace children rows}] {
     set lastrow 0
@@ -101,11 +94,17 @@ proc addInvRow {} {
     namespace eval $rowNo  {
 
       #get global vars
-      set artName [.invArtNameL cget -text]
+#      set artName [.invArtNameL cget -text]
+#      set menge [.mengeE get]
+#      set artPrice [.invArtPriceL cget -text]
+#      set artUnit [.invArtUnitL cget -text]
+#      set artType [.invArtTypeL cget -text]
+      set artName $::artName
       set menge [.mengeE get]
-      set artPrice [.invArtPriceL cget -text]
-      set artUnit [.invArtUnitL cget -text]
-      set artType [.invArtTypeL cget -text]
+      set artPrice $::artPrice
+      set artUnit $::artUnit
+      set artType $::artType
+      
       set rowNo $::rows::rowNo
       set rowtot [expr $menge * $artPrice]
 
@@ -119,6 +118,7 @@ proc addInvRow {} {
       catch {label .artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify right -anchor w}
       catch {label .artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
       catch {label .arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
+      catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
 
       #Get current values from GUI
       set bill $rows::bill
@@ -144,16 +144,18 @@ proc addInvRow {} {
 
           #compute this row's rebate
           set bill [expr $bill + $rowtot]
+puts "rowtot $rowtot"
+
+          set newrabatt [expr ($rabattProzent * $rowtot) / 100]
           
-          set newrabatt [expr $rabattProzent * $bill / 100]
           set oldrabatt $::rows::rabatt
-
-          #update global rebate - TODO to be passed to Latex!!!
-#TODO zis isnt working yet!
+puts "old $oldrabatt"
+puts "new $newrabatt"
+          #update global rebate
+          #TODO zis isnt working yet!
           set ::rows::rabatt [expr $oldrabatt + $newrabatt]
-
-          set ::rows::bill [expr $bill - $newrabatt]
-
+          set ::rows::bill [expr $bill + $rowtot - $newrabatt]
+          set ::rows::buch [expr $bill + $rowtot - $newrabatt]
          
         } else {
         
@@ -167,7 +169,6 @@ proc addInvRow {} {
         .artnameL${rowNo} conf -text "abzüglich $artName"
         .artpriceL${rowNo} conf -bg yellow -textvar ::rows::rabatt
 
-        #TODO remember that Latex Invoice computes rebate for ALL items except A !!!
       set ::rows::rabattProzent $artPrice
 puts $artPrice
         
@@ -187,18 +188,19 @@ puts $artPrice
         
           set ::rows::auslage [expr $auslage + $rowtot]
           set ::rows::bill [expr $bill + $rowtot]
+          set ::rows::buch [expr $bill - $auslage]
           .arttypeL${rowNo} conf -bg orange
-#.mengeE conf ..-
+          .rowtotL${rowNo} conf -bg orange
       }
 
-      catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
+      
       pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
       pack .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
 
       #Reduce amounts to 2 decimal points
       set ::rows::bill [expr {double(round(100*$rows::bill))/100}]
       set ::rows::buch [expr {double(round(100*$rows::buch))/100}]
-      if {[info exists rabatt] && $rabatt >0} {
+      if [info exists ::rows::rabatt] {
         set ::rows::rabatt [expr {double(round(100*$rows::rabatt))/100}]
       }
   
@@ -240,8 +242,10 @@ proc doSaveInv {} {
 ##saves new invoice to DB
 ##called by doSaveInv
 proc saveInv2DB {} {
-  global db adrNo env msg texDir itemFile
+  global db env msg texDir itemFile
   global cond ref comm auftrDat vat
+
+  set adrNo [.adrSB get]
 
   #1. Get invNo & export to ::Latex 
   #TODO: incorporate in DB as 'SERIAL', starting with %YY
@@ -974,7 +978,7 @@ puts "status $status"
 
 # updateCredit
 ##calculates total credit per customer
-##called by fillAdrInvWin + saveInvEntry
+##called by fillAdrInvWin + ?saveInvEntry
 proc updateCredit {adrNo} {
   global db
   

@@ -463,21 +463,8 @@ proc setArticleLine {tab} {
     set artNum [.invArtNumSB get]
     focus .invArtNumSB
 
-proc warumgehtdasnicht? {} {   
-    .mengeE config -state normal -validate focusin -vcmd {
-        %W delete 0 end
-        %W conf -fg black -bg beige
-        after idle {
-          %W conf -validate key -vcmd {
-          string is digit %P
-        } 
-      }
-      #-invcmd {%W conf -validate %V}
-      
-      return 1
-    }
   }
-}
+
 
 #.mengeE delete 0 end
 .mengeE conf -insertbackground orange -insertwidth 10 -insertborderwidth 5 -insertofftime 500 -insertontime 1000  
