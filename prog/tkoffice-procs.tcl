@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 31dez19
+# Restored: 4jan20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -359,8 +359,23 @@ proc deleteAddress {adrNo} {
 ### A B S C H L Ü S S E 
 ################################################################################################
 
-proc abschlussErstellen {} {
-  global db myComp
+# setAbschlussjahrSB
+##configures Abschlussjahr spinbox ('select distinct' shows only 1 per year)
+##includes actual business years up till now
+proc setAbschlussjahrSB {} {
+  global db
+  set heuer [clock format [clock seconds] -format %Y]
+  set token [pg_exec $db "SELECT DISTINCT EXTRACT(year FROM f_date) FROM invoice"]
+  set jahresliste [pg_result $token -list]
+  lappend jahresliste $heuer
+   
+  .abschlussJahrSB conf -values [lsort -decreasing $jahresliste]
+  #.abschlussJahrSB set $heuer
+}
+
+#TODO 
+proc createAbschluss {} {
+  global db myComp currency
 
   set jahr [.abschlussJahrSB get]
 	#put Jahr's abschluss in array
@@ -373,57 +388,101 @@ proc abschlussErstellen {} {
 	set t .n.t3.abschlussT
 	catch {text $t -width 700 -height [expr $maxTuples + 30]}
   $t delete 1.0 end
-	$t configure -tabs {2c 4c 18c numeric 20c numeric}
+  
+  #Compute tabs for landscape layout (c=cm) -TODO these are not exported correctly! , only useful for GUI layout
+	$t configure -tabs {
+	15m
+	40m
+	10c
+	20c numeric
+	23c numeric
+	26c numeric
+  }
 	pack $t -anchor nw
+	pack .printAbschlussB -in .n.t3 -side top -anchor se
 	
 #TODO : add Tags for font size!	
+#TODO forget about tags + try mixture of tabs and spaces (see below) !!!
+
 	$t insert 1.0 "$myComp\n"
   $t insert end "Erfolgsrechnung $jahr\n"
   $t insert end "=======================================================\n"
-  $t insert end "\nE i n n a h m e n\n\nRch.Nr. \tDatum\tAdresse\tBetrag\tBezahlt\n\n"
+  $t insert end "\nE i n n a h m e n\n\nRch.Nr.\tDatum\tAnschrift\t\tBetrag $currency\tBezahlt $currency\tTotal $currency\n\n"
 
 	#compute sum total & insert text lines
 	for {set no 0;set sumtotal 0} {$no <$maxTuples} {incr no} {
 		set total $j($no,payedsum)
-		catch {set sumtotal [expr $sumtotal + $total]}  
-		$t insert end "\n $j($no,f_number) \t $j($no,f_date) \t $j($no,addressheader) \t $j($no,finalsum) \t $j($no,payedsum)"		
+		catch {set sumtotal [expr $sumtotal + $total]}
+		  
+		#$t insert end "\n$j($no,f_number) \t $j($no,f_date) \t $j($no,addressheader)\t\t $j($no,finalsum) \t $j($no,payedsum)"
+		$t insert end "\n$j($no,f_number)   "
+		$t insert end "$j($no,f_date)   "
+		
+		set adrfieldL 80
+		set adrL [string length $j($no,addressheader)]
+		set Ldiff [expr $adrfieldL - $adrL]
+		$t insert end "$j($no,addressheader)$Ldiff"
+		$t insert end "$j($no,finalsum)       "
+		$t insert end "$j($no,payedsum)       "
 	}
 	
 
-	$t insert end "\n\n Einnahmen Total \t\t\t\t $sumtotal"
+	$t insert end "\n\n  EINNAHMEN TOTAL\t\t\t\t\t\t $sumtotal"
 	$t insert end "\n\nA u s l a g e n
 
-Büromiete
-Abschr. Büroeinrichtung\t\t\t
-Providergebühr\t\t\t
-Web-Hosting-Jahresgebühr\t\t\t
-Telefongebühren Grundtaxe & Gespräche\t\t\t
-Postwertzeichen\t\t\t
-Bahn-Berufsfahrten\t\t\t
-Bürobedarf\t\t\t
-Beglaubigungen\t\t\t
-Varia
-Varia
+Büromiete\t\t\t\t-0.00
+Abschr. Büroeinrichtung\t\t\t\t-0.00
+Providergebühr\t\t\t\t0.00
+Web-Hosting-Jahresgebühr\t\t\t\t-0.00
+Telefongebühren Grundtaxe & Gespräche\t\t\t\t-0.00
+Postwertzeichen\t\t\t\t-0.00
+Berufsfahrten\t\t\t\t-0.00
+Bürobedarf\t\t\t\t-0.00
+Beglaubigungen\t\t\t\t-0.00
+Varia\t\t\t\t-0.00
+Varia\t\t\t\t-0.00
 
- Auslagen Total\t\t\t
+  AUSLAGEN TOTAL\t\t\t\t\t\t-0.00
 
-R e i n g e w i n n \t\t\t\t
+R e i n g e w i n n \t\t\t\t\t\t0.00
 "
 }
 
-proc abschlussDrucken {} {
-  global kontorDir
-
+# printAbschluss
+##a)exports text from Abschluss text widget and writes it to TEXT FILE
+##b)tries printing via lpr
+proc printAbschluss {} {
+  global tkofficeDir
+  
+  set reportsDir [file join $tkofficeDir reports]
+  file mkdir $reportsDir
   set abschlusstext [.n.t3.abschlussT get 1.0 end]
   set jahr [.abschlussJahrSB get]
-  set datei $kontorDir/reports/abschluss${jahr}.txt
+  set abschlussTxt [file join $reportsDir abschluss${jahr}.txt]
+  append abschlussPs [file root $abschlussTxt] . ps
   
-  set chan [open $datei w]
+  #Write to text file
+  set chan [open $abschlussTxt w]
   puts $chan $abschlusstext
   close $chan
 
-  NewsHandler::QueryNews "Abschluss in $datei gespeichert. Wird jetzt gedruckt..." lightblue
-  exec ~/bin/bas $datei
+  #Try converting to PS
+  if {[auto_execok paps] == ""} {
+    set path $abschlussTxt
+  } else {
+    set path $abschlussPs
+    exec paps --landscape --font="Monospace10" $abschlussTxt > $abschlussPs
+  }
+  NewsHandler::QueryNews "Abschluss in $path gespeichert." green
+   
+  #Try printing PS or TXT
+  set printer [auto_execok lpr]
+  if {$printer != ""} {
+    NewsHandler::QueryNews "Abschluss wird jetzt gedruckt..." lightblue
+    if [catch {exec $printer $path}] {
+      NewsHandler::QueryNews "Datei konnte nicht gedruckt werden.\nSie finden den Jahresabschluss unter $abschlussPath zur weiteren Bearbeitung." orange
+    }
+  }
 }
 
 

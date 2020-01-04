@@ -822,10 +822,8 @@ proc printInvoice {invNo} {
 #    return 0
     #after 5000 {return 1}
  #   catch {exec lpr $invPsPath}
-        
+      return 0  
   } 
-return 
-
 
 
   #2. try direct printing vie GhostScript
@@ -841,12 +839,19 @@ return
   return 0
   }
 
+  #3. Print to PS or PDF 
   NewsHandler::QueryNews "Die Rechnung $invNo kann nicht gedruckt werden." red
   NewsHandler::QueryNews "Installieren Sie ein Betrachtungsprogramm wie 'evince' oder 'okular' für besseres Druck-Handling." orange
   
-  latexInvoice pdf
-  
+  set invPdfPath [setInvPath $invNo pdf]
+  if ![catch {exec ps2pdf $invPsPath $invPdfPath}] {
+    set path $invPdfPath
+  } else {
+    set path $invPsPath
+  }
+  NewsHandler::QueryNews "Sie finden Rechnung $invNo unter $path zur weiteren Bearbeitung." orange
   return 1
+
 } ;#END printInvoice
 
 

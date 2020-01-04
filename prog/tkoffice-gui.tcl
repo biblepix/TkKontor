@@ -216,14 +216,17 @@ pack .abbruchB -in .bottomF -side right
 # T A B  3 :  A B S C H L Ü S S E
 ######################################################################################
 
-button .abschlussErstellenB -text "Abschluss erstellen" -command {abschlussErstellen}
-button .abschlussDruckenB -text "Abschluss drucken" -command {abschlussDrucken}
-spinbox .abschlussJahrSB -values {2018 2019 2020 2021 2022 2023 2024 2025} -width 4
+label .abschlussL -justify left -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch.\nDie Auslagen und der Reingewinn sind von Hand zu berechnen und einzutragen.\nDer Ausdruck erfolgt nach PostScript bzw. Reintext."
+button .abschlussErstellenB -text "Abschluss erstellen" -command {createAbschluss}
+button .printAbschlussB -text "Abschluss drucken" -command {printAbschluss}
+spinbox .abschlussJahrSB -width 4
+
 
 message .news -textvar news -width 1000 -relief sunken -pady 5 -padx 10 -justify center -anchor n
 pack [frame .n.t3.bottomF.f2] -side bottom -fill x
 pack [frame .n.t3.bottomF.f1] -side bottom -fill x
-pack .abschlussJahrSB .abschlussErstellenB .abschlussDruckenB -in .n.t3.bottomF.f1 -side right -fill x
+pack .abschlussJahrSB .abschlussErstellenB -in .n.t3.bottomF.f1 -side right -fill x
+pack .abschlussL -in .n.t3.bottomF.f1 -side left
 
 #Execute initial commands if connected to DB
 catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res
@@ -358,4 +361,4 @@ updateArticleList
 resetArticleWin
 setArticleLine TAB2
 setArticleLine TAB4
-#createPrintBitmap
+setAbschlussjahrSB
