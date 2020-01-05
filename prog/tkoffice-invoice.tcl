@@ -32,7 +32,7 @@ proc resetNewInvDialog {} {
   
   updateArticleList
   #reseaArticleWin
-  .invArtNumSB invoke buttondown
+  .invartnumSB invoke buttondown
   
   #Configure message labels & pack
   .subtotalM conf -textvar rows::bill
@@ -47,7 +47,7 @@ proc resetNewInvDialog {} {
 
   pack .invcondL .invcondSB .invauftrdatL .invauftrdatE .invrefL .invrefE .invcomL .invcomE -in .n.t2.f1 -side left -fill x 
   pack .invArtlistL -in .n.t2.f1 -before .n.t2.f2 -anchor w 
-  pack .invArtNumSB .mengeE .invArtUnitL .invArtNameL .invArtPriceL -in .n.t2.f2 -side left -fill x
+  pack .invartnumSB .mengeE .invArtUnitL .invArtNameL .invArtPriceL -in .n.t2.f2 -side left -fill x
   pack .addrowB -in .n.t2.f2 -side right
   
   #Reset Buttons

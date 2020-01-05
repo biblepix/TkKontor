@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 4jan20
+# Restored: 5jan20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -401,35 +401,28 @@ proc createAbschluss {} {
 	pack $t -anchor nw
 	pack .printAbschlussB -in .n.t3 -side top -anchor se
 	
-#TODO : add Tags for font size!	
-#TODO forget about tags + try mixture of tabs and spaces (see below) !!!
-
-	$t insert 1.0 "$myComp\n"
-  $t insert end "Erfolgsrechnung $jahr\n"
-  $t insert end "=======================================================\n"
-  $t insert end "\nE i n n a h m e n\n\nRch.Nr.\tDatum\tAnschrift\t\tBetrag $currency\tBezahlt $currency\tTotal $currency\n\n"
-
+  #Configure font tags	
+  $t tag conf T2 -font "TkCaptionFont 16 bold"
+  $t tag conf T1 -font "TkHeadingFont 20"
+  $t tag conf T3 -font "TkSmallCaptionFont 12"
+  
+  #B u i l d   w i n d o w
+	$t insert 1.0 "$myComp\n" T1
+	$t insert end "Erfolgsrechnung $jahr\n\n" T1
+  $t insert end "Einnahmen\n\n" T2
+  $t insert end "Rch.Nr.\tDatum\tAnschrift\t\tBetrag $currency\tBezahlt $currency\tTotal $currency\n" T3
+	
 	#compute sum total & insert text lines
 	for {set no 0;set sumtotal 0} {$no <$maxTuples} {incr no} {
 		set total $j($no,payedsum)
 		catch {set sumtotal [expr $sumtotal + $total]}
 		  
-		#$t insert end "\n$j($no,f_number) \t $j($no,f_date) \t $j($no,addressheader)\t\t $j($no,finalsum) \t $j($no,payedsum)"
-		$t insert end "\n$j($no,f_number)   "
-		$t insert end "$j($no,f_date)   "
-		
-		set adrfieldL 80
-		set adrL [string length $j($no,addressheader)]
-		set Ldiff [expr $adrfieldL - $adrL]
-		$t insert end "$j($no,addressheader)$Ldiff"
-		$t insert end "$j($no,finalsum)       "
-		$t insert end "$j($no,payedsum)       "
+		$t insert end "\n$j($no,f_number)\t$j($no,f_date)\t$j($no,addressheader)\t\t$j($no,finalsum)\t$j($no,payedsum)"
 	}
-	
 
-	$t insert end "\n\n  EINNAHMEN TOTAL\t\t\t\t\t\t $sumtotal"
-	$t insert end "\n\nA u s l a g e n
-
+	$t insert end "\n\Einnahmen total\t\t\t\t\t\t $sumtotal" T3
+	$t insert end "\n\nAuslagen\n" T2
+  $t insert end "
 Büromiete\t\t\t\t-0.00
 Abschr. Büroeinrichtung\t\t\t\t-0.00
 Providergebühr\t\t\t\t0.00
@@ -441,11 +434,9 @@ Bürobedarf\t\t\t\t-0.00
 Beglaubigungen\t\t\t\t-0.00
 Varia\t\t\t\t-0.00
 Varia\t\t\t\t-0.00
-
-  AUSLAGEN TOTAL\t\t\t\t\t\t-0.00
-
-R e i n g e w i n n \t\t\t\t\t\t0.00
 "
+  $t insert end "\nAuslagen total\t\t\t\t\t\t-0.00\n\n" T3
+  $t insert end "Reingewinn\t\t\t\t\t\t0.00" T2
 }
 
 # printAbschluss
@@ -454,18 +445,64 @@ R e i n g e w i n n \t\t\t\t\t\t0.00
 proc printAbschluss {} {
   global tkofficeDir
   
+  set textWin .n.t3.abschlussT
   set reportsDir [file join $tkofficeDir reports]
   file mkdir $reportsDir
-  set abschlusstext [.n.t3.abschlussT get 1.0 end]
+  set abschlusstext [$textWin get 1.0 end]
   set jahr [.abschlussJahrSB get]
   set abschlussTxt [file join $reportsDir abschluss${jahr}.txt]
   append abschlussPs [file root $abschlussTxt] . ps
+  append abschlussPdf [file root $abschlussTxt] . pdf
   
-  #Write to text file
+  #1.Write to text file
   set chan [open $abschlussTxt w]
   puts $chan $abschlusstext
   close $chan
 
+
+  #2.Try screenshot > PDF
+  $textWin tag conf hide -elide 1
+  
+  ##move win to top & get visible window coords
+  $textWin yview moveto 0.0
+  set visibleFraction [$textWin yview]
+  set begVisible [lindex $visibleFraction 0] 
+  set endVisible [lindex $visibleFraction 1]
+  set totalLines [$textWin count -lines 1.0 end]
+  
+  #Test screenshot capability
+  if {[auto_execok xwd] != ""} {lappend missing xwd}
+  if {[auto_execok xwdtopnm] != ""} {lappend missing xwdtopnm}
+  if {[auto_execok pnmtops] != ""} {lappend missing {pnmtops (aus netpbm)}}
+  if {[auto_execok ps2pdf] != ""} {lappend missing {ps2pdf (aus GhostScript)}}
+  if [info exists missing] {
+    NewsHandler::QueryNews "Um Ausdrucke des Textfensters in hoher Qualität zu erzielen, müsssen Sie folgende fehlende Programme installieren: $missing.\nVorläufig können Sie die Textdatei $abschlussTxt in einem Textbearbeitungsprogramm nach Wunsch formatieren und dann ausdrucken." red
+    return 1
+  } 
+    
+  while {$endVisible < 1.0} {
+
+    takeScreenshot
+    
+    $textWin yview moveto $endVisible
+    set begVisible $endVisible
+    set endVisible [lindex [$textWin yview] 1]
+  }
+  
+  #After end is visible, hide top section for last remainder to avoid line duplication
+  set fraction [lindex [$textWin yview ] 0]
+  set begVisible [expr round($fraction * $lines] 
+  $textWin tag add hide 0.0 $begVisible
+  
+  proc takeScreenshot {} {
+    set winId [winfo id $textWin]
+    exec xwd -id $winId | xwdtopnm | pnmtops | ps2pdf > $abschlussPdf 
+    NewsHandler::QueryNews "Abschluss in $abschlussPdf gespeichert." green
+    return 0
+  }
+  
+  #TODO send PDF to printer
+   
   #Try converting to PS
   if {[auto_execok paps] == ""} {
     set path $abschlussTxt
@@ -490,7 +527,14 @@ proc printAbschluss {} {
 #### A R T I K E L V E R W A L T U N G
 ##################################################################################
 
+# resetArticleWin
+##called by ... in Artikel verwalten
 proc resetArticleWin {} {
+
+#this is already in GUI
+#  catch {namespace delete artikel}
+#  namespace eval artikel {}
+
   pack .confArtT .confArtM -in .n.t4.f1 -anchor w
   pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confartnameL .confArtTypeL -in .n.t4.f1 -side left
   pack .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
@@ -503,67 +547,61 @@ proc resetArticleWin {} {
 # setArticleLine
 ##sets Artikel line in New Invoice window
 ##set $args for Artikelverwaltung window
-##called by ? ?
+##called by ? + ?
 proc setArticleLine {tab} {
-  global db artPrice
+  global db
  
   .confArtTypeL conf -bg #c3c3c3
-  .mengeE delete 0 end
-#  .mengeE insert 0 "Menge"
-  .mengeE conf -bg beige
-
   
   if {$tab == "TAB4"} {
     set artNum [.confArtNumSB get]
 
   #Invoice Tab
   } elseif {$tab == "TAB2"} {
-
-    set artNum [.invArtNumSB get]
-    focus .invArtNumSB
-
+    .mengeE delete 0 end
+    .mengeE conf -bg beige
+    .mengeE conf -insertbackground orange -insertwidth 10 -insertborderwidth 5 -insertofftime 500 -insertontime 1000  
+    .mengeE conf -state normal -validate key -vcmd {string is double %P} -invcmd {%W conf -bg red; after 2000 {%W conf -bg beige}}
+    set artNum [.invartnumSB get]
+    focus .invartnumSB
   }
 
-
-#.mengeE delete 0 end
-.mengeE conf -insertbackground orange -insertwidth 10 -insertborderwidth 5 -insertofftime 500 -insertontime 1000  
-.mengeE conf -state normal -validate key -vcmd {string is double %P} -invcmd {%W conf -bg red; after 2000 {%W conf -bg beige}}
-
+#TODO this isnt working for TAB4!
   #Get data per line
-  set token [pg_exec $db "SELECT artname,artprice,artunit,arttype FROM artikel WHERE artnum=$artNum"]
-  set ::artName [lindex [pg_result $token -list] 0]
-  set ::artPrice [lindex [pg_result $token -list] 1]
-  set ::artUnit [lindex [pg_result $token -list] 2]
-  set ::artType [lindex [pg_result $token -list] 3]
+  namespace eval artikel {
+    set artNum [.invartnumSB get]
+    set token [pg_exec $db "SELECT artname,artprice,artunit,arttype FROM artikel WHERE artnum=$artNum"]
+    set artName [lindex [pg_result $token -list] 0]
+    set artPrice [lindex [pg_result $token -list] 1]
+    set artUnit [lindex [pg_result $token -list] 2]
+    set artType [lindex [pg_result $token -list] 3]
   
-    if {$::artType == "R"} {
+    if {$artType == "R"} {
       .mengeE delete 0 end
       .mengeE insert 0 "1"
       .mengeE conf -bg grey -fg silver -state readonly
       .confArtTypeL conf -bg yellow
      
-    } elseif {$::artType == "A"} {
+    } elseif {$artType == "A"} {
       .confArtTypeL conf -bg orange
-    } else {
-  #   .mengeE conf -state normal -bg beige -fg silver
     }
-    
+  }
+  
   if {$tab == "TAB4"} {
     return 0
   }
 
 #TODO get order right! 
- 
-    if {$::artPrice == 0} {
-      set ::artPrice [.invArtPriceE get]
+  namespace eval artikel {
+    if {$artPrice == 0} {
+      set artPrice [.invArtPriceE get]
       pack forget .invArtPriceL
       pack .invArtUnitL .invArtNameL .invArtPriceE .invArtTypeL -in .n.t2.f2 -side left   
-
     } else {
-    
       pack forget .invArtPriceE
       pack .invArtUnitL .invArtNameL .invArtPriceL .invArtTypeL -in .n.t2.f2 -side left
     }
+  }
   
   return 0
 
@@ -676,7 +714,7 @@ proc updateArticleList {} {
 
   #set spinbox article no. lists
   set token [pg_exec $db "SELECT artnum FROM artikel"] 
-  .invArtNumSB conf -values [pg_result $token -list]
+  .invartnumSB conf -values [pg_result $token -list]
   .confArtNumSB conf -values [pg_result $token -list]
 }
 

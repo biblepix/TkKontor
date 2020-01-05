@@ -179,7 +179,7 @@ message .totalM -width 70 -bg lightgreen -padx 20 -anchor w
 #Set up Artikelliste, fill later when connected to DB
 label .invArtlistL -text "Artikelliste" -font "TkHeadingFont"
 label .artL -text "Artikel Nr."
-spinbox .invArtNumSB -width 2 -command {setArticleLine TAB2}
+spinbox .invartnumSB -width 2 -command {setArticleLine TAB2}
 
 #Make invoiceFrame
 catch {frame .invoiceFrame}
@@ -244,15 +244,17 @@ message .confArtM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B.
 #These are packed/unpacked later by article procs
 label .confArtL -text "Artikel Nr."
 spinbox .confArtNumSB -width 5 -command {setArticleLine TAB4}
-label .confartnameL -padx 7 -width 25 -textvar artName -anchor w
-label .confArtPriceL -padx 10 -width 7 -textvar artPrice -anchor w
-label .confArtUnitL -padx 10 -width 7 -textvar artUnit -anchor w
-label .confArtTypeL -padx 10 -width 1 -textvar artType -anchor w
+namespace eval artikel {
+  label .confartnameL -padx 7 -width 25 -textvar artName -anchor w
+  label .confArtPriceL -padx 10 -width 7 -textvar artPrice -anchor w
+  label .confArtUnitL -padx 10 -width 7 -textvar artUnit -anchor w
+  label .confArtTypeL -padx 10 -width 1 -textvar artType -anchor w
+}
 button .confArtSaveB -text "Artikel speichern" -command {saveArticle}
 button .confArtDeleteB -text "Artikel löschen" -command {deleteArticle} -activebackground red
 button .confArtCreateB -text "Artikel erfassen" -command {createArticle}
 entry .confartnameE -bg beige
-entry .confartunitE -bg beige -textvar rabatt
+entry .confartunitE -bg beige -textvar artikel::rabatt
 entry .confartpriceE -bg beige
 ttk::checkbutton .confarttypeACB -text "Auslage"
 ttk::checkbutton .confarttypeRCB -text "Rabatt"
@@ -359,6 +361,8 @@ resetAdrWin
 resetNewInvDialog
 updateArticleList
 resetArticleWin
+
+#TODO can these be run only when Tab opened?
 setArticleLine TAB2
 setArticleLine TAB4
 setAbschlussjahrSB
