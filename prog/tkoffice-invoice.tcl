@@ -15,8 +15,10 @@ set itemFile [file join $texDir invitems.tex]
 # resetNewInvDialog
 ##called by Main + "Abbruch Rechnung"
 proc resetNewInvDialog {} {
-  #Cleanup ::rows & frame
+
+  #Cleanup ::rows, ::artikel & frame
   catch {namespace delete rows}
+  catch {namespace delete artikel}
   foreach w [pack slaves .invoiceFrame] {
     pack forget $w
   }
@@ -26,8 +28,8 @@ proc resetNewInvDialog {} {
     set bill 0
     set buch 0
     set auslage 0
-    catch {unset rabatt}
-    catch {unset rabattProzent}
+#    catch {unset rabatt}
+#    catch {unset rabattProzent}
   }
   
   updateArticleList

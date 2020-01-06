@@ -243,13 +243,14 @@ message .confArtM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B.
 
 #These are packed/unpacked later by article procs
 label .confArtL -text "Artikel Nr."
-spinbox .confArtNumSB -width 5 -command {setArticleLine TAB4}
+
 namespace eval artikel {
   label .confartnameL -padx 7 -width 25 -textvar artName -anchor w
   label .confArtPriceL -padx 10 -width 7 -textvar artPrice -anchor w
   label .confArtUnitL -padx 10 -width 7 -textvar artUnit -anchor w
   label .confArtTypeL -padx 10 -width 1 -textvar artType -anchor w
 }
+spinbox .confartnumSB -width 5 -command {setArticleLine TAB4}
 button .confArtSaveB -text "Artikel speichern" -command {saveArticle}
 button .confArtDeleteB -text "Artikel löschen" -command {deleteArticle} -activebackground red
 button .confArtCreateB -text "Artikel erfassen" -command {createArticle}

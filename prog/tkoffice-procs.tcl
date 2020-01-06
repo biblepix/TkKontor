@@ -439,16 +439,34 @@ Varia\t\t\t\t-0.00
   $t insert end "Reingewinn\t\t\t\t\t\t0.00" T2
 }
 
+# takeScreenshot
+##takes xwd/pnm picture(s) of Abschluss window & saves to $tmpDir
+##called by printAbschluss
+proc takeScreenshot {pageNo} {
+  global tmpDir
+  set pnmDir $tmpDir/tkoffice_pnm
+  file mkdir $pnmDir
+  set ::pnmDir $pnmDir
+  
+  set abschlussW .n.t3.abschlussT
+  set winId [winfo id $abschlussW]
+  
+  cd $pnmDir
+  #exec xwd -id $winId | xwdtopnm > abschluss_$pageNo.pnm
+  catch {exec xwd -id $winId | xwdtopnm > abschluss_$pageNo.pnm}
+  return 0
+}
+
 # printAbschluss
 ##a)exports text from Abschluss text widget and writes it to TEXT FILE
 ##b)tries printing via lpr
 proc printAbschluss {} {
-  global tkofficeDir
+  global tkofficeDir tmpDir pnmDir
   
-  set textWin .n.t3.abschlussT
+  set abschlussW .n.t3.abschlussT
   set reportsDir [file join $tkofficeDir reports]
   file mkdir $reportsDir
-  set abschlusstext [$textWin get 1.0 end]
+  set abschlusstext [$abschlussW get 1.0 end]
   set jahr [.abschlussJahrSB get]
   set abschlussTxt [file join $reportsDir abschluss${jahr}.txt]
   append abschlussPs [file root $abschlussTxt] . ps
@@ -461,48 +479,69 @@ proc printAbschluss {} {
 
 
   #2.Try screenshot > PDF
-  $textWin tag conf hide -elide 1
+  $abschlussW tag conf hide -elide 1
   
   ##move win to top & get visible window coords
-  $textWin yview moveto 0.0
-  set visibleFraction [$textWin yview]
+  $abschlussW yview moveto 0.0
+  set visibleFraction [$abschlussW yview]
   set begVisible [lindex $visibleFraction 0] 
   set endVisible [lindex $visibleFraction 1]
-  set totalLines [$textWin count -lines 1.0 end]
+  set totalLines [$abschlussW count -lines 1.0 end]
   
   #Test screenshot capability
-  if {[auto_execok xwd] != ""} {lappend missing xwd}
-  if {[auto_execok xwdtopnm] != ""} {lappend missing xwdtopnm}
-  if {[auto_execok pnmtops] != ""} {lappend missing {pnmtops (aus netpbm)}}
-  if {[auto_execok ps2pdf] != ""} {lappend missing {ps2pdf (aus GhostScript)}}
+  if {[auto_execok xwd] == ""} {lappend missing \nxwd}
+  if {[auto_execok xwdtopnm] == ""} {lappend missing \nxwdtopnm}
+  if {[auto_execok pnmtops] == ""} {lappend missing \n{pnmtops (aus Netpbm)}}
+  if {[auto_execok ps2pdf] == ""} {lappend missing \n{ps2pdf (aus GhostScript)}}
   if [info exists missing] {
-    NewsHandler::QueryNews "Um Ausdrucke des Textfensters in hoher Qualität zu erzielen, müsssen Sie folgende fehlende Programme installieren: $missing.\nVorläufig können Sie die Textdatei $abschlussTxt in einem Textbearbeitungsprogramm nach Wunsch formatieren und dann ausdrucken." red
+    NewsHandler::QueryNews "Um Ausdrucke des Textfensters in hoher Qualität zu erzielen, müsssen Sie folgende fehlende Programme installieren: $missing." orange
+    NewsHandler::QueryNews \nVorläufig können Sie die Textdatei $abschlussTxt in einem Textbearbeitungsprogramm nach Wunsch formatieren und dann ausdrucken." lightblue
     return 1
-  } 
-    
-  while {$endVisible < 1.0} {
+  }
 
-    takeScreenshot
+
+  set pageNo 0
+  
+  while {$endVisible < 1.0} {
     
-    $textWin yview moveto $endVisible
+    incr pageNo
+    takeScreenshot $pageNo
+    
+    $abschlussW yview moveto $endVisible
     set begVisible $endVisible
-    set endVisible [lindex [$textWin yview] 1]
+    set endVisible [lindex [$abschlussW yview] 1]
   }
   
   #After end is visible, hide top section for last remainder to avoid line duplication
-  set fraction [lindex [$textWin yview ] 0]
-  set begVisible [expr round($fraction * $lines] 
-  $textWin tag add hide 0.0 $begVisible
+  set fraction [lindex [$abschlussW yview ] 0]
+  set begVisible [expr round($fraction * $totalLines)] 
+  $abschlussW tag add hide 0.0 $begVisible.end
   
-  proc takeScreenshot {} {
-    set winId [winfo id $textWin]
-    exec xwd -id $winId | xwdtopnm | pnmtops | ps2pdf > $abschlussPdf 
-    NewsHandler::QueryNews "Abschluss in $abschlussPdf gespeichert." green
-    return 0
+  #Make one PDF from screenshot(s)
+  set pnmList [glob -directory $pnmDir *.pnm]
+#puts $pnmList
+
+#TODO geht nicht wegen Grösse!!!
+  set pnmtops [auto_execok pnmtops]
+#  set pnmdir $tmpDir/tkoffice_pnm
+#  cd $pnmDir
+  foreach f $pnmList {
+    catch {exec cat $f | $pnmtops -imagewidth 7  >> $tmpDir/abschluss2019.ps} 
   }
+#  foreach f $pnmList {
+#    set chan [open $f]
+#    set pnm [read $chan]
+#    close $chan
+#    puts $pnmChan $pnm
+#  }
+#  close $pnmChan
+  
+return
   
   #TODO send PDF to printer
-   
+  catch {exec ps2pdf > $abschlussPdf} 
+  NewsHandler::QueryNews "Abschluss als $abschlussPdf gespeichert." green
+
   #Try converting to PS
   if {[auto_execok paps] == ""} {
     set path $abschlussTxt
@@ -520,7 +559,7 @@ proc printAbschluss {} {
       NewsHandler::QueryNews "Datei konnte nicht gedruckt werden.\nSie finden den Jahresabschluss unter $abschlussPath zur weiteren Bearbeitung." orange
     }
   }
-}
+} ;#END printAbschluss
 
 
 ##################################################################################
@@ -531,12 +570,8 @@ proc printAbschluss {} {
 ##called by ... in Artikel verwalten
 proc resetArticleWin {} {
 
-#this is already in GUI
-#  catch {namespace delete artikel}
-#  namespace eval artikel {}
-
   pack .confArtT .confArtM -in .n.t4.f1 -anchor w
-  pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confartnameL .confArtTypeL -in .n.t4.f1 -side left
+  pack .confArtL .confartnumSB .confArtUnitL .confArtPriceL .confartnameL .confArtTypeL -in .n.t4.f1 -side left
   pack .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
   pack forget .confArtSaveB .confarttypeACB .confarttypeRCB
   pack forget .confartnameE .confartunitE .confartpriceE
@@ -545,18 +580,16 @@ proc resetArticleWin {} {
 }
 
 # setArticleLine
-##sets Artikel line in New Invoice window
-##set $args for Artikelverwaltung window
-##called by ? + ?
+##sets Artikel line in New Invoice window + Artikelverwaltung
+##needs TAB2 / TAB4 args
+##called by GUI + spinboxes .confartnumSB/.invartnumSB
 proc setArticleLine {tab} {
   global db
- 
   .confArtTypeL conf -bg #c3c3c3
   
   if {$tab == "TAB4"} {
-    set artNum [.confArtNumSB get]
-
-  #Invoice Tab
+    set artNum [.confartnumSB get]
+    
   } elseif {$tab == "TAB2"} {
     .mengeE delete 0 end
     .mengeE conf -bg beige
@@ -565,11 +598,20 @@ proc setArticleLine {tab} {
     set artNum [.invartnumSB get]
     focus .invartnumSB
   }
+  
+  #Read spinboxes
+  if {$tab == "TAB2"} {
+    namespace eval artikel {
+      set artNum [.invartnumSB get]
+    }
+  } else {
+    namespace eval artikel {
+      set artNum [.confartnumSB get]
+    }
+  }
 
-#TODO this isnt working for TAB4!
-  #Get data per line
+  #Get DB data per line
   namespace eval artikel {
-    set artNum [.invartnumSB get]
     set token [pg_exec $db "SELECT artname,artprice,artunit,arttype FROM artikel WHERE artnum=$artNum"]
     set artName [lindex [pg_result $token -list] 0]
     set artPrice [lindex [pg_result $token -list] 1]
@@ -581,7 +623,6 @@ proc setArticleLine {tab} {
       .mengeE insert 0 "1"
       .mengeE conf -bg grey -fg silver -state readonly
       .confArtTypeL conf -bg yellow
-     
     } elseif {$artType == "A"} {
       .confArtTypeL conf -bg orange
     }
@@ -611,8 +652,8 @@ proc createArticle {} {
   global db
 
  #clear previous entries & add .confArtSaveB
-  .confArtNumSB set ""
-  .confArtNumSB conf -bg lightgrey
+  .confartnumSB set ""
+  .confartnumSB conf -bg lightgrey
   pack .confArtSaveB -in .n.t4.f1 -side right
    
 #TODO:move to GUI?
@@ -683,7 +724,7 @@ proc saveArticle {} {
     pack forget $w
   }
 
-pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confartnameL .confArtTypeL -in .n.t4.f1 -side left
+pack .confArtL .confartnumSB .confArtUnitL .confArtPriceL .confartnameL .confArtTypeL -in .n.t4.f1 -side left
 #pack .confArtSaveB .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
 #  pack .confArtNameL .confArtPriceL .confArtUnitL .confArtTypeL -in .n.t4.f1 -side left
   
@@ -697,7 +738,7 @@ pack .confArtL .confArtNumSB .confArtUnitL .confArtPriceL .confartnameL .confArt
 # deleteArticle
 proc deleteArticle {} {
   global db
-  set artNo [.confArtNumSB get]
+  set artNo [.confartnumSB get]
   set res [tk_messageBox -message "Wollen Sie Artikel $artNo wirklich löschen?" -type yesno]
   if {$res == "yes"} {
     set token [pg_exec $db "DELETE FROM artikel WHERE artnum=$artNo"]
@@ -715,7 +756,7 @@ proc updateArticleList {} {
   #set spinbox article no. lists
   set token [pg_exec $db "SELECT artnum FROM artikel"] 
   .invartnumSB conf -values [pg_result $token -list]
-  .confArtNumSB conf -values [pg_result $token -list]
+  .confartnumSB conf -values [pg_result $token -list]
 }
 
 
