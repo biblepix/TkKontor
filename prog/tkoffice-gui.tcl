@@ -216,17 +216,16 @@ pack .abbruchB -in .bottomF -side right
 # T A B  3 :  A B S C H L Ü S S E
 ######################################################################################
 
-label .abschlussL -justify left -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch.\nDie Auslagen und der Reingewinn sind von Hand zu berechnen und einzutragen.\nDer Ausdruck erfolgt nach PostScript bzw. Reintext."
+message .abschlussM -justify left -width 800 -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch.\nDie Auslagen und der Reingewinn sind von Hand zu berechnen und einzutragen. Die Auslagen können in der Vorlagedatei '$auslagenTxt' angepasst werden.\nDer Ausdruck erfolgt phototechnisch; dazu müssen die Programme GhostScript und Netpbm installiert sein. Andernfalls steht der Text als Reintext in $reportDir zur weiteren Bearbeitung zur Verfügung."
 button .abschlussErstellenB -text "Abschluss erstellen" -command {createAbschluss}
 button .printAbschlussB -text "Abschluss drucken" -command {printAbschluss}
 spinbox .abschlussJahrSB -width 4
-
 
 message .news -textvar news -width 1000 -relief sunken -pady 5 -padx 10 -justify center -anchor n
 pack [frame .n.t3.bottomF.f2] -side bottom -fill x
 pack [frame .n.t3.bottomF.f1] -side bottom -fill x
 pack .abschlussJahrSB .abschlussErstellenB -in .n.t3.bottomF.f1 -side right -fill x
-pack .abschlussL -in .n.t3.bottomF.f1 -side left
+pack .abschlussM -in .n.t3.bottomF.f1 -side left
 
 #Execute initial commands if connected to DB
 catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res

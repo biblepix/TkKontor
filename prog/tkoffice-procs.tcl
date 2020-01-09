@@ -375,7 +375,7 @@ proc setAbschlussjahrSB {} {
 
 #TODO 
 proc createAbschluss {} {
-  global db myComp currency
+  global db myComp currency auslagenTxt
 
   set jahr [.abschlussJahrSB get]
 	#put Jahr's abschluss in array
@@ -402,14 +402,14 @@ proc createAbschluss {} {
 	pack .printAbschlussB -in .n.t3 -side top -anchor se
 	
   #Configure font tags	
-  $t tag conf T2 -font "TkCaptionFont 16 bold"
   $t tag conf T1 -font "TkHeadingFont 20"
-  $t tag conf T3 -font "TkSmallCaptionFont 12"
+  $t tag conf T2 -font "TkCaptionFont 16"
+  $t tag conf T3 -font "TkSmallCaptionFont 10 bold"
   
   #B u i l d   w i n d o w
 	$t insert 1.0 "$myComp\n" T1
 	$t insert end "Erfolgsrechnung $jahr\n\n" T1
-  $t insert end "Einnahmen\n\n" T2
+  $t insert end "Einnahmen\n" T2
   $t insert end "Rch.Nr.\tDatum\tAnschrift\t\tBetrag $currency\tBezahlt $currency\tTotal $currency\n" T3
 	
 	#compute sum total & insert text lines
@@ -419,83 +419,106 @@ proc createAbschluss {} {
 		  
 		$t insert end "\n$j($no,f_number)\t$j($no,f_date)\t$j($no,addressheader)\t\t$j($no,finalsum)\t$j($no,payedsum)"
 	}
-
 	$t insert end "\n\Einnahmen total\t\t\t\t\t\t $sumtotal" T3
+	
+  #load Auslagen file
+  set chan [open $auslagenTxt]
+  set auslagen [read $chan]
+  close $chan
+  
 	$t insert end "\n\nAuslagen\n" T2
-  $t insert end "
-Büromiete\t\t\t\t-0.00
-Abschr. Büroeinrichtung\t\t\t\t-0.00
-Providergebühr\t\t\t\t0.00
-Web-Hosting-Jahresgebühr\t\t\t\t-0.00
-Telefongebühren Grundtaxe & Gespräche\t\t\t\t-0.00
-Postwertzeichen\t\t\t\t-0.00
-Berufsfahrten\t\t\t\t-0.00
-Bürobedarf\t\t\t\t-0.00
-Beglaubigungen\t\t\t\t-0.00
-Varia\t\t\t\t-0.00
-Varia\t\t\t\t-0.00
-"
+  $t insert end "\n${auslagen}"
   $t insert end "\nAuslagen total\t\t\t\t\t\t-0.00\n\n" T3
   $t insert end "Reingewinn\t\t\t\t\t\t0.00" T2
 }
 
-# takeScreenshot
-##takes xwd/pnm picture(s) of Abschluss window & saves to $tmpDir
-##called by printAbschluss
-proc takeScreenshot {pageNo} {
-  global tmpDir
-  set pnmDir $tmpDir/tkoffice_pnm
-  file mkdir $pnmDir
-  set ::pnmDir $pnmDir
+#
+ # Capture a window into an image
+ # Author: David Easton
+ #
+
+proc captureWindow {win} {
+  global tmpDir reportDir
   
-  set abschlussW .n.t3.abschlussT
-  set winId [winfo id $abschlussW]
+  set ppmDir $tmpDir/tkoffice_ppm
+  file mkdir $ppmDir
+  set ppmFile [file join $ppmDir abschluss.ppm]
+
+  #create base image with defined height and width
+  image create photo abschlussPpm -height 100 -width 100
+
+  ##move win to top & get visible window coords
+  $win yview moveto 0.0
+  set visibleFraction [$win yview]
+  set begVisible [lindex $visibleFraction 0] 
+  set endVisible [lindex $visibleFraction 1]
+  set totalLines [$win count -lines 1.0 end]
   
-  cd $pnmDir
-  #exec xwd -id $winId | xwdtopnm > abschluss_$pageNo.pnm
-  catch {exec xwd -id $winId | xwdtopnm > abschluss_$pageNo.pnm}
-  return 0
-}
+  while {$endVisible < 1.0} {
+
+    captureWindow $win $pageNo
+    
+    $win yview moveto $endVisible
+    set begVisible $endVisible
+    set endVisible [lindex [$win yview] 1]
+  
+  
+  #TODO check hiding seen part!!!
+  #After end is visible, hide top section for last remainder to avoid line duplication
+  set fraction [lindex [$win yview ] 0]
+  set begVisible [expr round($fraction * $totalLines)] 
+  $win tag add hide 0.0 $begVisible.end
+  
+  set abschlussPart [image create photo -format window -data $win]
+  set width [image width $abschlussPpm]
+  set height [image height $abschlussPpm]
+  #append new img at bottom
+	$abschlussPpm copy $abschlussPart to $width $height  
+	}
+	 
+  $abschlussPpm write -format PPM $ppmFile
+  $abschlussPpm write -format PNG $abschlussPng
+
+} ;#END captureWindow
+ 
 
 # printAbschluss
 ##a)exports text from Abschluss text widget and writes it to TEXT FILE
 ##b)tries printing via lpr
 proc printAbschluss {} {
-  global tkofficeDir tmpDir pnmDir
+  global tkofficeDir tmpDir pnmDir 
   
-  set abschlussW .n.t3.abschlussT
+  set win .n.t3.abschlussT
   set reportsDir [file join $tkofficeDir reports]
   file mkdir $reportsDir
-  set abschlusstext [$abschlussW get 1.0 end]
+  set abschlusstext [$win get 1.0 end]
   set jahr [.abschlussJahrSB get]
   set abschlussTxt [file join $reportsDir abschluss${jahr}.txt]
-  append abschlussPs [file root $abschlussTxt] . ps
+ # append abschlussPs [file root $abschlussTxt] . ps
   append abschlussPdf [file root $abschlussTxt] . pdf
+  append abschlussPng [file root $abschlussTxt] . png
+  set win .n.t3.abschlussT
   
   #1.Write to text file
   set chan [open $abschlussTxt w]
   puts $chan $abschlusstext
   close $chan
 
-
-  #2.Try screenshot > PDF
-  $abschlussW tag conf hide -elide 1
+  #2.Try screenshot, hiding last top win from last page to avoid doubling
+  $win tag conf hide -elide 1
   
   ##move win to top & get visible window coords
-  $abschlussW yview moveto 0.0
-  set visibleFraction [$abschlussW yview]
+  $win yview moveto 0.0
+  set visibleFraction [$win yview]
   set begVisible [lindex $visibleFraction 0] 
   set endVisible [lindex $visibleFraction 1]
-  set totalLines [$abschlussW count -lines 1.0 end]
-  
-  #Test screenshot capability
-  if {[auto_execok xwd] == ""} {lappend missing \nxwd}
-  if {[auto_execok xwdtopnm] == ""} {lappend missing \nxwdtopnm}
-  if {[auto_execok pnmtops] == ""} {lappend missing \n{pnmtops (aus Netpbm)}}
-  if {[auto_execok ps2pdf] == ""} {lappend missing \n{ps2pdf (aus GhostScript)}}
-  if [info exists missing] {
-    NewsHandler::QueryNews "Um Ausdrucke des Textfensters in hoher Qualität zu erzielen, müsssen Sie folgende fehlende Programme installieren: $missing." orange
-    NewsHandler::QueryNews \nVorläufig können Sie die Textdatei $abschlussTxt in einem Textbearbeitungsprogramm nach Wunsch formatieren und dann ausdrucken." lightblue
+  set totalLines [$win count -lines 1.0 end]
+
+  #Check presence of Netpbm & GhostScript  
+  if {[auto_execok ps2pdf] == ""} {lappend missing {ps2pdf (aus GhostScript)}}
+  if {[auto_execok ppmtopgm] == ""} {lappend missing Netpbm} {
+    NewsHandler::QueryNews "Für Ausdrucke in hoher Qualität muss '$missing' installiert sein." orange
+    NewsHandler::QueryNews "Sie können vorläufig die Textdatei $abschlussTxt in einem Textbearbeitungsprogramm nach Wunsch formatieren und ausdrucken." lightblue
     return 1
   }
 
@@ -504,29 +527,39 @@ proc printAbschluss {} {
   
   while {$endVisible < 1.0} {
     
-    incr pageNo
-    takeScreenshot $pageNo
+#    incr pageNo
+    captureWindow $win $pageNo
     
-    $abschlussW yview moveto $endVisible
+    $win yview moveto $endVisible
     set begVisible $endVisible
-    set endVisible [lindex [$abschlussW yview] 1]
+    set endVisible [lindex [$win yview] 1]
   }
   
   #After end is visible, hide top section for last remainder to avoid line duplication
-  set fraction [lindex [$abschlussW yview ] 0]
+  set fraction [lindex [$win yview ] 0]
   set begVisible [expr round($fraction * $totalLines)] 
-  $abschlussW tag add hide 0.0 $begVisible.end
+  $win tag add hide 0.0 $begVisible.end
   
-  #Make one PDF from screenshot(s)
-  set pnmList [glob -directory $pnmDir *.pnm]
-#puts $pnmList
+  #Try saving to PS&PDF - TODO clarify paths
+  catch {exec pnmtops $abschlussPpm > $abschlussPs}
+  catch {exec ps2pdf $abschlussPs}
+
+	#check results 
+	if [file exists $abschlussPng] {append fileList "\n[file tail $abschlussPng]"}
+	if [file exists $abschlussPs] {append fileList "\n[file tail $abschlussPs]"}
+	if [file exists $abschlussPdf] {append fileList "\n[file tail $abschlussPdf"}
+	if {$fileList == ""} {set fileList $abschlussPpm; set extra "\nFür ein besseres Resultat müssen Netpbm und GhostScript installiert sein."} {set extra ""}
+  NewsHandler::QueryNews "Der Jahresabschluss konnte unter folgenden Formaten in $reportDir gespeichert werden: $fileList $extra" green 
+
+
 
 #TODO geht nicht wegen Grösse!!!
   set pnmtops [auto_execok pnmtops]
 #  set pnmdir $tmpDir/tkoffice_pnm
 #  cd $pnmDir
   foreach f $pnmList {
-    catch {exec cat $f | $pnmtops -imagewidth 7  >> $tmpDir/abschluss2019.ps} 
+    catch {
+    exec cat $f | $pnmtops -imagewidth 7  >> $tmpDir/abschluss2019.ps} 
   }
 #  foreach f $pnmList {
 #    set chan [open $f]
