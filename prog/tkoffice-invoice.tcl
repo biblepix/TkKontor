@@ -951,7 +951,8 @@ puts "status $status"
 	# S a v e  totalPayedsum  to 'invoice' 
   set token1 [pg_exec $db "UPDATE invoice 
     SET payedsum = $totalPayedsum, 
-    ts = $status 
+    ts = $status,
+    payeddate = "select current_timestamp::timestamp::date"
     WHERE f_number=$invNo"]
 
   #Update GUI    

@@ -469,8 +469,10 @@ proc createAbschluss {} {
 		set VAT $j($no,vatlesssum)
 		if {$VAT == "" || ! $VAT >= 0} {
   		set VAT ""
+  		set vatlesssum $finalsum
 		} else {
   		set VAT [expr $j($no,finalsum) - $j($no,vatlesssum)]
+  		 
   	}
 		##compute auslagen
 		set auslage $j($no,auslage)
@@ -478,7 +480,7 @@ proc createAbschluss {} {
 		  set auslage ""
 	  }
 		
-		$t insert end "\n$j($no,f_number)\t$j($no,f_date)\t$j($no,addressheader)\t\t$j($no,vatlesssum)\t$j($no,payedsum)\t$VAT\t$auslage"
+		$t insert end "\n$j($no,f_number)\t$j($no,f_date)\t$j($no,addressheader)\t\t$vatlesssum)\t$j($no,payedsum)\t$VAT\t$auslage"
 	}
 	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
 	
