@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 2jan20
+# Restored: 10jan20
 
 set version 1.0
 
@@ -21,7 +21,8 @@ label .titelL -text "Auftragsverwaltung" -pady $py -padx $px -font "TkHeadingFon
 catch setMyLogo
 
 #Create Notebook
-ttk::notebook .n -width 1400
+set screenX [winfo screenwidth .]
+ttk::notebook .n -width [expr ($screenX/10) * 9]
 .n add [frame .n.t1] -text "Adressen + Aufträge"
 .n add [frame .n.t2] -text "Neue Rechnung"
 .n add [frame .n.t3] -text "Jahresabschlüsse"
@@ -216,16 +217,17 @@ pack .abbruchB -in .bottomF -side right
 # T A B  3 :  A B S C H L Ü S S E
 ######################################################################################
 
-message .abschlussM -justify left -width 800 -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch.\nDie Auslagen und der Reingewinn sind von Hand zu berechnen und einzutragen. Die Auslagen können in der Vorlagedatei '$auslagenTxt' angepasst werden.\nDer Ausdruck erfolgt phototechnisch; dazu müssen die Programme GhostScript und Netpbm installiert sein. Andernfalls steht der Text als Reintext in $reportDir zur weiteren Bearbeitung zur Verfügung."
-button .abschlussErstellenB -text "Abschluss erstellen" -command {createAbschluss}
+message .abschlussM -justify left -width 1000 -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch. Die Auslagen und der Reingewinn sind von Hand zu berechnen und einzutragen. Die Auslagen können in der Vorlagedatei '$auslagenTxt' angepasst werden. Der Ausdruck erfolgt phototechnisch; dazu müssen die Programme GhostScript und Netpbm installiert sein. Andernfalls steht der Text als Reintext in $reportDir zur weiteren Bearbeitung zur Verfügung."
+button .createAbschlussB -text "Abschluss erstellen" -command {createAbschluss}
 button .printAbschlussB -text "Abschluss drucken" -command {printAbschluss}
 spinbox .abschlussJahrSB -width 4
-
 message .news -textvar news -width 1000 -relief sunken -pady 5 -padx 10 -justify center -anchor n
-pack [frame .n.t3.bottomF.f2] -side bottom -fill x
-pack [frame .n.t3.bottomF.f1] -side bottom -fill x
-pack .abschlussJahrSB .abschlussErstellenB -in .n.t3.bottomF.f1 -side right -fill x
-pack .abschlussM -in .n.t3.bottomF.f1 -side left
+pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
+pack [frame .n.t3.mainF -padx 15 -pady 15] -fill x
+pack [frame .n.t3.botF] -fill x
+
+pack .abschlussJahrSB .createAbschlussB -in .n.t3.topF -side right
+pack .abschlussM -in .n.t3.topF -side left
 
 #Execute initial commands if connected to DB
 catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res

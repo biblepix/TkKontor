@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 5jan20
+# Restored: 10jan20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -370,36 +370,82 @@ proc setAbschlussjahrSB {} {
   lappend jahresliste $heuer
    
   .abschlussJahrSB conf -values [lsort -decreasing $jahresliste]
-  #.abschlussJahrSB set $heuer
+  .abschlussJahrSB set [expr $heuer - 1]
 }
 
 #TODO 
 proc createAbschluss {} {
-  global db myComp currency auslagenTxt
+  global db myComp currency vat auslagenTxt
 
+  #Avoid empty vat column
+  if {$vat == 0} {set vatColumn ""} {set vatColumn "\tMwst. ${vat}%"}
+  
   set jahr [.abschlussJahrSB get]
-	#put Jahr's abschluss in array
-#get date from 'invoice'
-	set res [pg_exec $db "SELECT f_number,f_date,addressheader,finalsum,payedsum FROM invoice WHERE EXTRACT(YEAR from f_date) = $jahr ORDER BY f_number ASC"]
+  set t .abschlussT
+	
+#TODO incorporate saving 'payeddate' into savePayment
+
+	#get data from $jahr's invoices + 'payeddate = $jahr' from any previous invoices
+	set res [pg_exec $db "SELECT 
+	f_number,
+	f_date,
+	addressheader,
+	finalsum,
+	vatlesssum,
+	payedsum,
+	auslage FROM invoice 
+	WHERE EXTRACT(YEAR from payeddate) = $jahr OR EXTRACT(YEAR from f_date) = $jahr 
+	ORDER BY f_number ASC"]
+	
+	#save result to var
+	if {[pg_result $res -error] != ""} {
+	  NewsHandler::QueryNews "[pg_result $res -error]" red
+	  return 1
+  }
+	  
 	pg_result $res -assign j
 	set maxTuples [pg_result $res -numTuples]
 
-	#make text widget - TODO: try canvas instead and convert to postscript!!!
-	set t .n.t3.abschlussT
-	catch {text $t -width 700 -height [expr $maxTuples + 30]}
+	#Make text widget to fit A4 landscape
+	##A4= 210x297mm = 100x141.42857 %
+	##scaling: 1.0=72in
+	set scaling [tk scaling]
+#	set dpi [expr $scaling * 72]
+#	set A4YIn [expr 21.0 / 2.54]
+#	set A4XIn  [expr 29.7 / 2.54]
+#	set marginIn [expr $A4XIn / 10]
+#	set winX [expr round(($A4XIn - $marginIn) * $dpi)]
+#	set winY [expr round(($A4YIn - $marginIn) * $dpi)]
+	
+	#vom Verhältnis ausgehend * Tk scaling factor
+	##requires LETTER widths!
+	set winHeight 35
+	set winWidth  [expr round(3.5 * $winHeight)]
+	set winY [expr round($winHeight * $scaling)]
+	set winX [expr round($winWidth * $scaling)]
+
+  #Make text widget & scroll bar
+  catch {text $t -width $winX -height $winY}
+  catch {scrollbar .abschlussScr -orient vertical}
+  $t conf -border 3 -relief sunken -yscrollcommand {.abschlussScr set} 
+  .abschlussScr conf -command {.abschlussT yview}
+  #Pack all
+	pack $t -in .n.t3.mainF -side left -anchor n -fill x
+	pack .abschlussScr -in .n.t3.mainF -side left -fill y
+	pack .printAbschlussB -in .n.t3.botF -anchor se
+
   $t delete 1.0 end
   
-  #Compute tabs for landscape layout (c=cm) -TODO these are not exported correctly! , only useful for GUI layout
+  #Compute tabs for landscape layout (c=cm)
 	$t configure -tabs {
 	15m
 	40m
 	10c
-	20c numeric
-	23c numeric
-	26c numeric
+	15c numeric
+	18c numeric
+	21c numeric
+	24c numeric
   }
-	pack $t -anchor nw
-	pack .printAbschlussB -in .n.t3 -side top -anchor se
 	
   #Configure font tags	
   $t tag conf T1 -font "TkHeadingFont 20"
@@ -410,16 +456,31 @@ proc createAbschluss {} {
 	$t insert 1.0 "$myComp\n" T1
 	$t insert end "Erfolgsrechnung $jahr\n\n" T1
   $t insert end "Einnahmen\n" T2
-  $t insert end "Rch.Nr.\tDatum\tAnschrift\t\tBetrag $currency\tBezahlt $currency\tTotal $currency\n" T3
+  $t insert end "Rch.Nr.\tDatum\tAnschrift\t\tNettobetrag $currency\tBezahlt $currency $vatColumn \tAuslage\tTotal $currency\n" T3
 	
+#TODO jesch balagan: 'finalsum' is exclusive vat & Auslagen - so why list Auslagen?
+
 	#compute sum total & insert text lines
 	for {set no 0;set sumtotal 0} {$no <$maxTuples} {incr no} {
 		set total $j($no,payedsum)
 		catch {set sumtotal [expr $sumtotal + $total]}
-		  
-		$t insert end "\n$j($no,f_number)\t$j($no,f_date)\t$j($no,addressheader)\t\t$j($no,finalsum)\t$j($no,payedsum)"
+		
+		##compute vat
+		set VAT $j($no,vatlesssum)
+		if {$VAT == "" || ! $VAT >= 0} {
+  		set VAT ""
+		} else {
+  		set VAT [expr $j($no,finalsum) - $j($no,vatlesssum)]
+  	}
+		##compute auslagen
+		set auslage $j($no,auslage)
+		if ![string is double $auslage] {
+		  set auslage ""
+	  }
+		
+		$t insert end "\n$j($no,f_number)\t$j($no,f_date)\t$j($no,addressheader)\t\t$j($no,vatlesssum)\t$j($no,payedsum)\t$VAT\t$auslage"
 	}
-	$t insert end "\n\Einnahmen total\t\t\t\t\t\t $sumtotal" T3
+	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
 	
   #load Auslagen file
   set chan [open $auslagenTxt]
@@ -428,8 +489,8 @@ proc createAbschluss {} {
   
 	$t insert end "\n\nAuslagen\n" T2
   $t insert end "\n${auslagen}"
-  $t insert end "\nAuslagen total\t\t\t\t\t\t-0.00\n\n" T3
-  $t insert end "Reingewinn\t\t\t\t\t\t0.00" T2
+  $t insert end "\nAuslagen total\t\t\t\t\t\t\t-0.00\n\n" T3
+  $t insert end "Reingewinn\t\t\t\t\t\t\t0.00" T2
 }
 
 #
