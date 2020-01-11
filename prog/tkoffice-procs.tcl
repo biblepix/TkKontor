@@ -376,10 +376,8 @@ proc setAbschlussjahrSB {} {
 #TODO 
 proc createAbschluss {} {
   global db myComp currency vat auslagenTxt
+global j
 
-  #Avoid empty vat column
-  if {$vat == 0} {set vatColumn ""} {set vatColumn "\tMwst. ${vat}%"}
-  
   set jahr [.abschlussJahrSB get]
   set t .abschlussT
 	
@@ -394,7 +392,8 @@ proc createAbschluss {} {
 	vatlesssum,
 	payedsum,
 	auslage FROM invoice 
-	WHERE EXTRACT(YEAR from payeddate) = $jahr OR EXTRACT(YEAR from f_date) = $jahr 
+	WHERE EXTRACT(YEAR from payeddate) = $jahr 
+	OR EXTRACT(YEAR from f_date) = $jahr 
 	ORDER BY f_number ASC"]
 	
 	#save result to var
@@ -403,8 +402,28 @@ proc createAbschluss {} {
 	  return 1
   }
 	  
-	pg_result $res -assign j
+	pg_result $res -assign ::j
 	set maxTuples [pg_result $res -numTuples]
+
+  #Avoid empty vat column
+  if {$vat == 0} {
+    set vatColumn \t} {
+    set vatColumn "\tMwst. ${vat}%"
+  }
+
+  #Avoid empty Auslage column
+  	for {set no 0} {$no <$maxTuples} {incr no} {
+	  	set auslage $j($no,auslage)
+	puts $auslage
+	
+	  	if {$auslage != "" && $auslage > 0 } {
+	  	  set auslageCol "\tAuslage"
+	  	  set auslageYesh 1
+	  	} {
+	  	  set auslageCol \t
+	  	  set auslageYesh 0
+  	  }
+  	}  
 
 	#Make text widget to fit A4 landscape
 	##A4= 210x297mm = 100x141.42857 %
@@ -456,31 +475,37 @@ proc createAbschluss {} {
 	$t insert 1.0 "$myComp\n" T1
 	$t insert end "Erfolgsrechnung $jahr\n\n" T1
   $t insert end "Einnahmen\n" T2
-  $t insert end "Rch.Nr.\tDatum\tAnschrift\t\tNettobetrag $currency\tBezahlt $currency $vatColumn \tAuslage\tTotal $currency\n" T3
+  $t insert end "Rch.Nr.\tDatum\tAnschrift\t\tNettobetrag $currency\tBezahlt $currency $vatColumn $auslageCol\tTotal $currency\n" T3
 	
 #TODO jesch balagan: 'finalsum' is exclusive vat & Auslagen - so why list Auslagen?
 
+
+  	
 	#compute sum total & insert text lines
 	for {set no 0;set sumtotal 0} {$no <$maxTuples} {incr no} {
 		set total $j($no,payedsum)
 		catch {set sumtotal [expr $sumtotal + $total]}
 		
-		##compute vat
+		##compute Mwst
 		set VAT $j($no,vatlesssum)
+		set finalsum $j($no,finalsum)
+		
 		if {$VAT == "" || ! $VAT >= 0} {
   		set VAT ""
   		set vatlesssum $finalsum
 		} else {
-  		set VAT [expr $j($no,finalsum) - $j($no,vatlesssum)]
-  		 
+  		set VAT "\t[expr $finalsum - $vatlesssum]"
   	}
-		##compute auslagen
-		set auslage $j($no,auslage)
-		if ![string is double $auslage] {
-		  set auslage ""
+  	
+		##set auslagen tab if any found
+		if {$auslageYesh} {
+  		set auslage "\t$j($no,auslage)"
+	    if ![string is double $auslage] {
+		    set auslage ""
+		  }
 	  }
 		
-		$t insert end "\n$j($no,f_number)\t$j($no,f_date)\t$j($no,addressheader)\t\t$vatlesssum)\t$j($no,payedsum)\t$VAT\t$auslage"
+		$t insert end "\n$j($no,f_number)\t$j($no,f_date)\t$j($no,addressheader)\t\t$vatlesssum\t$j($no,payedsum) $VAT $auslage"
 	}
 	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
 	

@@ -217,7 +217,7 @@ pack .abbruchB -in .bottomF -side right
 # T A B  3 :  A B S C H L Ü S S E
 ######################################################################################
 
-message .abschlussM -justify left -width 1000 -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch. Die Auslagen und der Reingewinn sind von Hand zu berechnen und einzutragen. Die Auslagen können in der Vorlagedatei '$auslagenTxt' angepasst werden. Der Ausdruck erfolgt phototechnisch; dazu müssen die Programme GhostScript und Netpbm installiert sein. Andernfalls steht der Text als Reintext in $reportDir zur weiteren Bearbeitung zur Verfügung."
+message .abschlussM -justify left -width 1000 -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch. Die Auslagen und der Reingewinn sind von Hand zu berechnen und einzutragen. Die Auslagen können in der Vorlagedatei '$auslagenTxt' angepasst werden. Mehrwertsteuer und kundenspezifische Auslagen erscheinen neben der Rechnung, wenn der Betrag über 0 ist.\nDer Ausdruck erfolgt phototechnisch nach PNG. Für PDF muss das Programme GhostScript installiert sein. Der rohe Text steht in $reportDir zur weiteren Bearbeitung zur Verfügung."
 button .createAbschlussB -text "Abschluss erstellen" -command {createAbschluss}
 button .printAbschlussB -text "Abschluss drucken" -command {printAbschluss}
 spinbox .abschlussJahrSB -width 4
