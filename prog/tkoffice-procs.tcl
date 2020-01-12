@@ -376,13 +376,9 @@ proc setAbschlussjahrSB {} {
 #TODO 
 proc createAbschluss {} {
   global db myComp currency vat auslagenTxt
-global j
-
   set jahr [.abschlussJahrSB get]
   set t .abschlussT
 	
-#TODO incorporate saving 'payeddate' into savePayment
-
 	#get data from $jahr's invoices + 'payeddate = $jahr' from any previous invoices
 	set res [pg_exec $db "SELECT 
 	f_number,
@@ -402,28 +398,28 @@ global j
 	  return 1
   }
 	  
-	pg_result $res -assign ::j
+	pg_result $res -assign j
 	set maxTuples [pg_result $res -numTuples]
 
   #Avoid empty vat column
-  if {$vat == 0} {
-    set vatColumn \t} {
-    set vatColumn "\tMwst. ${vat}%"
-  }
+#  if {$vat == 0} {
+#    set vatColumn \t} {
+#    set vatColumn "\tMwst. ${vat}%"
+#  }
 
   #Avoid empty Auslage column
-  	for {set no 0} {$no <$maxTuples} {incr no} {
-	  	set auslage $j($no,auslage)
-	puts $auslage
-	
-	  	if {$auslage != "" && $auslage > 0 } {
-	  	  set auslageCol "\tAuslage"
-	  	  set auslageYesh 1
-	  	} {
-	  	  set auslageCol \t
-	  	  set auslageYesh 0
-  	  }
-  	}  
+#  	for {set no 0} {$no <$maxTuples} {incr no} {
+#	  	set auslage $j($no,auslage)
+#	puts $auslage
+#	
+#	  	if {$auslage != "" && $auslage > 0 } {
+#	  	  set auslageCol "\tAuslage"
+#	  	  set auslageYesh 1
+#	  	} {
+#	  	  set auslageCol \t
+#	  	  set auslageYesh 0
+#  	  }
+#  	}  
 
 	#Make text widget to fit A4 landscape
 	##A4= 210x297mm = 100x141.42857 %
@@ -446,7 +442,7 @@ global j
   #Make text widget & scroll bar
   catch {text $t -width $winX -height $winY}
   catch {scrollbar .abschlussScr -orient vertical}
-  $t conf -border 3 -relief sunken -yscrollcommand {.abschlussScr set} 
+  $t conf -padx 10 -pady 10 -borderwidth 0 -yscrollcommand {.abschlussScr set} 
   .abschlussScr conf -command {.abschlussT yview}
   #Pack all
 	pack $t -in .n.t3.mainF -side left -anchor n -fill x
@@ -475,11 +471,9 @@ global j
 	$t insert 1.0 "$myComp\n" T1
 	$t insert end "Erfolgsrechnung $jahr\n\n" T1
   $t insert end "Einnahmen\n" T2
-  $t insert end "Rch.Nr.\tDatum\tAnschrift\t\tNettobetrag $currency\tBezahlt $currency $vatColumn $auslageCol\tTotal $currency\n" T3
+  $t insert end "Rch.Nr.\tDatum\tAnschrift\t\tNettobetrag ${currency}\tBezahlt ${currency}\tSpesen\tMwst. ${vat}%\tTotal ${currency}\n" T3
 	
-#TODO jesch balagan: 'finalsum' is exclusive vat & Auslagen - so why list Auslagen?
-
-
+#TODO  'finalsum' is exclusive vat & Auslagen - list Auslagen anyway because payedsum may differ
   	
 	#compute sum total & insert text lines
 	for {set no 0;set sumtotal 0} {$no <$maxTuples} {incr no} {
@@ -490,24 +484,29 @@ global j
 		set VAT $j($no,vatlesssum)
 		set finalsum $j($no,finalsum)
 		
-		if {$VAT == "" || ! $VAT >= 0} {
+		if {! $vat > 0} {
   		set VAT ""
   		set vatlesssum $finalsum
 		} else {
-  		set VAT "\t[expr $finalsum - $vatlesssum]"
+  		set VAT [expr $finalsum - $vatlesssum]
   	}
   	
-		##set auslagen tab if any found
-		if {$auslageYesh} {
-  		set auslage "\t$j($no,auslage)"
-	    if ![string is double $auslage] {
-		    set auslage ""
-		  }
+		##set spesen tab  		
+		set spesen $j($no,auslage)
+    if ![string is double $spesen] {
+	    set spesen ""
+	  } else {
+   		set spesen $j($no,auslage)
 	  }
+		set invNo $j($no,f_number)
+		set invDat $j($no,f_date)
+		set invAdr $j($no,addressheader)
+		set payedsum $j($no,payedsum)
 		
-		$t insert end "\n$j($no,f_number)\t$j($no,f_date)\t$j($no,addressheader)\t\t$vatlesssum\t$j($no,payedsum) $VAT $auslage"
+		$t insert end "\n${invNo}\t${invDat}\t${invAdr}\t\t${vatlesssum}\t${payedsum}\t${spesen}\t${VAT}"
 	}
-	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
+	
+	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t\t $sumtotal" T3
 	
   #load Auslagen file
   set chan [open $auslagenTxt]
@@ -516,8 +515,8 @@ global j
   
 	$t insert end "\n\nAuslagen\n" T2
   $t insert end "\n${auslagen}"
-  $t insert end "\nAuslagen total\t\t\t\t\t\t\t-0.00\n\n" T3
-  $t insert end "Reingewinn\t\t\t\t\t\t\t0.00" T2
+  $t insert end "\nAuslagen total\t\t\t\t\t\t\t\t-0.00\n\n" T3
+  $t insert end "Reingewinn\t\t\t\t\t\t\t\t0.00" T2
 }
 
 #
@@ -531,44 +530,111 @@ proc captureWindow {win} {
   set ppmDir $tmpDir/tkoffice_ppm
   file mkdir $ppmDir
   set ppmFile [file join $ppmDir abschluss.ppm]
-
+  
   #create base image with defined height and width
-  image create photo abschlussPpm -height 100 -width 100
 
+  
+  set winX [winfo width $win]
+  set winY [winfo height $win]
+  
+  $win yview moveto 0.0 
+  image create photo abschlussPpm -format window -data $win -width $winX -height $winY
+  
+  set y2 [image height abschlussPpm]
+  set x2 [image width abschlussPpm]
+ 
   ##move win to top & get visible window coords
-  $win yview moveto 0.0
+
   set visibleFraction [$win yview]
   set begVisible [lindex $visibleFraction 0] 
   set endVisible [lindex $visibleFraction 1]
-  set totalLines [$win count -lines 1.0 end]
+
+  ##count lines for hiding
+#  set totalLines [$win count -lines 1.0 end]
   
   while {$endVisible < 1.0} {
 
-    captureWindow $win $pageNo
-    
     $win yview moveto $endVisible
+    
+    image create photo abschlussPart -format window -data $win -width $winX -height $winY
+	  abschlussPpm copy -shrink abschlussPart -to $y2 $x2 
+
     set begVisible $endVisible
     set endVisible [lindex [$win yview] 1]
-  
-  
-  #TODO check hiding seen part!!!
-  #After end is visible, hide top section for last remainder to avoid line duplication
-  set fraction [lindex [$win yview ] 0]
-  set begVisible [expr round($fraction * $totalLines)] 
-  $win tag add hide 0.0 $begVisible.end
-  
-  set abschlussPart [image create photo -format window -data $win]
-  set width [image width $abschlussPpm]
-  set height [image height $abschlussPpm]
-  #append new img at bottom
-	$abschlussPpm copy $abschlussPart to $width $height  
+    
+    set x2 [image width abschlussPpm]
+    set y2 [image height abschlussPpm]
 	}
-	 
-  $abschlussPpm write -format PPM $ppmFile
-  $abschlussPpm write -format PNG $abschlussPng
+	
+  ##compute lines to hide for last fraction
+#  set visFraction [lindex [$win yview ] 0]
+#  set invisible [expr round($visFraction * $totalLines)] 
+#  $win tag configure hide -elide
+#  $win tag add hide 0.0 $invisible.end
+
+  image create photo abschlussEnd -format window -data $win -width $winX -height $winY
+  #compute any top whiteArea
+  ##TODO take from BiblePix !
+  
+	abschlussPpm copy -shrink abschlussEnd -to $y2 $x2 
+
+  abschlussPpm write -format PPM $ppmFile
+#  abschlussPpm write -format PNG $abschlussPng
 
 } ;#END captureWindow
- 
+
+proc window2ppm {win} {
+  global tmpDir reportDir
+  
+  set ppmDir $tmpDir/tkoffice_ppm
+  file mkdir $ppmDir
+  
+  #first page pic
+  $win yview moveto 0.0 
+  set picNo 1
+  image create photo abschlussPpm -format window -data $win 
+	abschlussPpm write -format PPM [file join $ppmDir abschluss${picNo}.ppm]  
+  
+  set visibleFraction [$win yview]
+  set begVisible [lindex $visibleFraction 0] 
+  set endVisible [lindex $visibleFraction 1]
+
+  #any following pages pics
+  while {$endVisible < 1.0} {
+
+    incr picNo
+    $win yview moveto $endVisible
+    
+    #recreate abschlussPpm, save to new name
+    image create photo abschlussPpm -format window -data $win
+	  abschlussPpm write -format PPM [file join $ppmDir abschluss${picNo}.ppm]
+
+    set begVisible $endVisible
+    set endVisible [lindex [$win yview] 1]
+  }
+}
+
+proc ppm2pdf {jahr} {
+  global reportDir
+  set ppmDir $tmpDir/tkoffice_ppm
+  set ppmList [glob -directory $ppmDir *.ppm]
+  
+  if {[auto_execok img2pdf] == ""} {
+    NewsHandler::QueryNews "PDF konnte nicht generiert werden. Sie müssen das Programm 'img2pdf' installieren." red
+    foreach file $ppmList {
+      set psNo 1
+      exec pnmtops $file > [file join $reportDir abschluss${psNo}.ps]
+      incr psNo
+    }
+    NewsHandler::QueryNews "Der Abschluss liegt als seitengetrennte Postscript-Dateien in $reportDir zum Ausdruck vor." lightblue
+    return 1
+  }
+  
+  #TODO make global var
+  set abschlussPdf [file join $reportDir abschluss${jahr}.pdf]   
+  exec img2pdf --output $abschlussPdf $ppmList
+  NewsHandler::QueryNews "Der Abschluss liegt als PDF in $reportDir bereit." green
+}
 
 # printAbschluss
 ##a)exports text from Abschluss text widget and writes it to TEXT FILE
@@ -585,7 +651,7 @@ proc printAbschluss {} {
  # append abschlussPs [file root $abschlussTxt] . ps
   append abschlussPdf [file root $abschlussTxt] . pdf
   append abschlussPng [file root $abschlussTxt] . png
-  set win .n.t3.abschlussT
+
   
   #1.Write to text file
   set chan [open $abschlussTxt w]
@@ -629,6 +695,7 @@ proc printAbschluss {} {
   $win tag add hide 0.0 $begVisible.end
   
   #Try saving to PS&PDF - TODO clarify paths
+  #exec pnmcrop 'letztes Bild'
   catch {exec pnmtops $abschlussPpm > $abschlussPs}
   catch {exec ps2pdf $abschlussPs}
 
