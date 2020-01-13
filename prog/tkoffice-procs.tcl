@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 10jan20
+# Restored: 13jan20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -401,54 +401,36 @@ proc createAbschluss {} {
 	pg_result $res -assign j
 	set maxTuples [pg_result $res -numTuples]
 
-  #Avoid empty vat column
-#  if {$vat == 0} {
-#    set vatColumn \t} {
-#    set vatColumn "\tMwst. ${vat}%"
-#  }
-
-  #Avoid empty Auslage column
-#  	for {set no 0} {$no <$maxTuples} {incr no} {
-#	  	set auslage $j($no,auslage)
-#	puts $auslage
-#	
-#	  	if {$auslage != "" && $auslage > 0 } {
-#	  	  set auslageCol "\tAuslage"
-#	  	  set auslageYesh 1
-#	  	} {
-#	  	  set auslageCol \t
-#	  	  set auslageYesh 0
-#  	  }
-#  	}  
-
-	#Make text widget to fit A4 landscape
-	##A4= 210x297mm = 100x141.42857 %
-	##scaling: 1.0=72in
-	set scaling [tk scaling]
-#	set dpi [expr $scaling * 72]
-#	set A4YIn [expr 21.0 / 2.54]
-#	set A4XIn  [expr 29.7 / 2.54]
-#	set marginIn [expr $A4XIn / 10]
-#	set winX [expr round(($A4XIn - $marginIn) * $dpi)]
-#	set winY [expr round(($A4YIn - $marginIn) * $dpi)]
-	
 	#vom Verhältnis ausgehend * Tk scaling factor
 	##requires LETTER widths!
-	set winHeight 35
-	set winWidth  [expr round(3.5 * $winHeight)]
-	set winY [expr round($winHeight * $scaling)]
-	set winX [expr round($winWidth * $scaling)]
+	set scaling [tk scaling]
+	set winLetX 35
+	set winLetX [expr round($winLetX * $scaling)]
+  set winLetY [expr round(3.5 * $winLetX)]
+	set winLetY [expr round($winLetY * $scaling)]
+	
+  #Create canvas & text widget
+  catch {canvas .abschlussC -borderwidth 0 }
+  catch {text $t -width $winLetX -height $winLetY}
+  
+  #Create  scroll bar & configure widgets
+  set winPixX [winfo width $t]
+  set winPixY [winfo height $t]
 
-  #Make text widget & scroll bar
-  catch {text $t -width $winX -height $winY}
   catch {scrollbar .abschlussScr -orient vertical}
-  $t conf -padx 10 -pady 10 -borderwidth 0 -yscrollcommand {.abschlussScr set} 
+  $t conf -padx 10 -pady 10 -borderwidth 0 -yscrollcommand {.abschlussScr set}
+  .abschlussC conf -width $winPixX -height $winPixY
   .abschlussScr conf -command {.abschlussT yview}
+  
   #Pack all
-	pack $t -in .n.t3.mainF -side left -anchor n -fill x
-	pack .abschlussScr -in .n.t3.mainF -side left -fill y
+  pack .abschlussC -in .n.t3.mainF -side left	
+  pack .abschlussScr -in .n.t3.mainF -side right -fill y
 	pack .printAbschlussB -in .n.t3.botF -anchor se
-
+	pack $t -in .abschlussC
+	
+	#Create canvas window for text widget
+	.abschlussC create window 0 0 -anchor nw -window $t
+	
   $t delete 1.0 end
   
   #Compute tabs for landscape layout (c=cm)
@@ -523,6 +505,52 @@ proc createAbschluss {} {
  # Capture a window into an image
  # Author: David Easton
  #
+proc canvas2postscript {canv} {
+  global reportDir tmpDir
+  set win .abschlussT
+  
+  #1. move win to top position + make first PS page
+  raise $win
+  $win yview moveto 0.0 
+  update
+  
+  set pageNo 1
+  $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
+  
+  #2. PS any following pages
+  set visibleFraction [$win yview]
+  set begVisible [lindex $visibleFraction 0] 
+  set endVisible [lindex $visibleFraction 1]
+  
+    while {$endVisible < 1.0} {
+
+      incr pageNo
+    
+      $win yview moveto $endVisible
+      raise $win
+      update
+      
+      set begVisible $endVisible
+      set endVisible [lindex [$win yview] 1]
+	}
+	
+	#3. PS last page
+	set winY [winfo height $win]
+	$win yview moveto $endVisible
+  set newWinHeight [expr round($endVisible * $winY)]
+
+  #TODO gehtnicht wegen letterheight!
+#  $win conf -height $newWinHeight
+  $canv conf -height $newWinHeight
+  
+  raise $win
+  $win yview moveto 1.0
+  update
+  
+  incr pageNo
+  $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
+
+}
 
 proc captureWindow {win} {
   global tmpDir reportDir
