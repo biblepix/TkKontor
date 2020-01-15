@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 10jan20
+# Restored: 15jan20
 
 set version 1.0
 
@@ -223,7 +223,7 @@ button .printAbschlussB -text "Abschluss drucken" -command {printAbschluss}
 spinbox .abschlussJahrSB -width 4
 message .news -textvar news -width 1000 -relief sunken -pady 5 -padx 10 -justify center -anchor n
 pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
-pack [frame .n.t3.mainF -padx 15 -pady 15] -fill x
+pack [frame .n.t3.mainF -padx 15 -pady 15] -fill both -expand 1
 pack [frame .n.t3.botF] -fill x
 
 pack .abschlussJahrSB .createAbschlussB -in .n.t3.topF -side right

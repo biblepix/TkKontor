@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 13jan20
+# Restored: 15jan20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -377,7 +377,7 @@ proc setAbschlussjahrSB {} {
 proc createAbschluss {} {
   global db myComp currency vat auslagenTxt
   set jahr [.abschlussJahrSB get]
-  set t .abschlussT
+
 	
 	#get data from $jahr's invoices + 'payeddate = $jahr' from any previous invoices
 	set res [pg_exec $db "SELECT 
@@ -401,37 +401,41 @@ proc createAbschluss {} {
 	pg_result $res -assign j
 	set maxTuples [pg_result $res -numTuples]
 
-	#vom Verhältnis ausgehend * Tk scaling factor
-	##requires LETTER widths!
-	set scaling [tk scaling]
-	set winLetX 35
-	set winLetX [expr round($winLetX * $scaling)]
-  set winLetY [expr round(3.5 * $winLetX)]
-	set winLetY [expr round($winLetY * $scaling)]
-	
-  #Create canvas & text widget
-  catch {canvas .abschlussC -borderwidth 0 }
-  catch {text $t -width $winLetX -height $winLetY}
-  
-  #Create  scroll bar & configure widgets
-  set winPixX [winfo width $t]
-  set winPixY [winfo height $t]
 
-  catch {scrollbar .abschlussScr -orient vertical}
-  $t conf -padx 10 -pady 10 -borderwidth 0 -yscrollcommand {.abschlussScr set}
-  .abschlussC conf -width $winPixX -height $winPixY
-  .abschlussScr conf -command {.abschlussT yview}
+  # C r e a t e   c a n v a s   &   t e x t w i n
+  set t .abschlussT
+  set c .abschlussC
+  set sb .abschlussScroll
+  destroy $t $c $sb
+  text .abschlussT
+  canvas .abschlussC
+  scrollbar .abschlussScroll -orient vertical
+  
+	#Textwin dimensions Tk scaling factor:
+	##requires LETTER height + LINE width!
+	set scaling [tk scaling]
+	set winLetH 35
+  set winLetW [expr round(3.5 * $winLetH)]
+	set winLetY [expr round($winLetH * $scaling)]
+ 	set winLetX [expr round($winLetW * $scaling)]
+  
+  #Configure widgets & scroll bar
+  $t conf -bd 0 -width $winLetX -height $winLetY -padx 10 -pady 10 -yscrollcommand "$sb set"
+  $sb conf -command "$t yview"
   
   #Pack all
-  pack .abschlussC -in .n.t3.mainF -side left	
-  pack .abschlussScr -in .n.t3.mainF -side right -fill y
+  pack $c $sb -in .n.t3.mainF -side left -fill both
+ # pack -in .n.t3.mainF -side right -fill y
+	pack $t -in $c
+puts "$t width:  [winfo width $t]"
+
+
 	pack .printAbschlussB -in .n.t3.botF -anchor se
-	pack $t -in .abschlussC
 	
-	#Create canvas window for text widget
-	.abschlussC create window 0 0 -anchor nw -window $t
-	
-  $t delete 1.0 end
+	# F i l l   t e x t w i n
+	raise $t
+	update
+	$t delete 1.0 end
   
   #Compute tabs for landscape layout (c=cm)
 	$t configure -tabs {
@@ -499,55 +503,69 @@ proc createAbschluss {} {
   $t insert end "\n${auslagen}"
   $t insert end "\nAuslagen total\t\t\t\t\t\t\t\t-0.00\n\n" T3
   $t insert end "Reingewinn\t\t\t\t\t\t\t\t0.00" T2
-}
+
+	$c create window 0 0 -anchor nw -window $t -width [winfo width $t] -height [winfo height $t] -tags textwin
+	$c conf -width [winfo width $t] -height [winfo height $t] 
+
+} ;#END createAbschluss 
 
 #
  # Capture a window into an image
  # Author: David Easton
  #
-proc canvas2postscript {canv} {
+proc canv2ps {canv} {
   global reportDir tmpDir
   set win .abschlussT
   
   #1. move win to top position + make first PS page
-  raise $win
   $win yview moveto 0.0 
+  raise $win
   update
   
   set pageNo 1
-  $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
+
   
   #2. PS any following pages
   set visibleFraction [$win yview]
   set begVisible [lindex $visibleFraction 0] 
   set endVisible [lindex $visibleFraction 1]
+
+puts $endVisible
   
     while {$endVisible < 1.0} {
 
+      set lastVisible $endVisible
       incr pageNo
+      
+      set begVisible $endVisible
+      set endVisible [lindex [$win yview] 1]
     
       $win yview moveto $endVisible
       raise $win
       update
       
-      set begVisible $endVisible
-      set endVisible [lindex [$win yview] 1]
-	}
-	
-	#3. PS last page
-	set winY [winfo height $win]
-	$win yview moveto $endVisible
-  set newWinHeight [expr round($endVisible * $winY)]
+      $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]      
 
-  #TODO gehtnicht wegen letterheight!
+	}
+puts $endVisible
+puts $lastVisible	
+	#3. PS last page
+#	set winY [winfo height $win]
+#	$win yview moveto $endVisible
+  set canvHeight [winfo height $canv]
+  set hiddenHeight [expr round($lastVisible * $canvHeight)]
+  set visHeight [expr $canvHeight - $hiddenHeight]
+  $canv itemconf textwin -height $visHeight
+  $canv conf -height $visHeight 
+#return "$hiddenHeight $visHeight [winfo height $canv]"
+
+#TODO gehtnicht wegen letterheight!
 #  $win conf -height $newWinHeight
-  $canv conf -height $newWinHeight
   
   raise $win
   $win yview moveto 1.0
   update
   
-  incr pageNo
   $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
 
 }
