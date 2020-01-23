@@ -375,9 +375,10 @@ proc setAbschlussjahrSB {} {
 
 #TODO 
 proc createAbschluss {} {
-  global db myComp currency vat auslagenTxt
+  global db myComp currency vat texDir reportDir
   set jahr [.abschlussJahrSB get]
-
+  set auslagenTex [file join $texDir abschlussAuslagen.tex]
+  set auslagenTxt [file join $reportDir auslagen.txt]
 	
 	#get data from $jahr's invoices + 'payeddate = $jahr' from any previous invoices
 	set res [pg_exec $db "SELECT 
@@ -402,13 +403,13 @@ proc createAbschluss {} {
 	set maxTuples [pg_result $res -numTuples]
 
 
-  # C r e a t e   c a n v a s   &   t e x t w i n
+  # C r e a t e      t e x t w i n
   set t .abschlussT
-  set c .abschlussC
+#  set c .abschlussC
   set sb .abschlussScroll
-  destroy $t $c $sb
+  destroy $t $sb
   text .abschlussT
-  canvas .abschlussC
+#  canvas .abschlussC
   scrollbar .abschlussScroll -orient vertical
   
 	#Textwin dimensions Tk scaling factor:
@@ -424,28 +425,22 @@ proc createAbschluss {} {
   $sb conf -command "$t yview"
   
   #Pack all
-  pack $c $sb -in .n.t3.mainF -side left -fill both
- # pack -in .n.t3.mainF -side right -fill y
-	pack $t -in $c
-puts "$t width:  [winfo width $t]"
-
-
+  pack $t $sb -in .n.t3.mainF -side left -fill both
 	pack .printAbschlussB -in .n.t3.botF -anchor se
 	
 	# F i l l   t e x t w i n
-	raise $t
-	update
-	$t delete 1.0 end
+#	raise $t
+#	update
+#	$t delete 1.0 end
   
-  #Compute tabs for landscape layout (c=cm)
+  #Compute tabs for landscape layout (c=cm m=mm)
 	$t configure -tabs {
-	15m
-	40m
-	10c
-	15c numeric
-	18c numeric
-	21c numeric
-	24c numeric
+	1.5c
+	4.0c
+	16c numeric
+	19c numeric
+	22c numeric
+	25c numeric
   }
 	
   #Configure font tags	
@@ -457,8 +452,12 @@ puts "$t width:  [winfo width $t]"
 	$t insert 1.0 "$myComp\n" T1
 	$t insert end "Erfolgsrechnung $jahr\n\n" T1
   $t insert end "Einnahmen\n" T2
-  $t insert end "Rch.Nr.\tDatum\tAnschrift\t\tNettobetrag ${currency}\tBezahlt ${currency}\tSpesen\tMwst. ${vat}%\tTotal ${currency}\n" T3
-	
+  
+  # E I N N A H M E N
+  
+  $t insert end "Rch.Nr.\tDatum\tAnschrift\tNettobetrag ${currency}\tBezahlt ${currency}\tSpesen\tMwst. ${vat}%\tTotal ${currency}\n" T3
+
+
 #TODO  'finalsum' is exclusive vat & Auslagen - list Auslagen anyway because payedsum may differ
   	
 	#compute sum total & insert text lines
@@ -489,204 +488,165 @@ puts "$t width:  [winfo width $t]"
 		set invAdr $j($no,addressheader)
 		set payedsum $j($no,payedsum)
 		
-		$t insert end "\n${invNo}\t${invDat}\t${invAdr}\t\t${vatlesssum}\t${payedsum}\t${spesen}\t${VAT}"
+		#1. list in text window
+		$t insert end "\n${invNo}\t${invDat}\t${invAdr}\t${vatlesssum}\t${payedsum}\t${spesen}\t${VAT}"
+		
+		#2. export to Latex
+    append einnahmenTex $invNo & $invDat & $invAdr & $vatlesssum & $payedsum & $spesen & $VAT \n
 	}
+
+  #Save to einnahmenTex for printAbschluss
+  set einnahmen [file join $texDir abschlussEinnahmen.tex]
+  set chan [open $einnahmen w]
+  puts $chan $einnahmenTex
+  close $chan
+
+### A U S L A G E N
 	
-	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t\t $sumtotal" T3
+	#TODO insert further  ...
+	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
 	
   #load Auslagen file
   set chan [open $auslagenTxt]
   set auslagen [read $chan]
   close $chan
   
-	$t insert end "\n\nAuslagen\n" T2
-  $t insert end "\n${auslagen}"
-  $t insert end "\nAuslagen total\t\t\t\t\t\t\t\t-0.00\n\n" T3
-  $t insert end "Reingewinn\t\t\t\t\t\t\t\t0.00" T2
+  #get rid of trailing empty lines & add special marker
+#  regsub -all {^\n+|\n+$|(\n)+} $auslagen {\1} auslagen
+  #append auslagen \0
+  puts $auslagen
+  ##reconvert &'s to tabs + add end of text mark
+  #set auslagen [string map {& \u0009} $auslagenRoh]
+  #regsub -all {&} $auslagenRoh [\t] auslagen
 
-	$c create window 0 0 -anchor nw -window $t -width [winfo width $t] -height [winfo height $t] -tags textwin
-	$c conf -width [winfo width $t] -height [winfo height $t] 
+  
+	$t insert end "\n\nAuslagen\n" T2
+	
+	set begRealPos [$t index insert]
+  $t insert $begRealPos "\n${auslagen}"
+  
+  #work empty lines one up, setting pos to ?.0
+  set curPos "[expr round([$t index insert])].0"
+  
+  while {! [string is alnum [$t get $curPos]]} {
+    set curPos [expr $curPos - 1]
+  }
+  
+  set curLine [expr round($curPos)]
+  set curPosEnd [$t index $curLine.end]
+  set curRealPos [$t index $curPosEnd]
+  
+  puts $curRealPos
+
+#TODO this hangs!  
+#  while [string is control [$t get $curRealPos]] {
+#    set curRealPos [expr $curRealPos - 0.01]
+#    puts $curRealPos
+##    set curPosEnd [expr round($curRealPos)].end 
+#  }
+  puts $curRealPos
+  puts $curPosEnd
+  
+#  set lastPosEnd "[expr round($curRealPos)].end"
+#  set lastPosRealEnd [$t index $lastPosEnd]
+  
+  #Export Auslagen positions for Latex
+  namespace eval auslagen {}
+  set auslagen::begPos $begRealPos
+  set auslagen::endPos $curRealPos
+  
+  $t insert end "\nAuslagen total\t\t\t\t\t\t\t-0.00\n\n" T3
+  $t insert end "Reingewinn\t\t\t\t\t\t\t0.00" T2
 
 } ;#END createAbschluss 
 
-#
- # Capture a window into an image
- # Author: David Easton
- #
-proc canv2ps {canv} {
-  global reportDir tmpDir
-  set win .abschlussT
+# auslagen2latex
+##extract Auslagen from .abschlussT window & save to TeX
+##called by printAbschluss
+proc auslagen2latex {} {
+  global tkofficeDir tmpDir texDir 
+  set w .abschlussT
+  set auslagenTex [file join $texDir abschlussAuslagen.tex]
   
-  #1. move win to top position + make first PS page
-  $win yview moveto 0.0 
-  raise $win
-  update
+  #Mark beginning + end of "Auslagen"
+#  set begAuslagenI [$w search "Auslagen" 1.0 end]  
+#  $w mark set begAuslagen [string map {0 end} $begAuslagenI]
+#  #search special char for end of text, must remain in file!
+#  set endAuslagenI [$w search \u80 1.0 end]
+#  $w mark set endAuslagen $endAuslagenI
+
+  #Extract dump & prepare for LateX table
+  #set beg [lindex [$w dump -mark begAuslagen] 2]
+  #set end [lindex [$w dump -mark endAuslagen] 2]
   
-  set pageNo 1
+  set t [$w dump -text $auslagen::begPos $auslagen::endPos]
+  regsub -line -all {.*(text.\u007B)(.*)} $t {\2} t
+  regsub -all {\t} $t {\&} t
+  regsub -all {[{}]} $t {} t
 
+  #cut any tailing line number
+  set startSearch [expr [string length $t] - 5]
+  regsub -start $startSearch { \d.*$} $t {} t
   
-  #2. PS any following pages
-  set visibleFraction [$win yview]
-  set begVisible [lindex $visibleFraction 0] 
-  set endVisible [lindex $visibleFraction 1]
-
-puts $endVisible
+  #Save to auslagen.tex
+  set chan [open $auslagenTex w]
+  puts $chan $t
+  close $chan
   
-    while {$endVisible < 1.0} {
-
-      set lastVisible $endVisible
-      incr pageNo
-      
-      set begVisible $endVisible
-      set endVisible [lindex [$win yview] 1]
-    
-      $win yview moveto $endVisible
-      raise $win
-      update
-      
-      $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]      
-
-	}
-puts $endVisible
-puts $lastVisible	
-	#3. PS last page
-#	set winY [winfo height $win]
-#	$win yview moveto $endVisible
-  set canvHeight [winfo height $canv]
-  set hiddenHeight [expr round($lastVisible * $canvHeight)]
-  set visHeight [expr $canvHeight - $hiddenHeight]
-  $canv itemconf textwin -height $visHeight
-  $canv conf -height $visHeight 
-#return "$hiddenHeight $visHeight [winfo height $canv]"
-
-#TODO gehtnicht wegen letterheight!
-#  $win conf -height $newWinHeight
-  
-  raise $win
-  $win yview moveto 1.0
-  update
-  
-  $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
-
+  #TODO: testing:
+  return $t
 }
 
-proc captureWindow {win} {
-  global tmpDir reportDir
+proc printAbschl2 {} {
+  global tkofficeDir tmpDir reportDir texDir
+  set w .abschlussT
+  set t [auslagen2latex]
   
-  set ppmDir $tmpDir/tkoffice_ppm
-  file mkdir $ppmDir
-  set ppmFile [file join $ppmDir abschluss.ppm]
+  set jahr [.abschlussJahrSB get]
+ # set abschlussTxt [file join $reportsDir abschluss${jahr}.txt]
+ # append abschlussPs [file root $abschlussTxt] . ps
+  set abschlussTex [file join $texDir abschluss${jahr}.tex]
+  append abschlussPdf [file root $abschlussTxt] . pdf
   
-  #create base image with defined height and width
 
-  
-  set winX [winfo width $win]
-  set winY [winfo height $win]
-  
-  $win yview moveto 0.0 
-  image create photo abschlussPpm -format window -data $win -width $winX -height $winY
-  
-  set y2 [image height abschlussPpm]
-  set x2 [image width abschlussPpm]
- 
-  ##move win to top & get visible window coords
 
-  set visibleFraction [$win yview]
-  set begVisible [lindex $visibleFraction 0] 
-  set endVisible [lindex $visibleFraction 1]
-
-  ##count lines for hiding
-#  set totalLines [$win count -lines 1.0 end]
-  
-  while {$endVisible < 1.0} {
-
-    $win yview moveto $endVisible
-    
-    image create photo abschlussPart -format window -data $win -width $winX -height $winY
-	  abschlussPpm copy -shrink abschlussPart -to $y2 $x2 
-
-    set begVisible $endVisible
-    set endVisible [lindex [$win yview] 1]
-    
-    set x2 [image width abschlussPpm]
-    set y2 [image height abschlussPpm]
-	}
-	
-  ##compute lines to hide for last fraction
-#  set visFraction [lindex [$win yview ] 0]
-#  set invisible [expr round($visFraction * $totalLines)] 
-#  $win tag configure hide -elide
-#  $win tag add hide 0.0 $invisible.end
-
-  image create photo abschlussEnd -format window -data $win -width $winX -height $winY
-  #compute any top whiteArea
-  ##TODO take from BiblePix !
-  
-	abschlussPpm copy -shrink abschlussEnd -to $y2 $x2 
-
-  abschlussPpm write -format PPM $ppmFile
-#  abschlussPpm write -format PNG $abschlussPng
-
-} ;#END captureWindow
-
-proc window2ppm {win} {
-  global tmpDir reportDir
-  
-  set ppmDir $tmpDir/tkoffice_ppm
-  file mkdir $ppmDir
-  
-  #first page pic
-  $win yview moveto 0.0 
-  set picNo 1
-  image create photo abschlussPpm -format window -data $win 
-	abschlussPpm write -format PPM [file join $ppmDir abschluss${picNo}.ppm]  
-  
-  set visibleFraction [$win yview]
-  set begVisible [lindex $visibleFraction 0] 
-  set endVisible [lindex $visibleFraction 1]
-
-  #any following pages pics
-  while {$endVisible < 1.0} {
-
-    incr picNo
-    $win yview moveto $endVisible
-    
-    #recreate abschlussPpm, save to new name
-    image create photo abschlussPpm -format window -data $win
-	  abschlussPpm write -format PPM [file join $ppmDir abschluss${picNo}.ppm]
-
-    set begVisible $endVisible
-    set endVisible [lindex [$win yview] 1]
-  }
 }
-
-proc ppm2pdf {jahr} {
-  global reportDir
-  set ppmDir $tmpDir/tkoffice_ppm
-  set ppmList [glob -directory $ppmDir *.ppm]
-  
-  if {[auto_execok img2pdf] == ""} {
-    NewsHandler::QueryNews "PDF konnte nicht generiert werden. Sie müssen das Programm 'img2pdf' installieren." red
-    foreach file $ppmList {
-      set psNo 1
-      exec pnmtops $file > [file join $reportDir abschluss${psNo}.ps]
-      incr psNo
-    }
-    NewsHandler::QueryNews "Der Abschluss liegt als seitengetrennte Postscript-Dateien in $reportDir zum Ausdruck vor." lightblue
-    return 1
-  }
-  
-  #TODO make global var
-  set abschlussPdf [file join $reportDir abschluss${jahr}.pdf]   
-  exec img2pdf --output $abschlussPdf $ppmList
-  NewsHandler::QueryNews "Der Abschluss liegt als PDF in $reportDir bereit." green
-}
-
-# printAbschluss
 ##a)exports text from Abschluss text widget and writes it to TEXT FILE
 ##b)tries printing via lpr
 proc printAbschluss {} {
-  global tkofficeDir tmpDir pnmDir 
+
+  
+#get expenses list from text window
+#set beg [$t index begExpenses]
+#set end [$t index endExpenses]
+
+#Extract raw text for export to LateX
+regsub -all -line {(^.*text )\{} $T "" T
+regsub -all {[{}]} $T "" T
+#TODO
+#warum geht das nicht? will mittleren Teil ohne {} extrahieren
+regsub -all -line {(^.*text )(\{.*\})(.*$)} $T "\1"
+regsub {(^.*text )(.*)} $t {\2} - das geht, aber Text in {...}
+
+#das geht 100% :-)
+#regsub -all -line {(^.*text.[{}])(.*)([{}].*$)} $t {\2}
+regsub -line -all {.*(text.\u007B)(.*)} $t {\2}
+regsub -all {\t} $r {\&}
+
+set abschlussTagsDump [$t dump -tag 1.0 end]
+regexp {tagon expenses} $abschlussTagsDump
+regexp {tagoff expenses} $abschlussTagsDump
+
+set index1 [string first {tagon expenses} $abschlussTagsDump]
+set in1 [expr $index1 + 14]
+set in2 [expr $in1 + 6]
+ 
+set index2 [string first {tagoff expenses} $abschlussTagsDump]
+regsub ... $abschlussRohTxt abschlussTxt
+  
+  #format for LateX
+  
+  
   
   set win .n.t3.abschlussT
   set reportsDir [file join $tkofficeDir reports]
@@ -1124,3 +1084,185 @@ proc dumpDB {} {
   }
 }
 
+# T  E  S  T  I  N   G
+
+#
+ # Capture a window into an image
+ # Author: David Easton
+ #
+proc canv2ps {canv} {
+  global reportDir tmpDir
+  set win .abschlussT
+
+  set origCanvHeight [winfo height $canv]
+    
+  #1. move win to top position + make first PS page
+  raise $win
+  update
+  $win yview moveto 0.0 
+  raise $win
+  update
+
+  set pageNo 1
+  $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
+  
+  #move 1 page
+  set visFraction [$win yview]
+  set begVisible [lindex $visFraction 0] 
+  set endVisible [lindex $visFraction 1]
+  $win yview moveto $endVisible
+
+  while {$endVisible < 1.0} {
+
+    incr pageNo
+        
+    set lastVisible $endVisible
+    raise $win
+    update
+    $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
+
+    #move 1 page
+    set visFraction [$win yview]
+    set begVisible $endVisible
+    set endVisible [lindex $visFraction 1]
+    $win yview moveto $endVisible      
+    
+	}
+
+puts $endVisible
+puts $lastVisible	
+
+	#3. Compute remaining page height & adapt window dimension
+    if {$begVisible < $lastVisible} {
+        set cutoutPercent [expr $begVisible - $lastVisisble]
+        set hiddenHeight [expr round($cutoutPercent * $origCanvHeight)]
+        set visHeight [expr $origCanvHeight - $hiddenHeight]
+        $canv itemconf textwin -height $visHeight
+        $canv conf -height $visHeight 
+    }
+
+
+
+  incr pageNo
+  
+  #4. Make last page
+  raise $win
+  update
+  $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
+  
+  #5. Restore original dimensions
+  $canv itemconf textwin -height $origCanvHeight
+  $canv conf -height $origCanvHeight 
+}
+
+proc captureWindow {win} {
+  global tmpDir reportDir
+  
+  set ppmDir $tmpDir/tkoffice_ppm
+  file mkdir $ppmDir
+  set ppmFile [file join $ppmDir abschluss.ppm]
+  
+  #create base image with defined height and width
+
+  
+  set winX [winfo width $win]
+  set winY [winfo height $win]
+  
+  $win yview moveto 0.0 
+  image create photo abschlussPpm -format window -data $win -width $winX -height $winY
+  
+  set y2 [image height abschlussPpm]
+  set x2 [image width abschlussPpm]
+ 
+  ##move win to top & get visible window coords
+
+  set visibleFraction [$win yview]
+  set begVisible [lindex $visibleFraction 0] 
+  set endVisible [lindex $visibleFraction 1]
+
+  ##count lines for hiding
+#  set totalLines [$win count -lines 1.0 end]
+  
+  while {$endVisible < 1.0} {
+
+    $win yview moveto $endVisible
+    
+    image create photo abschlussPart -format window -data $win -width $winX -height $winY
+	  abschlussPpm copy -shrink abschlussPart -to $y2 $x2 
+
+    set begVisible $endVisible
+    set endVisible [lindex [$win yview] 1]
+    
+    set x2 [image width abschlussPpm]
+    set y2 [image height abschlussPpm]
+	}
+	
+  ##compute lines to hide for last fraction
+#  set visFraction [lindex [$win yview ] 0]
+#  set invisible [expr round($visFraction * $totalLines)] 
+#  $win tag configure hide -elide
+#  $win tag add hide 0.0 $invisible.end
+
+  image create photo abschlussEnd -format window -data $win -width $winX -height $winY
+  #compute any top whiteArea
+  ##TODO take from BiblePix !
+  
+	abschlussPpm copy -shrink abschlussEnd -to $y2 $x2 
+
+  abschlussPpm write -format PPM $ppmFile
+#  abschlussPpm write -format PNG $abschlussPng
+
+} ;#END captureWindow
+
+proc window2ppm {win} {
+  global tmpDir reportDir
+  
+  set ppmDir $tmpDir/tkoffice_ppm
+  file mkdir $ppmDir
+  
+  #first page pic
+  $win yview moveto 0.0 
+  set picNo 1
+  image create photo abschlussPpm -format window -data $win 
+	abschlussPpm write -format PPM [file join $ppmDir abschluss${picNo}.ppm]  
+  
+  set visibleFraction [$win yview]
+  set begVisible [lindex $visibleFraction 0] 
+  set endVisible [lindex $visibleFraction 1]
+
+  #any following pages pics
+  while {$endVisible < 1.0} {
+
+    incr picNo
+    $win yview moveto $endVisible
+    
+    #recreate abschlussPpm, save to new name
+    image create photo abschlussPpm -format window -data $win
+	  abschlussPpm write -format PPM [file join $ppmDir abschluss${picNo}.ppm]
+
+    set begVisible $endVisible
+    set endVisible [lindex [$win yview] 1]
+  }
+}
+
+proc ppm2pdf {jahr} {
+  global reportDir
+  set ppmDir $tmpDir/tkoffice_ppm
+  set ppmList [glob -directory $ppmDir *.ppm]
+  
+  if {[auto_execok img2pdf] == ""} {
+    NewsHandler::QueryNews "PDF konnte nicht generiert werden. Sie müssen das Programm 'img2pdf' installieren." red
+    foreach file $ppmList {
+      set psNo 1
+      exec pnmtops $file > [file join $reportDir abschluss${psNo}.ps]
+      incr psNo
+    }
+    NewsHandler::QueryNews "Der Abschluss liegt als seitengetrennte Postscript-Dateien in $reportDir zum Ausdruck vor." lightblue
+    return 1
+  }
+  
+  #TODO make global var
+  set abschlussPdf [file join $reportDir abschluss${jahr}.pdf]   
+  exec img2pdf --output $abschlussPdf $ppmList
+  NewsHandler::QueryNews "Der Abschluss liegt als PDF in $reportDir bereit." green
+}
