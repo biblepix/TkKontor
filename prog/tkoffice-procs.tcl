@@ -373,9 +373,50 @@ proc setAbschlussjahrSB {} {
   .abschlussJahrSB set [expr $heuer - 1]
 }
 
+# mangeExpenses
+## TODO CREATE INCREMENTAL TABLE spesen with rows NAME + AMOUNT 
+proc manageExpenses {} {
+  global db
+  
+  #pack Listbox & buttons
+  pack forget .abschlussT .abschlussScr
+  pack .spesenAbbruchB .spesenAddB .spesenDeleteB -in .n.t3.mainF -side right
+  pack .spesenLB -in .n.t3.mainF
+
+  #get listbox values from DB
+  set token [pg_exec $db "SELECT * FROM spesen"]
+  pg_result $token -assign expensesArr
+  
+  #fill listbox
+  foreach name [array names expensesArr] {
+    .spesenLB insert end [array get expensesArr $name]
+  }
+}
+
+proc addExpenses {} {
+  global db
+  set token [pg_exec $db "UPDATE spesen ADD name=... amount=... "]
+#TODO: check token & update .spesenLB & return
+}
+proc deleteExpenses {} {
+  global db
+  #1. delete from DB
+  
+  #2. delete from LB
+  .spesenLB delete curselection
+  QueryNews::
+  return 0
+}
+#is this needed?
+proc exitExpenses {} {
+
+}
+
 #TODO 
 proc createAbschluss {} {
   global db myComp currency vat texDir reportDir
+  pack forget .spesenLB .spesenAbbruchB .spesenAddB .spesenDeleteB
+  
   set jahr [.abschlussJahrSB get]
   set auslagenTex [file join $texDir abschlussAuslagen.tex]
   set auslagenTxt [file join $reportDir auslagen.txt]
@@ -406,11 +447,11 @@ proc createAbschluss {} {
   # C r e a t e      t e x t w i n
   set t .abschlussT
 #  set c .abschlussC
-  set sb .abschlussScroll
+  set sb .abschlussScr
   destroy $t $sb
   text .abschlussT
 #  canvas .abschlussC
-  scrollbar .abschlussScroll -orient vertical
+  scrollbar .abschlussScr -orient vertical
   
 	#Textwin dimensions Tk scaling factor:
 	##requires LETTER height + LINE width!
@@ -557,7 +598,7 @@ proc createAbschluss {} {
   
   $t insert end "\nAuslagen total\t\t\t\t\t\t\t-0.00\n\n" T3
   $t insert end "Reingewinn\t\t\t\t\t\t\t0.00" T2
-
+  $t conf -state disabled
 } ;#END createAbschluss 
 
 # auslagen2latex
