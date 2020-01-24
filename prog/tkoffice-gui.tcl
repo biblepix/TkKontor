@@ -218,8 +218,8 @@ pack .abbruchB -in .bottomF -side right
 ######################################################################################
 
 message .abschlussM -justify left -width 1000 -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch. Die Auslagen und der Reingewinn sind von Hand zu berechnen und einzutragen. Die Auslagen können in der Vorlagedatei '$auslagenTxt' angepasst werden.\nAllfällige Mehrwertsteuer und kundenspezifische Spesen erscheinen neben der Rechnung.\nDer Ausdruck erfolgt phototechnisch nach PNG. Für PDF müssen die Programme Netpbm und GhostScript installiert sein.\nDer rohe Text steht in $reportDir zur weiteren Bearbeitung zur Verfügung."
-button .createAbschlussB -text "Abschluss erstellen" -command {createAbschluss}
-button .printAbschlussB -text "Abschluss drucken" -command {printAbschluss}
+button .abschlussCreateB -text "Abschluss erstellen" -command {createAbschluss}
+button .abschlussPrintB -text "Abschluss drucken" -command {printAbschluss}
 
 button .spesenB -text "Spesen verwalten" -command {manageExpenses}
 button .spesenDeleteB -text "Eintrag löschen" -command {deleteExpenses}
@@ -233,7 +233,7 @@ pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
 pack [frame .n.t3.mainF -padx 15 -pady 15] -fill both -expand 1
 pack [frame .n.t3.botF] -fill x
 
-pack .abschlussJahrSB .createAbschlussB .spesenB -in .n.t3.topF -side right
+pack .abschlussJahrSB .abschlussCreateB .spesenB -in .n.t3.topF -side right
 pack .abschlussM -in .n.t3.topF -side left
 
 #Execute initial commands if connected to DB

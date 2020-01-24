@@ -379,7 +379,7 @@ proc manageExpenses {} {
   global db
   
   #pack Listbox & buttons
-  pack forget .abschlussT .abschlussScr
+  pack forget .abschlussT .abschlussScr .abschlussPrintB
   pack .spesenAbbruchB .spesenAddB .spesenDeleteB -in .n.t3.mainF -side right
   pack .spesenLB -in .n.t3.mainF
 
@@ -467,7 +467,7 @@ proc createAbschluss {} {
   
   #Pack all
   pack $t $sb -in .n.t3.mainF -side left -fill both
-	pack .printAbschlussB -in .n.t3.botF -anchor se
+	pack .abschlussPrintB -in .n.t3.botF -anchor se
 	
 	# F i l l   t e x t w i n
 #	raise $t
