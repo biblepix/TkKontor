@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 15jan20
+# Restored: 27jan20
 
 set version 1.0
 
@@ -70,7 +70,6 @@ pack [frame .adrF3] -anchor se -in .n.t1.mainF.f2 -expand 1 -side left
 
 ##create Address number Spinbox
 set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -bg lightblue -justify right]
-#$adrSpin conf -command {fillAdrWin %s} -validate focus -vcmd {puts %s;puts %S;return 0}
 focus $adrSpin
 
 ##Create search field
@@ -223,9 +222,11 @@ button .abschlussPrintB -text "Abschluss drucken" -command {printAbschluss}
 
 button .spesenB -text "Spesen verwalten" -command {manageExpenses}
 button .spesenDeleteB -text "Eintrag löschen" -command {deleteExpenses}
-button .spesenAbbruchB -text "Abbruch" -command {destroy .spesenLB???}
+button .spesenAbbruchB -text "Abbruch" -command {manageExpenses}
 button .spesenAddB -text "Eintrag hinzufügen" -command {addExpenses}
 listbox .spesenLB -width 100 -height 40 -bg lightblue
+entry .expnameE
+entry .expvalueE
 
 spinbox .abschlussJahrSB -width 4
 message .news -textvar news -width 1000 -relief sunken -pady 5 -padx 10 -justify center -anchor n

@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 15jan20
+# Restored: 27jan20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -377,26 +377,48 @@ proc setAbschlussjahrSB {} {
 ## TODO CREATE INCREMENTAL TABLE spesen with rows NAME + AMOUNT 
 proc manageExpenses {} {
   global db
-  
+  .expnameE conf -bg beige -fg grey -width 60 -textvar ::expname
+  .expvalueE conf -bg beige -fg grey -width 7 -textvar ::expval
+
   #pack Listbox & buttons
-  pack forget .abschlussT .abschlussScr .abschlussPrintB
-  pack .spesenAbbruchB .spesenAddB .spesenDeleteB -in .n.t3.mainF -side right
+  pack forget .spesenAbbruchB .abschlussT .abschlussScr .abschlussPrintB .expnameE .expvalueE
+  pack .spesenAddB .spesenDeleteB -in .n.t3.mainF -side right -anchor se
   pack .spesenLB -in .n.t3.mainF
+
+  .spesenAddB conf -text "Eintrag hinzufügen" -command {addExpenses}
+  
 
   #get listbox values from DB
   set token [pg_exec $db "SELECT * FROM spesen"]
   pg_result $token -assign expensesArr
-  
-  #fill listbox
+
+  #TODO separate tuples!!!  
+  #fill listbox  
+  .spesenLB delete 0 end
   foreach name [array names expensesArr] {
     .spesenLB insert end [array get expensesArr $name]
   }
 }
 
 proc addExpenses {} {
+  pack .spesenAbbruchB .spesenAddB .expvalueE .expnameE -in .n.t3.mainF -side right -anchor se
+  pack forget .spesenDeleteB
+  .spesenAddB conf -text "Speichern" -command {saveExpenses} 
+  set ::expname "Bezeichnung"
+  set ::expval "Preis"
+  .expnameE conf -fg grey -validate focusin -vcmd {%W delete 0 end;%W conf -fg black;return 0}
+  .expvalueE conf -fg grey -validate focusin -vcmd {%W delete 0 end; %W conf -fg black; return 0}
+}
+proc saveExpenses {} {
   global db
-  set token [pg_exec $db "UPDATE spesen ADD name=... amount=... "]
-#TODO: check token & update .spesenLB & return
+
+  set name [.expnameE get]
+  set value [.expvalueE get]
+  set token [pg_exec $db "INSERT INTO spesen (name,value) VALUES ('$name',$value)"]
+  
+  NewsHandler::QueryNews [pg_result $token -error] red
+  #reportResult $token "Eintrag gespeichert."
+  manageExpenses
 }
 proc deleteExpenses {} {
   global db
@@ -404,7 +426,7 @@ proc deleteExpenses {} {
   
   #2. delete from LB
   .spesenLB delete curselection
-  QueryNews::
+  NewsHandler::QueryNews "" lightblue
   return 0
 }
 #is this needed?
@@ -1092,7 +1114,7 @@ proc reportResult {token text} {
 }
 
 proc initialiseDB {dbname} {
-
+  global db
   #1. Create DB
 
   #2. Create tables
@@ -1105,6 +1127,13 @@ proc initialiseDB {dbname} {
       artprice NUMERIC
     )"
     ]
+    
+  set token [pg_exec $db "CREATE TABLE spesen (
+    num SERIAL,
+    name text NOT NULL,
+    value NUMERIC NOT NULL
+  )"
+  ]
 }
 
 # dumpDB
