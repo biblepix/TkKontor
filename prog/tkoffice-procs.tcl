@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 27jan20
+# Restored: 28jan20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -387,16 +387,15 @@ proc manageExpenses {} {
 
   .spesenAddB conf -text "Eintrag hinzufügen" -command {addExpenses}
   
-
+  .spesenLB delete 0 end
   #get listbox values from DB
   set token [pg_exec $db "SELECT * FROM spesen"]
-  pg_result $token -assign expensesArr
-
-  #TODO separate tuples!!!  
-  #fill listbox  
-  .spesenLB delete 0 end
-  foreach name [array names expensesArr] {
-    .spesenLB insert end [array get expensesArr $name]
+  
+  foreach tuple [pg_result $token -llist] {
+    #set tuple [pg_result $token -getTuple $tupleNo]
+    set name [lindex $tuple 1]
+    set value [lindex $tuple 2]
+    .spesenLB insert end "$name       $value"
   }
 }
 
@@ -405,7 +404,7 @@ proc addExpenses {} {
   pack forget .spesenDeleteB
   .spesenAddB conf -text "Speichern" -command {saveExpenses} 
   set ::expname "Bezeichnung"
-  set ::expval "Preis"
+  set ::expval "Betrag"
   .expnameE conf -fg grey -validate focusin -vcmd {%W delete 0 end;%W conf -fg black;return 0}
   .expvalueE conf -fg grey -validate focusin -vcmd {%W delete 0 end; %W conf -fg black; return 0}
 }
@@ -422,16 +421,15 @@ proc saveExpenses {} {
 }
 proc deleteExpenses {} {
   global db
-  #1. delete from DB
-  
-  #2. delete from LB
-  .spesenLB delete curselection
-  NewsHandler::QueryNews "" lightblue
-  return 0
-}
-#is this needed?
-proc exitExpenses {} {
 
+  #1 delete from DB
+  set value [lindex [.spesenLB get active] end]
+  set token [pg_exec $db "DELETE FROM spesen WHERE value=$value"]
+  reportResult $token "Eintrag gelöscht"
+  
+  #2 update LB
+  manageExpenses
+#  return 0
 }
 
 #TODO 
