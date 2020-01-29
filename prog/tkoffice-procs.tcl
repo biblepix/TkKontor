@@ -564,24 +564,41 @@ proc createAbschluss {} {
 
 ### A U S L A G E N
 	
+	#get -spesen- from DB
+	set token [pg_exec $db "SELECT * FROM spesen"]
+  
+  foreach tuple [pg_result $token -llist] {
+    set name [lindex $tuple 1]
+    set value [lindex $tuple 2]
+    append spesenList "$name\t\t\t\t-${value}\n"
+    lappend spesenAmounts $value
+  }
+  set spesenTotal 0
+  foreach i $spesenAmounts {
+    set spesenTotal [expr $spesenTotal + $i]
+  }
+
 	#TODO insert further  ...
 	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
 	
   #load Auslagen file
-  set chan [open $auslagenTxt]
-  set auslagen [read $chan]
-  close $chan
+#  set chan [open $auslagenTxt]
+#  set auslagen [read $chan]
+#  close $chan
   
   #get rid of trailing empty lines & add special marker
 #  regsub -all {^\n+|\n+$|(\n)+} $auslagen {\1} auslagen
   #append auslagen \0
-  puts $auslagen
+  
   ##reconvert &'s to tabs + add end of text mark
   #set auslagen [string map {& \u0009} $auslagenRoh]
   #regsub -all {&} $auslagenRoh [\t] auslagen
 
   
 	$t insert end "\n\nAuslagen\n" T2
+	$t insert end $spesenList
+	
+	set mejutar {
 	
 	set begRealPos [$t index insert]
   $t insert $begRealPos "\n${auslagen}"
@@ -615,9 +632,14 @@ proc createAbschluss {} {
   namespace eval auslagen {}
   set auslagen::begPos $begRealPos
   set auslagen::endPos $curRealPos
+  }
   
-  $t insert end "\nAuslagen total\t\t\t\t\t\t\t-0.00\n\n" T3
-  $t insert end "Reingewinn\t\t\t\t\t\t\t0.00" T2
+  ##compute Reingewinn
+  set netProfit [expr $sumtotal - $spesenTotal]
+  if {$netProfit < 0} {set netProfit 0.00}
+  
+  $t insert end "\nAuslagen total\t\t\t\t\t\t\t-${spesenTotal}\n\n" T3
+  $t insert end "Reingewinn\t\t\t\t\t\t\t$netProfit" T2
   $t conf -state disabled
 } ;#END createAbschluss 
 
