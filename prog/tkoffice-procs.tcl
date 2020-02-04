@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 28jan20
+# Restored: 4feb20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -374,7 +374,7 @@ proc setAbschlussjahrSB {} {
 }
 
 # mangeExpenses
-## TODO CREATE INCREMENTAL TABLE spesen with rows NAME + AMOUNT 
+##
 proc manageExpenses {} {
   global db
   .expnameE conf -bg beige -fg grey -width 60 -textvar ::expname
@@ -438,9 +438,9 @@ proc createAbschluss {} {
   pack forget .spesenLB .spesenAbbruchB .spesenAddB .spesenDeleteB
   
   set jahr [.abschlussJahrSB get]
-  set auslagenTex [file join $texDir abschlussAuslagen.tex]
-  set auslagenTxt [file join $reportDir auslagen.txt]
-	
+  set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
+  set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
+
 	#get data from $jahr's invoices + 'payeddate = $jahr' from any previous invoices
 	set res [pg_exec $db "SELECT 
 	f_number,
@@ -552,15 +552,11 @@ proc createAbschluss {} {
 		#1. list in text window
 		$t insert end "\n${invNo}\t${invDat}\t${invAdr}\t${vatlesssum}\t${payedsum}\t${spesen}\t${VAT}"
 		
-		#2. export to Latex
-    append einnahmenTex $invNo & $invDat & $invAdr & $vatlesssum & $payedsum & $spesen & $VAT \n
+		#2.export to Latex
+    append einnahmenTex $invNo & $invDat & $invAdr & $vatlesssum & $spesen & $VAT & $payedsum {\\} \n
 	}
 
-  #Save to einnahmenTex for printAbschluss
-  set einnahmen [file join $texDir abschlussEinnahmen.tex]
-  set chan [open $einnahmen w]
-  puts $chan $einnahmenTex
-  close $chan
+
 
 ### A U S L A G E N
 	
@@ -570,8 +566,14 @@ proc createAbschluss {} {
   foreach tuple [pg_result $token -llist] {
     set name [lindex $tuple 1]
     set value [lindex $tuple 2]
+    ##1.prepare for text window
     append spesenList "$name\t\t\t\t-${value}\n"
     lappend spesenAmounts $value
+    ##2.prepare for LateX
+    append auslagenTex {
+    \multicolumn{3}{l}
+    }
+    append auslagenTex \{ $name \} & & & \{ - $value \} {\\} \n
   }
   set spesenTotal 0
   foreach i $spesenAmounts {
@@ -581,10 +583,6 @@ proc createAbschluss {} {
 	#TODO insert further  ...
 	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
 	
-  #load Auslagen file
-#  set chan [open $auslagenTxt]
-#  set auslagen [read $chan]
-#  close $chan
   
   #get rid of trailing empty lines & add special marker
 #  regsub -all {^\n+|\n+$|(\n)+} $auslagen {\1} auslagen
@@ -597,51 +595,117 @@ proc createAbschluss {} {
   
 	$t insert end "\n\nAuslagen\n" T2
 	$t insert end $spesenList
-	
-	set mejutar {
-	
-	set begRealPos [$t index insert]
-  $t insert $begRealPos "\n${auslagen}"
-  
-  #work empty lines one up, setting pos to ?.0
-  set curPos "[expr round([$t index insert])].0"
-  
-  while {! [string is alnum [$t get $curPos]]} {
-    set curPos [expr $curPos - 1]
-  }
-  
-  set curLine [expr round($curPos)]
-  set curPosEnd [$t index $curLine.end]
-  set curRealPos [$t index $curPosEnd]
-  
-  puts $curRealPos
 
-#TODO this hangs!  
-#  while [string is control [$t get $curRealPos]] {
-#    set curRealPos [expr $curRealPos - 0.01]
-#    puts $curRealPos
-##    set curPosEnd [expr round($curRealPos)].end 
-#  }
-  puts $curRealPos
-  puts $curPosEnd
-  
-#  set lastPosEnd "[expr round($curRealPos)].end"
-#  set lastPosRealEnd [$t index $lastPosEnd]
-  
-  #Export Auslagen positions for Latex
-  namespace eval auslagen {}
-  set auslagen::begPos $begRealPos
-  set auslagen::endPos $curRealPos
-  }
-  
   ##compute Reingewinn
   set netProfit [expr $sumtotal - $spesenTotal]
-  if {$netProfit < 0} {set netProfit 0.00}
-  
+  namespace eval auslagen {}
+  if {$netProfit < 0} {set auslagen::netProfit 0.00} {set auslagen::netProfit $netProfit}
+
   $t insert end "\nAuslagen total\t\t\t\t\t\t\t-${spesenTotal}\n\n" T3
   $t insert end "Reingewinn\t\t\t\t\t\t\t$netProfit" T2
   $t conf -state disabled
+
+  #Save Einnahmen & Auslagen to LateX for printAbschluss
+  set chan [open $einnahmenTexFile w]
+  puts $chan $einnahmenTex
+  close $chan
+  set chan [open $auslagenTexFile w]
+  puts $chan $auslagenTex
+  close $chan
+
 } ;#END createAbschluss 
+
+# abschluss2latex
+##recreates Abschluss.tex
+##called by printAbschluss
+proc abschluss2latex {} {
+  global db myComp currency vat texDir reportDir
+  
+  set jahr [.abschlussJahrSB get]
+  set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
+  set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
+  set abschlussTexFile [file join $texDir Abschluss.tex]
+  set abschlussPdfFile [file join $reportDir Abschluss${jahr}.pdf]
+  
+  set einnahmenTex [read [open $einnahmenTexFile]]
+  set auslagenTex  [read [open $auslagenTexFile]]
+  
+  #get netTot vatTot spesTot from DB
+  set token1 [pg_exec $db "SELECT sum(vatlesssum),
+    sum(vatlesssum),
+    sum(finalsum),
+    sum(auslage) FROM invoice 
+    WHERE EXTRACT(YEAR from payeddate) = $jahr OR 
+    EXTRACT(YEAR from f_date) = $jahr  AS total
+  "]
+
+  set netTot [lindex [pg_result $token -list] 0]
+  set expTot [lindex [pg_result $token -list] 2]
+  set finTot [lindex [pg_result $token -list ] 1]
+  set vatTot [expr $finTot - $netTot]
+  
+  #Recreate Abschluss.tex: header data
+  append abschlTex {
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{german}
+\usepackage{longtable}
+\author{}
+\begin{document}
+\maketitle
+\begin{small}
+\begin{longtable}{ll p{0.4\textwidth} rrrr}
+%1. Einnahmen
+\caption{Einnahmen} \\
+\textbf{R.Nr} & \textbf{Datum} & \textbf{Adresse} & 
+\textbf{Netto} &  
+\textbf{Mwst.} & 
+\textbf{Spesen} & 
+\textbf{Bez.} \\
+\endhead
+}
+  ##1.Einnahmen
+  append abschlTex $einnahmenTex
+  append abschlTex {\\}
+  append abschlTex {
+\multicolumn{3}{l}{\textbf{Einnahmen total}} } &&& 
+  append abschlTex \ textbf \{ $finTot \} &
+  append abschlTex \ textbf \{ $vatTot \} &
+  append abschlTex \ textbf \{ $expTot \} &
+  append abschlTex [expr $finTot - $vatTot - $spesenTot] {\\}
+
+  append abschlTex {
+\multicolumn{3}{l}{abzügl. Mwst.}&&&{-173.25} \\
+\multicolumn{3}{l}{abzügl. Spesen}&&&{-65.25} \\
+\multicolumn{3}{l}{\textbf{EINNAHMEN TOTAL NETTO}}&&&&{\textbf}
+}
+  append abschlTex \{ $netTot \} {\\}
+  
+  ##2. Auslagen
+  \caption{Auslagen} \\
+  append abschlTex $auslagenTex
+  append abschlTex {
+\multicolumn{3}{l}{\textbf{AUSLAGEN TOTAL}} &&&&
+}
+
+  ##3. Reingewinn
+  append abschlTex \ textbf \{ - $expTot \} {\\} {\\}
+  append abschlTex {
+\multicolumn{3}{l}{\textbf{REINGEWINN}} &&&&
+}
+  set netProfit [expr $netTot - $expTot]
+  append abschlTex \ textbf \{ $netProfit \} {\\}
+  append abschlTex {
+\end{longtable}
+\end{small}
+\end{document}
+}
+  
+  #TODO: was ist das? - jesch balagan im ha-sechumim!
+#TODO why no work with payedsum???
+#  append abschlTex & & & & & & $auslagen::netProfit
+
+} ;#END abschluss2tex
 
 # auslagen2latex
 ##extract Auslagen from .abschlussT window & save to TeX
@@ -680,23 +744,67 @@ proc auslagen2latex {} {
   return $t
 }
 
-proc printAbschl2 {} {
-  global tkofficeDir tmpDir reportDir texDir
-  set w .abschlussT
-  set t [auslagen2latex]
+proc printAbschluss {} {
+  global reportDir texDir myComp
   
   set jahr [.abschlussJahrSB get]
- # set abschlussTxt [file join $reportsDir abschluss${jahr}.txt]
- # append abschlussPs [file root $abschlussTxt] . ps
-  set abschlussTex [file join $texDir abschluss${jahr}.tex]
-  append abschlussPdf [file root $abschlussTxt] . pdf
+  set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
+  set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
+  set abschlussTexFile [file join $texDir Abschluss.tex]
+  set abschlussPdfFile [file join $reportDir Abschluss${jahr}.pdf]
   
-
-
+  set einnahmenTex [read [open $einnahmenTexFile]]
+  set auslagenTex  [read [open $auslagenTexFile]]
+  
+  #Recreate Abschluss.tex
+  append abschlTex {
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
 }
+append abschlTex \\ title \{ $myComp \\\\ Erfolgsrechnung { } $jahr \}
+append abschlTex {
+\begin{document}
+\maketitle
+\begin{table}{}
+\caption{EINNAHMEN}
+\begin{tabular}{lllrrrrr}
+}
+#append abschlTex {\\} include \{ $einnahmenTexFile \}
+append abschlTex $einnahmenTex
+append abschlTex {
+\end{tabular}
+\caption{AUSLAGEN}
+\begin{tabular}{lr}
+}
+#append abschlTex {\\} include \{ $auslagenTexFile \}
+append abschlTex $auslagenTex
+append abschlTex {
+\end{tabular}
+\caption{REINGEWINN}
+}
+append abschlTex & & & & & & $auslagen::netProfit
+append abschlTex {
+\end{table}
+\end{document}
+}
+
+  #Save to Abschluss.tex
+  set chan [open $abschlussTexFile w]
+  puts $chan $abschlTex
+  close $chan
+  
+  #Latex to pdf
+  catch {eval exec pdflatex $abschlussTexFile $abschlussPdfFile}
+
+} ;#END printAbschluss
+
+
 ##a)exports text from Abschluss text widget and writes it to TEXT FILE
 ##b)tries printing via lpr
-proc printAbschluss {} {
+proc printAbschluss-ALT {} {
 
   
 #get expenses list from text window
