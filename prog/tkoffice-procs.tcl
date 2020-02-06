@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 4feb20
+# Restored: 6feb20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -516,7 +516,7 @@ proc createAbschluss {} {
   
   # E I N N A H M E N
   
-  $t insert end "Rch.Nr.\tDatum\tAnschrift\tNettobetrag ${currency}\tBezahlt ${currency}\tSpesen\tMwst. ${vat}%\tTotal ${currency}\n" T3
+  $t insert end "Rch.Nr.\tDatum\tAnschrift\tNetto ${currency}\tMwst. ${vat}%\tSpesen\tBezahlt ${currency}\tTotal ${currency}\n" T3
 
 
 #TODO  'finalsum' is exclusive vat & Auslagen - list Auslagen anyway because payedsum may differ
@@ -550,7 +550,7 @@ proc createAbschluss {} {
 		set payedsum $j($no,payedsum)
 		
 		#1. list in text window
-		$t insert end "\n${invNo}\t${invDat}\t${invAdr}\t${vatlesssum}\t${payedsum}\t${spesen}\t${VAT}"
+		$t insert end "\n${invNo}\t${invDat}\t${invAdr}\t${vatlesssum}\t${VAT}\t${spesen}\t${payedsum}"
 		
 		#2.export to Latex
     append einnahmenTex $invNo & $invDat & $invAdr & $vatlesssum & $spesen & $VAT & $payedsum {\\} \n
@@ -570,36 +570,26 @@ proc createAbschluss {} {
     append spesenList "$name\t\t\t\t-${value}\n"
     lappend spesenAmounts $value
     ##2.prepare for LateX
-    append auslagenTex {
-    \multicolumn{3}{l}
-    }
-    append auslagenTex \{ $name \} & & & \{ - $value \} {\\} \n
+    append auslagenTex {\multicolumn{3}{l}} \{ $name \} &&& \{ \$ \- $value \$ \} {\\} \n
   }
-  set spesenTotal 0
-  foreach i $spesenAmounts {
-    set spesenTotal [expr $spesenTotal + $i]
+ 
+  if {$spesenAmounts == ""} {
+    set spesenAmounts 0.00
+  } else {
+    set spesenTotal 0
+      foreach i $spesenAmounts {
+        set spesenTotal [expr $spesenTotal + $i]
+      }
   }
-
 	#TODO insert further  ...
 	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
-	
-  
-  #get rid of trailing empty lines & add special marker
-#  regsub -all {^\n+|\n+$|(\n)+} $auslagen {\1} auslagen
-  #append auslagen \0
-  
-  ##reconvert &'s to tabs + add end of text mark
-  #set auslagen [string map {& \u0009} $auslagenRoh]
-  #regsub -all {&} $auslagenRoh [\t] auslagen
-
-  
 	$t insert end "\n\nAuslagen\n" T2
 	$t insert end $spesenList
 
   ##compute Reingewinn
   set netProfit [expr $sumtotal - $spesenTotal]
-  namespace eval auslagen {}
-  if {$netProfit < 0} {set auslagen::netProfit 0.00} {set auslagen::netProfit $netProfit}
+#  namespace eval auslagen {}
+#  if {$netProfit < 0} {set auslagen::netProfit 0.00} {set auslagen::netProfit $netProfit}
 
   $t insert end "\nAuslagen total\t\t\t\t\t\t\t-${spesenTotal}\n\n" T3
   $t insert end "Reingewinn\t\t\t\t\t\t\t$netProfit" T2
@@ -631,26 +621,33 @@ proc abschluss2latex {} {
   set auslagenTex  [read [open $auslagenTexFile]]
   
   #get netTot vatTot spesTot from DB
-  set token1 [pg_exec $db "SELECT sum(vatlesssum),
-    sum(vatlesssum),
-    sum(finalsum),
-    sum(auslage) FROM invoice 
-    WHERE EXTRACT(YEAR from payeddate) = $jahr OR 
-    EXTRACT(YEAR from f_date) = $jahr  AS total
+  ##TODO? Bedingung 'year = payeddate' könnte dazu führen, dass Gesamtbetrag in 2 Jahren aufgeführt wird, wenn Teilzahlung vorhanden!
+  set token [pg_exec $db "SELECT sum(vatlesssum),sum(finalsum),sum(auslage),sum(payedsum) 
+    FROM invoice AS total
+    WHERE EXTRACT(YEAR from f_date) = $jahr OR
+          EXTRACT(YEAR from payeddate) = $jahr
   "]
 
-  set netTot [lindex [pg_result $token -list] 0]
+  ##compute all values for Abschluss
+  set vatlessTot [lindex [pg_result $token -list] 0]
+  set bruTot [lindex [pg_result $token -list] 1]
   set expTot [lindex [pg_result $token -list] 2]
-  set finTot [lindex [pg_result $token -list ] 1]
-  set vatTot [expr $finTot - $netTot]
+  set payTot [lindex [pg_result $token -list] 3]
+  set vatTot [expr $bruTot - $vatlessTot]
+  set netTot [expr $payTot - $vatTot - $expTot]
+
+  set netProfit [expr $netTot - $expTot]
   
-  #Recreate Abschluss.tex: header data
-  append abschlTex {
-\documentclass[10pt,a4paper]{article}
+  #R E C R E A T E   A B S C H L U S S . T E X 
+  ##header data
+  append abschlTex {\documentclass[10pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage{german}
 \usepackage{longtable}
 \author{}
+}
+append abschlTex {\title} \{ $myComp {\\} Erfolgsrechnung { } $jahr \}
+append abschlTex { 
 \begin{document}
 \maketitle
 \begin{small}
@@ -661,51 +658,45 @@ proc abschluss2latex {} {
 \textbf{Netto} &  
 \textbf{Mwst.} & 
 \textbf{Spesen} & 
-\textbf{Bez.} \\
+\textbf{Bezahlt} \\
 \endhead
 }
   ##1.Einnahmen
   append abschlTex $einnahmenTex
-  append abschlTex {\\}
-  append abschlTex {
-\multicolumn{3}{l}{\textbf{Einnahmen total}} } &&& 
-  append abschlTex \ textbf \{ $finTot \} &
-  append abschlTex \ textbf \{ $vatTot \} &
-  append abschlTex \ textbf \{ $expTot \} &
-  append abschlTex [expr $finTot - $vatTot - $spesenTot] {\\}
-
-  append abschlTex {
-\multicolumn{3}{l}{abzügl. Mwst.}&&&{-173.25} \\
-\multicolumn{3}{l}{abzügl. Spesen}&&&{-65.25} \\
-\multicolumn{3}{l}{\textbf{EINNAHMEN TOTAL NETTO}}&&&&{\textbf}
-}
-  append abschlTex \{ $netTot \} {\\}
-  
-  ##2. Auslagen
-  \caption{Auslagen} \\
+#  append abschlTex {\\}
+  append abschlTex {\multicolumn{3}{l}{\textbf{Einnahmen total}}} &
+  append abschlTex {\textbf} \{ $bruTot \} &
+  append abschlTex {\textbf} \{ $vatTot \} &
+  append abschlTex {\textbf} \{ $expTot \} &
+  append abschlTex [expr $bruTot - $vatTot - $expTot] {\\} \n
+  append abschlTex {&&abzügl. Mwst.&&&} \{ \$ \- $vatTot \$ \} {\\} \n
+  append abschlTex {&&abzügl. Spesen&&&} \{ \$ \- $expTot \$ \} {\\} \n
+  append abschlTex {\multicolumn{3}{l}{\textbf{EINNAHMEN TOTAL NETTO}}&&&&\textbf} \{ $netTot \} {\\} \n
+  ##2.Auslagen
+  append abschlTex {\caption{Auslagen} \\}
   append abschlTex $auslagenTex
-  append abschlTex {
-\multicolumn{3}{l}{\textbf{AUSLAGEN TOTAL}} &&&&
-}
-
+  append abschlTex {\multicolumn{3}{l}{\textbf{AUSLAGEN TOTAL}} &&&& \textbf} \{ \- $expTot \} {\\\\} \n
   ##3. Reingewinn
-  append abschlTex \ textbf \{ - $expTot \} {\\} {\\}
-  append abschlTex {
-\multicolumn{3}{l}{\textbf{REINGEWINN}} &&&&
-}
-  set netProfit [expr $netTot - $expTot]
-  append abschlTex \ textbf \{ $netProfit \} {\\}
+  append abschlTex {\multicolumn{3}{l}{\textbf{REINGEWINN}} &&&& \textbf} \{ $netProfit \} {\\} \n
+  ##4. End
   append abschlTex {
 \end{longtable}
 \end{small}
 \end{document}
-}
+  }
   
+  #Save to file
+  set chan [open $abschlussTexFile w]
+  puts $chan $abschlTex
+  close $chan
+  
+  #TODO: for testing only > need PDF!
+  NewsHandler::QueryNews "$abschlussTexFile gespeichert" green
   #TODO: was ist das? - jesch balagan im ha-sechumim!
 #TODO why no work with payedsum???
 #  append abschlTex & & & & & & $auslagen::netProfit
 
-} ;#END abschluss2tex
+} ;#END abschluss2latex
 
 # auslagen2latex
 ##extract Auslagen from .abschlussT window & save to TeX
