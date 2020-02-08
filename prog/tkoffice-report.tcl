@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-report.tcl
 # called by tkoffice-gui.tcl
-# Updated: 7feb20
+# Updated: 8feb20
 
 #sSrced by abschlussPrintB button & ?
 
@@ -22,8 +22,10 @@ proc setAbschlussjahrSB {} {
   .abschlussJahrSB set [expr $heuer - 1]
 }
 
-# mangeExpenses
-##
+# manageExpenses
+##shows general expenses (Auslagen) from DB
+##shows Add + Delete buttons for managing
+##called by createAbschluss
 proc manageExpenses {} {
   global db
   .expnameE conf -bg beige -fg grey -width 60 -textvar ::expname
@@ -81,7 +83,9 @@ proc deleteExpenses {} {
 #  return 0
 }
 
-#TODO 
+# createAbschluss
+##Creates yearly report for display in text window
+##called by .abschlussCreateB button
 proc createAbschluss {} {
   global db myComp currency vat texDir reportDir
   pack forget .spesenLB .spesenAbbruchB .spesenAddB .spesenDeleteB
@@ -205,11 +209,9 @@ proc createAbschluss {} {
     append einnahmenTex $invNo & $invDat & $invAdr & $vatlesssum & $spesen & $VAT & $payedsum {\\} \n
 	}
 
-
-
 ### A U S L A G E N
 	
-	#get -spesen- from DB
+	#Get 'spesen' from DB
 	set token [pg_exec $db "SELECT * FROM spesen"]
   
   foreach tuple [pg_result $token -llist] {
@@ -255,7 +257,8 @@ proc createAbschluss {} {
 } ;#END createAbschluss 
 
 # abschluss2latex
-##recreates Abschluss.tex
+##recreates abschlussEinnahmen.tex & abschlussAuslagen.tex
+##recreates Abschluss.tex from above files
 ##called by printAbschluss
 proc abschluss2latex {} {
   global db myComp currency vat texDir reportDir
@@ -341,254 +344,33 @@ append abschlTex {
   
   #TODO: for testing only > need PDF!
   NewsHandler::QueryNews "$abschlussTexFile gespeichert" green
-  #TODO: was ist das? - jesch balagan im ha-sechumim!
-#TODO why no work with payedsum???
-#  append abschlTex & & & & & & $auslagen::netProfit
-
+  return 0
 } ;#END abschluss2latex
 
-# auslagen2latex
-##extract Auslagen from .abschlussT window & save to TeX
-##called by printAbschluss
-proc auslagen2latex {} {
-  global tkofficeDir tmpDir texDir 
-  set w .abschlussT
-  set auslagenTex [file join $texDir abschlussAuslagen.tex]
-  
-  #Mark beginning + end of "Auslagen"
-#  set begAuslagenI [$w search "Auslagen" 1.0 end]  
-#  $w mark set begAuslagen [string map {0 end} $begAuslagenI]
-#  #search special char for end of text, must remain in file!
-#  set endAuslagenI [$w search \u80 1.0 end]
-#  $w mark set endAuslagen $endAuslagenI
-
-  #Extract dump & prepare for LateX table
-  #set beg [lindex [$w dump -mark begAuslagen] 2]
-  #set end [lindex [$w dump -mark endAuslagen] 2]
-  
-  set t [$w dump -text $auslagen::begPos $auslagen::endPos]
-  regsub -line -all {.*(text.\u007B)(.*)} $t {\2} t
-  regsub -all {\t} $t {\&} t
-  regsub -all {[{}]} $t {} t
-
-  #cut any tailing line number
-  set startSearch [expr [string length $t] - 5]
-  regsub -start $startSearch { \d.*$} $t {} t
-  
-  #Save to auslagen.tex
-  set chan [open $auslagenTex w]
-  puts $chan $t
-  close $chan
-  
-  #TODO: testing:
-  return $t
-  
-} ;#END auslagenLatex
-
-
-
-
-
-
+# printAbschluss
+##runs abschluss2latex & produces Print dialog
+##called by .abschlussPrintB button
 proc printAbschluss {} {
-  global reportDir texDir myComp
+  global texDir reportDir
   
-  set jahr [.abschlussJahrSB get]
-  set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
-  set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
-  set abschlussTexFile [file join $texDir Abschluss.tex]
-  set abschlussPdfFile [file join $reportDir Abschluss${jahr}.pdf]
-  
-  set einnahmenTex [read [open $einnahmenTexFile]]
-  set auslagenTex  [read [open $auslagenTexFile]]
-  
-  #Recreate Abschluss.tex
-  append abschlTex {
-\documentclass[12pt,a4paper]{article}
-\usepackage[utf8]{inputenc}
-\usepackage{amsmath}
-\usepackage{amsfonts}
-\usepackage{amssymb}
-}
-append abschlTex \\ title \{ $myComp \\\\ Erfolgsrechnung { } $jahr \}
-append abschlTex {
-\begin{document}
-\maketitle
-\begin{table}{}
-\caption{EINNAHMEN}
-\begin{tabular}{lllrrrrr}
-}
-#append abschlTex {\\} include \{ $einnahmenTexFile \}
-append abschlTex $einnahmenTex
-append abschlTex {
-\end{tabular}
-\caption{AUSLAGEN}
-\begin{tabular}{lr}
-}
-#append abschlTex {\\} include \{ $auslagenTexFile \}
-append abschlTex $auslagenTex
-append abschlTex {
-\end{tabular}
-\caption{REINGEWINN}
-}
-append abschlTex & & & & & & $auslagen::netProfit
-append abschlTex {
-\end{table}
-\end{document}
-}
-
-  #Save to Abschluss.tex
-  set chan [open $abschlussTexFile w]
-  puts $chan $abschlTex
-  close $chan
-  
-  #Latex to pdf
-  catch {eval exec pdflatex $abschlussTexFile $abschlussPdfFile}
-
-} ;#END printAbschluss
-
-
-##a)exports text from Abschluss text widget and writes it to TEXT FILE
-##b)tries printing via lpr
-proc printAbschluss-ALT {} {
-
-  
-#get expenses list from text window
-#set beg [$t index begExpenses]
-#set end [$t index endExpenses]
-
-#Extract raw text for export to LateX
-regsub -all -line {(^.*text )\{} $T "" T
-regsub -all {[{}]} $T "" T
-#TODO
-#warum geht das nicht? will mittleren Teil ohne {} extrahieren
-regsub -all -line {(^.*text )(\{.*\})(.*$)} $T "\1"
-regsub {(^.*text )(.*)} $t {\2} - das geht, aber Text in {...}
-
-#das geht 100% :-)
-#regsub -all -line {(^.*text.[{}])(.*)([{}].*$)} $t {\2}
-regsub -line -all {.*(text.\u007B)(.*)} $t {\2}
-regsub -all {\t} $r {\&}
-
-set abschlussTagsDump [$t dump -tag 1.0 end]
-regexp {tagon expenses} $abschlussTagsDump
-regexp {tagoff expenses} $abschlussTagsDump
-
-set index1 [string first {tagon expenses} $abschlussTagsDump]
-set in1 [expr $index1 + 14]
-set in2 [expr $in1 + 6]
- 
-set index2 [string first {tagoff expenses} $abschlussTagsDump]
-regsub ... $abschlussRohTxt abschlussTxt
-  
-  #format for LateX
-  
-  
-  
-  set win .n.t3.abschlussT
-  set reportsDir [file join $tkofficeDir reports]
-  file mkdir $reportsDir
-  set abschlusstext [$win get 1.0 end]
-  set jahr [.abschlussJahrSB get]
-  set abschlussTxt [file join $reportsDir abschluss${jahr}.txt]
- # append abschlussPs [file root $abschlussTxt] . ps
-  append abschlussPdf [file root $abschlussTxt] . pdf
-  append abschlussPng [file root $abschlussTxt] . png
-
-  
-  #1.Write to text file
-  set chan [open $abschlussTxt w]
-  puts $chan $abschlusstext
-  close $chan
-
-  #2.Try screenshot, hiding last top win from last page to avoid doubling
-  $win tag conf hide -elide 1
-  
-  ##move win to top & get visible window coords
-  $win yview moveto 0.0
-  set visibleFraction [$win yview]
-  set begVisible [lindex $visibleFraction 0] 
-  set endVisible [lindex $visibleFraction 1]
-  set totalLines [$win count -lines 1.0 end]
-
-  #Check presence of Netpbm & GhostScript  
-  if {[auto_execok ps2pdf] == ""} {lappend missing {ps2pdf (aus GhostScript)}}
-  if {[auto_execok ppmtopgm] == ""} {lappend missing Netpbm} {
-    NewsHandler::QueryNews "Für Ausdrucke in hoher Qualität muss '$missing' installiert sein." orange
-    NewsHandler::QueryNews "Sie können vorläufig die Textdatei $abschlussTxt in einem Textbearbeitungsprogramm nach Wunsch formatieren und ausdrucken." lightblue
+  #TODO: globalize paths (see calling prog)
+  set abschlussTexFile Abschluss.tex
+  set abschlussTexPath [file join $texDir $abschlussTexFile]
+  append abschlussPdfPath [file join $reportDir [file tail $abschlussTexFile]] . pdf
+       
+  #1. run abschluss2latex
+  if [catch abschluss2latex] {
+    NewsHandler::QueryNews "Es ist ein Fehler aufgetreten..." red
     return 1
   }
-
-
-  set pageNo 0
   
-  while {$endVisible < 1.0} {
-    
-#    incr pageNo
-    captureWindow $win $pageNo
-    
-    $win yview moveto $endVisible
-    set begVisible $endVisible
-    set endVisible [lindex [$win yview] 1]
-  }
-  
-  #After end is visible, hide top section for last remainder to avoid line duplication
-  set fraction [lindex [$win yview ] 0]
-  set begVisible [expr round($fraction * $totalLines)] 
-  $win tag add hide 0.0 $begVisible.end
-  
-  #Try saving to PS&PDF - TODO clarify paths
-  #exec pnmcrop 'letztes Bild'
-  catch {exec pnmtops $abschlussPpm > $abschlussPs}
-  catch {exec ps2pdf $abschlussPs}
+  #2. latex2pdf
+    eval exec -- pdflatex -interaction nonstopmode -output-directory=$reportDir $abschlussTexPath
+    NewsHandler::QueryNews "Das PDF ist nun unter $abschlussPdfPath bereit. Wir versuchen es nun für Sie zur Weiterbearbeitung zu öffnen." green
 
-	#check results 
-	if [file exists $abschlussPng] {append fileList "\n[file tail $abschlussPng]"}
-	if [file exists $abschlussPs] {append fileList "\n[file tail $abschlussPs]"}
-	if [file exists $abschlussPdf] {append fileList "\n[file tail $abschlussPdf"}
-	if {$fileList == ""} {set fileList $abschlussPpm; set extra "\nFür ein besseres Resultat müssen Netpbm und GhostScript installiert sein."} {set extra ""}
-  NewsHandler::QueryNews "Der Jahresabschluss konnte unter folgenden Formaten in $reportDir gespeichert werden: $fileList $extra" green 
-
-
-
-#TODO geht nicht wegen Grösse!!!
-  set pnmtops [auto_execok pnmtops]
-#  set pnmdir $tmpDir/tkoffice_pnm
-#  cd $pnmDir
-  foreach f $pnmList {
-    catch {
-    exec cat $f | $pnmtops -imagewidth 7  >> $tmpDir/abschluss2019.ps} 
-  }
-#  foreach f $pnmList {
-#    set chan [open $f]
-#    set pnm [read $chan]
-#    close $chan
-#    puts $pnmChan $pnm
-#  }
-#  close $pnmChan
-  
-return
-  
-  #TODO send PDF to printer
-  catch {exec ps2pdf > $abschlussPdf} 
-  NewsHandler::QueryNews "Abschluss als $abschlussPdf gespeichert." green
-
-  #Try converting to PS
-  if {[auto_execok paps] == ""} {
-    set path $abschlussTxt
-  } else {
-    set path $abschlussPs
-    exec paps --landscape --font="Monospace10" $abschlussTxt > $abschlussPs
-  }
-  NewsHandler::QueryNews "Abschluss in $path gespeichert." green
-   
-  #Try printing PS or TXT
-  set printer [auto_execok lpr]
-  if {$printer != ""} {
-    NewsHandler::QueryNews "Abschluss wird jetzt gedruckt..." lightblue
-    if [catch {exec $printer $path}] {
-      NewsHandler::QueryNews "Datei konnte nicht gedruckt werden.\nSie finden den Jahresabschluss unter $abschlussPath zur weiteren Bearbeitung." orange
-    }
-  }
-} ;#END printAbschluss
-
+#TODO get goodies from ...?
+  #3. View PDF / ?PS / Print to Lpr
+set betrachter evince
+exec $betrachter $abschlussPdfPath
+  return 0
+}

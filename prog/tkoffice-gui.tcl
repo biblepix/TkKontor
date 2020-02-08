@@ -371,36 +371,21 @@ resetAdrWin
 resetNewInvDialog
 updateArticleList
 resetArticleWin
+setArticleLine TAB2
+setArticleLine TAB4
 
 #Execute once when specific TAB opened
 bind .n <<NotebookTabChanged>> {
   set selected [.n select]
-#  puts $selected
+  puts "Changed to $selected"
   if {$selected == ".n.t3"} {
     set t3 1
-  } elseif {$selected == ".n.t2"} {
-    set t2 1
-  } elseif {$selected == ".n.t4"} {
-    set t4 1    
   }
 }
-
-set t2 0
-set t3 0
-set t4 0
-##tab 3
+##Load progs for tab 3
 after 500 {
   vwait t3
   source [file join $progDir tkoffice-report.tcl]
   setAbschlussjahrSB
 }
-##tab 2
-after 500 {
-  vwait t2
-  setArticleLine TAB2
-}
-##tab 4
-after 500 {
-  vwait t4
-  setArticleLine TAB4
-}
+
