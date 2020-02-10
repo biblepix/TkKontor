@@ -217,6 +217,7 @@ pack .abbruchB -in .bottomF -side right
 ######################################################################################
 
 message .abschlussM -justify left -width 1000 -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch. Die Auslagen und der Reingewinn sind von Hand zu berechnen und einzutragen. Die Auslagen können in der Vorlagedatei '$auslagenTxt' angepasst werden.\nAllfällige Mehrwertsteuer und kundenspezifische Spesen erscheinen neben der Rechnung.\nDer Ausdruck erfolgt phototechnisch nach PNG. Für PDF müssen die Programme Netpbm und GhostScript installiert sein.\nDer rohe Text steht in $reportDir zur weiteren Bearbeitung zur Verfügung."
+message .spesenM -justify left -width 1000 -text "Hier kommen die allgemeinen Geschäftsauslagen..."
 button .abschlussCreateB -text "Abschluss erstellen" -command {createAbschluss}
 button .abschlussPrintB -text "Abschluss drucken" -command {printAbschluss}
 

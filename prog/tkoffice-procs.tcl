@@ -1,11 +1,57 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 6feb20
+# Restored:10feb20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
 ##################################################################################################
+
+# roundDecimal
+##rounds any sum to $sum.$dp
+##called by various output progs 
+proc roundDecimal {sum} {
+  set dp 2 ;#no. of decimal places
+  set rounded [format "%.${dp}f" $sum]
+  return $rounded
+}
+
+# latex2pdf
+##produces PDF of any TeX file
+##called by ?printInvoice? & ?printReport?
+proc latex2pdf {texPath} {
+  global tmpDir spoolDir reportDir
+  
+  #Latex > PDF
+  namespace eval Latex {}
+  set Latex::texPath $texPath
+  set Latex::tmpDir $tmpDir
+  namespace eval Latex {
+    eval exec -- pdflatex -interaction nonstopmode -output-directory $tmpDir $texPath
+  }
+
+  #Copy PDF to correct location
+  set fileName [file tail $texPath]
+  if [regexp Abschluss $texPath] {
+    set targetDir $reportDir
+  } else {
+    set targetDir $spoolDir
+  }
+  set pdfName [file root $fileName].pdf
+  file copy -force [file join $tmpDir $pdfName] $targetDir
+  
+  NewsHandler::QueryNews "Die Datei $pdfName befindet sich in $targetDir zur weiteren Bearbeitung." lightgreen
+  return 0
+}
+
+# printPdf
+##sends PDF to printer / viewer
+##called by ?printInvoice? & ?printReport?
+proc printPdf {pdfPath} {
+  
+}
+
+
 
 # createTkOfficeLogo
 ##called by tkoffice-gui.tcl 
@@ -324,7 +370,7 @@ set tel2 $::tel2
   if {[pg_result $token -error] != ""} {
   	NewsHandler::QueryNews "[pg_result $token -error ]" red
   } else {
-   	NewsHandler::QueryNews "Anschrift Nr. $adrno gespeichert" green
+   	NewsHandler::QueryNews "Anschrift Nr. $adrno gespeichert" lightgreen
 	  #Update Address list
 	  catch setAdrList
   } 
@@ -522,6 +568,7 @@ pack .confArtL .confartnumSB .confArtUnitL .confArtPriceL .confartnameL .confArt
   #Recreate article list
   updateArticleList
   resetArticleWin
+  setArticleLine TAB4
   reportResult $token "Artikel $artName gespeichert"
 
 } ;#END saveArticle
@@ -535,6 +582,7 @@ proc deleteArticle {} {
     set token [pg_exec $db "DELETE FROM artikel WHERE artnum=$artNo"]
     reportResult $token "Artikel $artNo gelöscht."
     updateArticleList
+    setArticleLine TAB4
   }
 }
 
@@ -643,7 +691,7 @@ proc reportResult {token text} {
 #FOR deletions? insertions? 
   } elseif {[pg_result $token -oid] != ""} {
 
-    NewsHandler::QueryNews "$text [pg_result $token -oid]" green
+    NewsHandler::QueryNews "$text [pg_result $token -oid]" lightgreen
   } 
 }
 
@@ -684,7 +732,7 @@ proc dumpDB {} {
   if {$err != ""} {
     NewsHandler::QueryNews "Datenbank konnte nicht gesichert werden;\n$err" red
   } else {
-    NewsHandler::QueryNews "Datenbank erfolgreich gesichert in $dumppath" green
+    NewsHandler::QueryNews "Datenbank erfolgreich gesichert in $dumppath" lightgreen
   }
 }
 
@@ -868,5 +916,5 @@ proc ppm2pdf {jahr} {
   #TODO make global var
   set abschlussPdf [file join $reportDir abschluss${jahr}.pdf]   
   exec img2pdf --output $abschlussPdf $ppmList
-  NewsHandler::QueryNews "Der Abschluss liegt als PDF in $reportDir bereit." green
+  NewsHandler::QueryNews "Der Abschluss liegt als PDF in $reportDir bereit." lightgreen
 }

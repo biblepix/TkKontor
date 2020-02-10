@@ -1,16 +1,17 @@
 # ~/TkOffice/prog/tkoffice-report.tcl
 # called by tkoffice-gui.tcl
-# Updated: 8feb20
+# Updated: 9feb20
 
 #sSrced by abschlussPrintB button & ?
 
-################################################################################################
-### A B S C H L Ü S S E 
-################################################################################################
+################################################################################
+### A B S C H L Ü S S E  &  E X P E N S E S
+################################################################################
 
 # setAbschlussjahrSB
 ##configures Abschlussjahr spinbox ('select distinct' shows only 1 per year)
 ##includes actual business years up till now
+##called by manageExpenses & createAbschluss
 proc setAbschlussjahrSB {} {
   global db
   set heuer [clock format [clock seconds] -format %Y]
@@ -22,6 +23,10 @@ proc setAbschlussjahrSB {} {
   .abschlussJahrSB set [expr $heuer - 1]
 }
 
+#################################
+# A U S L A G E N
+#################################
+
 # manageExpenses
 ##shows general expenses (Auslagen) from DB
 ##shows Add + Delete buttons for managing
@@ -32,7 +37,8 @@ proc manageExpenses {} {
   .expvalueE conf -bg beige -fg grey -width 7 -textvar ::expval
 
   #pack Listbox & buttons
-  pack forget .spesenAbbruchB .abschlussT .abschlussScr .abschlussPrintB .expnameE .expvalueE
+  pack forget .abschlussM .spesenAbbruchB .abschlussT .abschlussScr .abschlussPrintB .expnameE .expvalueE
+  pack .spesenM -side left
   pack .spesenAddB .spesenDeleteB -in .n.t3.mainF -side right -anchor se
   pack .spesenLB -in .n.t3.mainF
 
@@ -83,13 +89,19 @@ proc deleteExpenses {} {
 #  return 0
 }
 
+
+############################
+# A B S C H L U S S
+############################
+
 # createAbschluss
 ##Creates yearly report for display in text window
 ##called by .abschlussCreateB button
 proc createAbschluss {} {
   global db myComp currency vat texDir reportDir
-  pack forget .spesenLB .spesenAbbruchB .spesenAddB .spesenDeleteB
-  
+  pack forget .spesenM .spesenLB .spesenAbbruchB .spesenAddB .spesenDeleteB
+  pack .abschlussM -side top
+
   set jahr [.abschlussJahrSB get]
   set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
   set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
@@ -343,10 +355,12 @@ append abschlTex {
   close $chan
   
   #TODO: for testing only > need PDF!
-  NewsHandler::QueryNews "$abschlussTexFile gespeichert" green
+  NewsHandler::QueryNews "$abschlussTexFile gespeichert" lightgreen
   return 0
 } ;#END abschluss2latex
 
+
+# TODO make 2 distinct progs for viewing / printing invoices + reports !!!
 # printAbschluss
 ##runs abschluss2latex & produces Print dialog
 ##called by .abschlussPrintB button
@@ -366,7 +380,7 @@ proc printAbschluss {} {
   
   #2. latex2pdf
     eval exec -- pdflatex -interaction nonstopmode -output-directory=$reportDir $abschlussTexPath
-    NewsHandler::QueryNews "Das PDF ist nun unter $abschlussPdfPath bereit. Wir versuchen es nun für Sie zur Weiterbearbeitung zu öffnen." green
+    NewsHandler::QueryNews "Das PDF ist nun unter $abschlussPdfPath bereit. Wir versuchen es nun für Sie zur Weiterbearbeitung zu öffnen." lightgreen
 
 #TODO get goodies from ...?
   #3. View PDF / ?PS / Print to Lpr

@@ -527,7 +527,7 @@ proc fillAdrInvWin {adrId} {
 
 			  if {$ts==3} {
 			  
-			    $invF.$n.payedL conf -fg green
+			    $invF.$n.payedL conf -fg lightgreen
 				  $invF.$n.commM conf -fg grey -text $comment -textvar {}
           pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumL $invF.$n.payedL $invF.$n.commM -side left
 			  
@@ -743,6 +743,7 @@ proc setInvPath {invNo type} {
   
 } ;#END setInvPath
 
+#TODO extend to be used by abschluss too >tkoffice-procs.tcl
 # viewInvoice
 ##checks out DVI/PS capable viewer
 ##sends rechnung.dvi / rechnung.ps to prog for viewing
@@ -961,7 +962,7 @@ puts "status $status"
   ##delete OR reset zahlen entry
   if {$status == 3} {
     pack forget $curEName
- 		$invF.$rowNo.payedL conf -text $totalPayedsum -fg green
+ 		$invF.$rowNo.payedL conf -text $totalPayedsum -fg lightgreen
     pack forget $invF.$rowNo.commM
     
   } else {
