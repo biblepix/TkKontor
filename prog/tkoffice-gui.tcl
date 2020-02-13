@@ -22,7 +22,7 @@ catch setMyLogo
 
 #Create Notebook
 set screenX [winfo screenwidth .]
-ttk::notebook .n -width [expr ($screenX/10) * 9]
+ttk::notebook .n -width [expr round($screenX / 10 * 9)]
 .n add [frame .n.t1] -text "Adressen + Aufträge"
 .n add [frame .n.t2] -text "Neue Rechnung"
 .n add [frame .n.t3] -text "Jahresabschlüsse"

@@ -710,6 +710,8 @@ return
   after 8000 "viewInvoice $invPsPath"
 }
 
+
+#TODO extend for use with Abschluss!!!
 # setInvPath
 ##composes invoice name from company short name & invoice number
 ##returns invoice path with required ending: TEX / DVI / PS / PDF
@@ -754,7 +756,7 @@ proc viewInvoice {invNo} {
   set invDviPath [setInvPath $invNo dvi]
 
   #A) Show DVI
-  if {[auto_execok XXevince] != ""} {
+  if {[auto_execok evince] != ""} {
     set dviViewer "evince"
   } elseif {[auto_execok okular] != ""} {
     set dviViewer "okular"

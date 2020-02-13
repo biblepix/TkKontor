@@ -44,13 +44,63 @@ proc latex2pdf {texPath} {
   return 0
 }
 
+proc viewDVI/PDF {} {}
+
+# detectViewer
+##looks for DVI/PDF viewer
+##returns 1 if none found
+##called by showInvoice (DVI) +  ? ?
+proc detectViewer {type} {
+  
+  #Viewers for DVI+PDF
+  lappend viewerList evince okular
+
+  #Extra PDF viewers
+  if {$type == "pdf" } {
+    lappend viewerList xpdf qpdf mupdf acroread zathura qpdfview pqiv gspdf pdf-reader firefox seamonkey opera epiphany
+  }
+  
+  #Detect 1st installed viewer
+  foreach p $viewerList {
+    if {[auto_execok $p] != ""} {
+      set viewer $p
+      break
+    }
+  }
+    
+  if [info exists viewer] {
+    return $viewer
+  } else {
+    return 1
+  }
+
+} ;#END detectViewer
+
 # printPdf
 ##sends PDF to printer / viewer
 ##called by ?printInvoice? & ?printReport?
 proc printPdf {pdfPath} {
+  set pdfFile [file tail $pdfPath]
   
+  #1. try lpr, else view
+  if {[auto_execok lpr] != ""} {
+    NewsHandler::QueryNews "Das Dokument $pdfFile wird zum Drucker geschickt." lightgreen
+    
+    after 500 {
+      if ![catch {exec lpr $pdfPath}] {
+        return 0
+      }
+    }
+    
+    after 2000 {
+      set viewer [detectViewer]
+      NewsHandler::QueryNews "Das Dokument $pdfFile wurde möglicherweise nicht gedruckt.\nIst der Drucker eingeschaltet?\nSie können es aus $viewer nochmals versuchen." orange
+      $viewer $pdfPath
+    }
+    
+  return 1
+  }
 }
-
 
 
 # createTkOfficeLogo
@@ -734,187 +784,4 @@ proc dumpDB {} {
   } else {
     NewsHandler::QueryNews "Datenbank erfolgreich gesichert in $dumppath" lightgreen
   }
-}
-
-# T  E  S  T  I  N   G
-
-#
- # Capture a window into an image
- # Author: David Easton
- #
-proc canv2ps {canv} {
-  global reportDir tmpDir
-  set win .abschlussT
-
-  set origCanvHeight [winfo height $canv]
-    
-  #1. move win to top position + make first PS page
-  raise $win
-  update
-  $win yview moveto 0.0 
-  raise $win
-  update
-
-  set pageNo 1
-  $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
-  
-  #move 1 page
-  set visFraction [$win yview]
-  set begVisible [lindex $visFraction 0] 
-  set endVisible [lindex $visFraction 1]
-  $win yview moveto $endVisible
-
-  while {$endVisible < 1.0} {
-
-    incr pageNo
-        
-    set lastVisible $endVisible
-    raise $win
-    update
-    $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
-
-    #move 1 page
-    set visFraction [$win yview]
-    set begVisible $endVisible
-    set endVisible [lindex $visFraction 1]
-    $win yview moveto $endVisible      
-    
-	}
-
-puts $endVisible
-puts $lastVisible	
-
-	#3. Compute remaining page height & adapt window dimension
-    if {$begVisible < $lastVisible} {
-        set cutoutPercent [expr $begVisible - $lastVisisble]
-        set hiddenHeight [expr round($cutoutPercent * $origCanvHeight)]
-        set visHeight [expr $origCanvHeight - $hiddenHeight]
-        $canv itemconf textwin -height $visHeight
-        $canv conf -height $visHeight 
-    }
-
-
-
-  incr pageNo
-  
-  #4. Make last page
-  raise $win
-  update
-  $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
-  
-  #5. Restore original dimensions
-  $canv itemconf textwin -height $origCanvHeight
-  $canv conf -height $origCanvHeight 
-}
-
-proc captureWindow {win} {
-  global tmpDir reportDir
-  
-  set ppmDir $tmpDir/tkoffice_ppm
-  file mkdir $ppmDir
-  set ppmFile [file join $ppmDir abschluss.ppm]
-  
-  #create base image with defined height and width
-
-  
-  set winX [winfo width $win]
-  set winY [winfo height $win]
-  
-  $win yview moveto 0.0 
-  image create photo abschlussPpm -format window -data $win -width $winX -height $winY
-  
-  set y2 [image height abschlussPpm]
-  set x2 [image width abschlussPpm]
- 
-  ##move win to top & get visible window coords
-
-  set visibleFraction [$win yview]
-  set begVisible [lindex $visibleFraction 0] 
-  set endVisible [lindex $visibleFraction 1]
-
-  ##count lines for hiding
-#  set totalLines [$win count -lines 1.0 end]
-  
-  while {$endVisible < 1.0} {
-
-    $win yview moveto $endVisible
-    
-    image create photo abschlussPart -format window -data $win -width $winX -height $winY
-	  abschlussPpm copy -shrink abschlussPart -to $y2 $x2 
-
-    set begVisible $endVisible
-    set endVisible [lindex [$win yview] 1]
-    
-    set x2 [image width abschlussPpm]
-    set y2 [image height abschlussPpm]
-	}
-	
-  ##compute lines to hide for last fraction
-#  set visFraction [lindex [$win yview ] 0]
-#  set invisible [expr round($visFraction * $totalLines)] 
-#  $win tag configure hide -elide
-#  $win tag add hide 0.0 $invisible.end
-
-  image create photo abschlussEnd -format window -data $win -width $winX -height $winY
-  #compute any top whiteArea
-  ##TODO take from BiblePix !
-  
-	abschlussPpm copy -shrink abschlussEnd -to $y2 $x2 
-
-  abschlussPpm write -format PPM $ppmFile
-#  abschlussPpm write -format PNG $abschlussPng
-
-} ;#END captureWindow
-
-proc window2ppm {win} {
-  global tmpDir reportDir
-  
-  set ppmDir $tmpDir/tkoffice_ppm
-  file mkdir $ppmDir
-  
-  #first page pic
-  $win yview moveto 0.0 
-  set picNo 1
-  image create photo abschlussPpm -format window -data $win 
-	abschlussPpm write -format PPM [file join $ppmDir abschluss${picNo}.ppm]  
-  
-  set visibleFraction [$win yview]
-  set begVisible [lindex $visibleFraction 0] 
-  set endVisible [lindex $visibleFraction 1]
-
-  #any following pages pics
-  while {$endVisible < 1.0} {
-
-    incr picNo
-    $win yview moveto $endVisible
-    
-    #recreate abschlussPpm, save to new name
-    image create photo abschlussPpm -format window -data $win
-	  abschlussPpm write -format PPM [file join $ppmDir abschluss${picNo}.ppm]
-
-    set begVisible $endVisible
-    set endVisible [lindex [$win yview] 1]
-  }
-}
-
-proc ppm2pdf {jahr} {
-  global reportDir
-  set ppmDir $tmpDir/tkoffice_ppm
-  set ppmList [glob -directory $ppmDir *.ppm]
-  
-  if {[auto_execok img2pdf] == ""} {
-    NewsHandler::QueryNews "PDF konnte nicht generiert werden. Sie müssen das Programm 'img2pdf' installieren." red
-    foreach file $ppmList {
-      set psNo 1
-      exec pnmtops $file > [file join $reportDir abschluss${psNo}.ps]
-      incr psNo
-    }
-    NewsHandler::QueryNews "Der Abschluss liegt als seitengetrennte Postscript-Dateien in $reportDir zum Ausdruck vor." lightblue
-    return 1
-  }
-  
-  #TODO make global var
-  set abschlussPdf [file join $reportDir abschluss${jahr}.pdf]   
-  exec img2pdf --output $abschlussPdf $ppmList
-  NewsHandler::QueryNews "Der Abschluss liegt als PDF in $reportDir bereit." lightgreen
 }
