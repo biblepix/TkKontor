@@ -527,14 +527,14 @@ proc fillAdrInvWin {adrId} {
 
 			  if {$ts==3} {
 			  
-			    $invF.$n.payedL conf -fg lightgreen
+			    $invF.$n.payedL conf -fg green
 				  $invF.$n.commM conf -fg grey -text $comment -textvar {}
           pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumL $invF.$n.payedL $invF.$n.commM -side left
 			  
         #If 1 or 2 make entry
 			  } else {
 			  
-          $invF.$n.payedL conf -fg red			    
+          $invF.$n.payedL conf -fg red    
           catch {entry $invF.$n.zahlenE -bg beige -fg black -width 7 -justify left}
           $invF.$n.zahlenE conf -validate focusout -vcmd "saveInvEntry %P %W $n"
 
@@ -710,8 +710,6 @@ return
   after 8000 "viewInvoice $invPsPath"
 }
 
-
-#TODO extend for use with Abschluss!!!
 # setInvPath
 ##composes invoice name from company short name & invoice number
 ##returns invoice path with required ending: TEX / DVI / PS / PDF
@@ -744,6 +742,7 @@ proc setInvPath {invNo type} {
   return $invPath
   
 } ;#END setInvPath
+
 
 #TODO extend to be used by abschluss too >tkoffice-procs.tcl
 # viewInvoice
@@ -955,8 +954,9 @@ puts "status $status"
   set token1 [pg_exec $db "UPDATE invoice 
     SET payedsum = $totalPayedsum, 
     ts = $status,
-    payeddate = "select current_timestamp::timestamp::date"
-    WHERE f_number=$invNo"]
+    payeddate = (SELECT current_timestamp::timestamp::date)
+    WHERE f_number=$invNo
+    "]
 
   #Update GUI    
   reportResult $token1 "Betrag CHF $newPayedsum verbucht"
@@ -964,7 +964,7 @@ puts "status $status"
   ##delete OR reset zahlen entry
   if {$status == 3} {
     pack forget $curEName
- 		$invF.$rowNo.payedL conf -text $totalPayedsum -fg lightgreen
+ 		$invF.$rowNo.payedL conf -text $totalPayedsum -fg green
     pack forget $invF.$rowNo.commM
     
   } else {

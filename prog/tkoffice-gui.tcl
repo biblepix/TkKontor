@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 7feb20
+# Restored: 17feb20
 
 set version 1.0
 
@@ -121,7 +121,7 @@ pack .umsatzM .umsatzL -in .umsatzF -side right -anchor e
 label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 9
 label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 13
 label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 47
-label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 11
+label .invSumH -text "Betrag $currency" -font TkCaptionFont -justify right -anchor w -width 11
 label .invPayedH -text "Bezahlt $currency" -font TkCaptionFont -justify right -anchor w -width 10
 label .invcommH -text "Anmerkung" -font TkCaptionFont -justify right -anchor w -width 20
 label .invShowH -text "Rechnung anzeigen" -font TkCaptionFont -fg steelblue3 -justify right -anchor e -justify right -width 20
