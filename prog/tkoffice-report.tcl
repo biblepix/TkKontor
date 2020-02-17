@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-report.tcl
 # called by tkoffice-gui.tcl
-# Updated: 9feb20
+# Updated: 17feb20
 
 #sSrced by abschlussPrintB button & ?
 
@@ -147,7 +147,7 @@ proc createAbschluss {} {
  	set winLetX [expr round($winLetW * $scaling)]
   
   #Configure widgets & scroll bar
-  $t conf -bd 0 -width $winLetX -height $winLetY -padx 10 -pady 10 -yscrollcommand "$sb set"
+  $t conf -bg lightblue -bd 0 -width $winLetX -height $winLetY -padx 10 -pady 10 -yscrollcommand "$sb set"
   $sb conf -command "$t yview"
   
   #Pack all
@@ -317,7 +317,7 @@ append abschlTex {
 \begin{small}
 \begin{longtable}{ll p{0.4\textwidth} rrrr}
 %1. Einnahmen
-\caption{Einnahmen} \\
+\caption{\textbf{EINNAHMEN}} \\
 \textbf{R.Nr} & \textbf{Datum} & \textbf{Adresse} & 
 \textbf{Netto} &  
 \textbf{Mwst.} & 
@@ -333,11 +333,11 @@ append abschlTex {
   append abschlTex {\textbf} \{ $vatTot \} &
   append abschlTex {\textbf} \{ $expTot \} &
   append abschlTex [expr $bruTot - $vatTot - $expTot] {\\} \n
-  append abschlTex {&&abzügl. Mwst.&&&} \{ \$ \- $vatTot \$ \} {\\} \n
+  append abschlTex {&&abzügl. Mehrwertsteuer&&&} \{ \$ \- $vatTot \$ \} {\\} \n
   append abschlTex {&&abzügl. Spesen&&&} \{ \$ \- $expTot \$ \} {\\} \n
   append abschlTex {\multicolumn{3}{l}{\textbf{EINNAHMEN TOTAL NETTO}}&&&&\textbf} \{ $netTot \} {\\} \n
   ##2.Auslagen
-  append abschlTex {\caption{Auslagen} \\}
+  append abschlTex {\caption{\textbf{AUSLAGEN}} \\} \n
   append abschlTex $auslagenTex
   append abschlTex {\multicolumn{3}{l}{\textbf{AUSLAGEN TOTAL}} &&&& \textbf} \{ \- $expTot \} {\\\\} \n
   ##3. Reingewinn
@@ -360,17 +360,19 @@ append abschlTex {
 } ;#END abschluss2latex
 
 
-# TODO make 2 distinct progs for viewing / printing invoices + reports !!!
 # printAbschluss
 ##runs abschluss2latex & produces Print dialog
 ##called by .abschlussPrintB button
 proc printAbschluss {} {
-  global texDir reportDir
+  global texDir reportDir tmpDir
+  set jahr [.abschlussJahrSB get]
   
-  #TODO: globalize paths (see calling prog)
-  set abschlussTexFile Abschluss.tex
-  set abschlussTexPath [file join $texDir $abschlussTexFile]
-  append abschlussPdfPath [file join $reportDir [file tail $abschlussTexFile]] . pdf
+  ##recreate TeX file
+  set abschlussTexName Abschluss.tex
+  set abschlussTexPath [file join $texDir $abschlussTexName]
+  ##create temporary Pdf file
+  append abschlussPdfName [file root $abschlussTexName] $jahr . pdf 
+  set abschlussPdfPath [file join $reportDir $abschlussPdfName]
        
   #1. run abschluss2latex
   if [catch abschluss2latex] {
@@ -379,12 +381,14 @@ proc printAbschluss {} {
   }
   
   #2. latex2pdf
-    eval exec -- pdflatex -interaction nonstopmode -output-directory=$reportDir $abschlussTexPath
-    NewsHandler::QueryNews "Das PDF ist nun unter $abschlussPdfPath bereit. Wir versuchen es nun für Sie zur Weiterbearbeitung zu öffnen." lightgreen
+    latex2pdf $abschlussTexPath
 
-#TODO get goodies from ...?
-  #3. View PDF / ?PS / Print to Lpr
-set betrachter evince
-exec $betrachter $abschlussPdfPath
+  #3. Try printing OR view
+  namespace eval Latex {}
+  set Latex::abschlussPdfPath $abschlussPdfPath
+  after 3000 {
+    printPdf $Latex::abschlussPdfPath
+  }
+
   return 0
 }

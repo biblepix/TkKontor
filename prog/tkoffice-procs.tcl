@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored:10feb20
+# Restored:17feb20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -44,7 +44,20 @@ proc latex2pdf {texPath} {
   return 0
 }
 
-proc viewDVI/PDF {} {}
+# viewDocument
+##runs detectViewer & opens file with appropriate app
+##works with DVI & PDF
+##called by ...
+proc viewDocument {file type} {
+  set viewer [detectViewer $type]
+  #open in $viewer if found, else use xdg-open
+  if {$viewer==1} {
+    exec xdg-open $file
+  } else {
+    catch {exec $viewer $file}
+  }
+  return
+}
 
 # detectViewer
 ##looks for DVI/PDF viewer
@@ -57,7 +70,7 @@ proc detectViewer {type} {
 
   #Extra PDF viewers
   if {$type == "pdf" } {
-    lappend viewerList xpdf qpdf mupdf acroread zathura qpdfview pqiv gspdf pdf-reader firefox seamonkey opera epiphany
+    lappend viewerList xpdf qpdf mupdf acroread zathura qpdfview pqiv gspdf pdf-reader
   }
   
   #Detect 1st installed viewer
@@ -78,29 +91,45 @@ proc detectViewer {type} {
 
 # printPdf
 ##sends PDF to printer / viewer
-##called by ?printInvoice? & ?printReport?
+##called by ?printInvoice? & latexReport
 proc printPdf {pdfPath} {
-  set pdfFile [file tail $pdfPath]
+
+  namespace eval Latex {}
+  set Latex::pdfPath $pdfPath
+  set Latex::pdfFile [file tail $pdfPath]
   
-  #1. try lpr, else view
-  if {[auto_execok lpr] != ""} {
-    NewsHandler::QueryNews "Das Dokument $pdfFile wird zum Drucker geschickt." lightgreen
+  #1. View if no lpr found
+  if {[auto_execok lpr] == ""} {
+    NewsHandler::QueryNews "Kein Drucker gefunden!\nDas Dokument $pdfFile wird zur Weiterverarbeitung angezeigt..." orange
+    viewDocument $pdfPath pdf
+    return 1
+  }
     
-    after 500 {
-      if ![catch {exec lpr $pdfPath}] {
-        return 0
-      }
+  #2. Try printing
+  after 500 {
+  NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wird zum Drucker geschickt..." orange
+     }
+    if ![catch {exec lpr $pdfPath}] {
+      return 0
     }
-    
-    after 2000 {
-      set viewer [detectViewer]
-      NewsHandler::QueryNews "Das Dokument $pdfFile wurde möglicherweise nicht gedruckt.\nIst der Drucker eingeschaltet?\nSie können es aus $viewer nochmals versuchen." orange
-      $viewer $pdfPath
+  
+  
+  after 2000  {
+  NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wurde möglicherweise nicht gedruckt.\nIst der Drucker eingeschaltet?" red  
+  }
+  
+  #3. Retry printing OR view
+  after 5000  {
+  NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wird noch einmal zum Drucker geschickt..." lightblue
+    if [catch {exec lpr $Latex::pdfPath}] {
+      NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wurde möglicherweise nicht gedruckt.\nEs wird nun zur Weiterverarbeitung angezeigt..." orange
+      viewDocument $Latex::pdfPath pdf
     }
     
   return 1
   }
-}
+  
+} ;#END printPdf
 
 
 # createTkOfficeLogo
