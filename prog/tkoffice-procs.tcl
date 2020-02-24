@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored:17feb20
+# Restored: 24feb20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -37,7 +37,9 @@ proc latex2pdf {texPath} {
   } else {
     set targetDir $spoolDir
   }
-  set pdfName [file root $fileName].pdf
+  #TODO coordinate names with [printAbschluss]  !!!
+  set jahr [.abschlussJahrSB get]
+  set pdfName [file root $fileName] $jahr . pdf
   file copy -force [file join $tmpDir $pdfName] $targetDir
   
   NewsHandler::QueryNews "Die Datei $pdfName befindet sich in $targetDir zur weiteren Bearbeitung." lightgreen

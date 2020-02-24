@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-invoice.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
-# Updated: 3jan20
+# Updated: 24feb20
 
 source $confFile
 ################################################################################################################
@@ -476,7 +476,7 @@ proc fillAdrInvWin {adrId} {
     if {![string is double $auslagen] || $auslagen == ""} {
       set auslagen 0.00
     }
-    set ::umsatz [expr $verbucht + $auslagen]
+    set ::umsatz [roundDecimal [expr $verbucht + $auslagen]]
         
     #Create row per invoice
     for {set n 0} {$n<$nTuples} {incr n} {
@@ -974,14 +974,6 @@ puts "status $status"
  		$invF.$rowNo.payedL conf -text $totalPayedsum -fg maroon
   }
     
-
-    
-  # S a v e  credit to 'address'
-#  set token2 [pg_exec $db "UPDATE address
-#    SET credit = $totalCredit
-#    WHERE objectid = $adrNo"]
-
-
   set ::credit [updateCredit $adrNo]
   #reportResult $token2 "Das aktuelle Kundenguthaben beträgt $newCredit"
   return 0
@@ -1025,14 +1017,7 @@ proc updateCredit {adrNo} {
     .creditM conf -bg silver
   }
   
-#Reduce amount to 2 Kommastellen - TODO getnicht
-set credit [expr (100*$totalCredit)/100.00]
-#try this :
-proc ::tcl::mathfunc::precision {precision float}  {
-  expr {round( 10 ** $precision * $float) / (10.0 ** $precision)} 
-}
-
-  return $credit
+  return [roundDecimal $totalCredit]
 }
     
 ### A R C H I V ################################################################################

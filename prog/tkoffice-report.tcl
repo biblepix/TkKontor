@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-report.tcl
 # called by tkoffice-gui.tcl
-# Updated: 17feb20
+# Updated: 24feb20
 
 #sSrced by abschlussPrintB button & ?
 
@@ -187,9 +187,11 @@ proc createAbschluss {} {
 #TODO  'finalsum' is exclusive vat & Auslagen - list Auslagen anyway because payedsum may differ
   	
 	#compute sum total & insert text lines
+	#TODO use sum(...) from DB instaead!
 	for {set no 0;set sumtotal 0} {$no <$maxTuples} {incr no} {
 		set total $j($no,payedsum)
 		catch {set sumtotal [expr $sumtotal + $total]}
+		set sumtotal [roundDecimal $sumtotal]
 		
 		##compute Mwst
 		set VAT $j($no,vatlesssum)
@@ -239,18 +241,20 @@ proc createAbschluss {} {
   if {$spesenAmounts == ""} {
     set spesenAmounts 0.00
   } else {
-    set spesenTotal 0
+    set spesenTotal 0.00
       foreach i $spesenAmounts {
         set spesenTotal [expr $spesenTotal + $i]
       }
   }
+  set spesenTotal [roundDecimal $spesenTotal]
+  
 	#TODO insert further  ...
 	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
 	$t insert end "\n\nAuslagen\n" T2
 	$t insert end $spesenList
 
   ##compute Reingewinn
-  set netProfit [expr $sumtotal - $spesenTotal]
+  set netProfit [roundDecimal [expr $sumtotal - $spesenTotal]]
 #  namespace eval auslagen {}
 #  if {$netProfit < 0} {set auslagen::netProfit 0.00} {set auslagen::netProfit $netProfit}
 
@@ -292,15 +296,17 @@ proc abschluss2latex {} {
           EXTRACT(YEAR from payeddate) = $jahr
   "]
 
+  set yearlyExpTot [pg_result [pg_exec $db "SELECT sum(value) from spesen"] -list]
+  
   ##compute all values for Abschluss
   set vatlessTot [lindex [pg_result $token -list] 0]
-  set bruTot [lindex [pg_result $token -list] 1]
-  set expTot [lindex [pg_result $token -list] 2]
+  set bruTot [roundDecimal [lindex [pg_result $token -list] 1]]
+  set custExpTot [lindex [pg_result $token -list] 2]
   set payTot [lindex [pg_result $token -list] 3]
-  set vatTot [expr $bruTot - $vatlessTot]
-  set netTot [expr $payTot - $vatTot - $expTot]
+  set vatTot [roundDecimal [expr $bruTot - $vatlessTot]]
+  set netTot [roundDecimal [expr $payTot - $vatTot - $custExpTot]]
 
-  set netProfit [expr $netTot - $expTot]
+  set netProfit [expr $netTot - $custExpTot]
   
   #R E C R E A T E   A B S C H L U S S . T E X 
   ##header data
@@ -327,19 +333,19 @@ append abschlTex {
 }
   ##1.Einnahmen
   append abschlTex $einnahmenTex
-#  append abschlTex {\\}
   append abschlTex {\multicolumn{3}{l}{\textbf{Einnahmen total}}} &
   append abschlTex {\textbf} \{ $bruTot \} &
   append abschlTex {\textbf} \{ $vatTot \} &
-  append abschlTex {\textbf} \{ $expTot \} &
-  append abschlTex [expr $bruTot - $vatTot - $expTot] {\\} \n
+  append abschlTex {\textbf} \{ $custExpTot \} &
+  
+  append abschlTex [expr $bruTot - ($vatTot - $custExpTot)] {\\} \n
   append abschlTex {&&abzügl. Mehrwertsteuer&&&} \{ \$ \- $vatTot \$ \} {\\} \n
-  append abschlTex {&&abzügl. Spesen&&&} \{ \$ \- $expTot \$ \} {\\} \n
+  append abschlTex {&&abzügl. Spesen&&&} \{ \$ \- $custExpTot \$ \} {\\} \n
   append abschlTex {\multicolumn{3}{l}{\textbf{EINNAHMEN TOTAL NETTO}}&&&&\textbf} \{ $netTot \} {\\} \n
   ##2.Auslagen
   append abschlTex {\caption{\textbf{AUSLAGEN}} \\} \n
   append abschlTex $auslagenTex
-  append abschlTex {\multicolumn{3}{l}{\textbf{AUSLAGEN TOTAL}} &&&& \textbf} \{ \- $expTot \} {\\\\} \n
+  append abschlTex {\multicolumn{3}{l}{\textbf{AUSLAGEN TOTAL}} &&&& \textbf} \{ \- $yearlyExpTot \} {\\\\} \n
   ##3. Reingewinn
   append abschlTex {\multicolumn{3}{l}{\textbf{REINGEWINN}} &&&& \textbf} \{ $netProfit \} {\\} \n
   ##4. End
@@ -381,7 +387,7 @@ proc printAbschluss {} {
   }
   
   #2. latex2pdf
-    latex2pdf $abschlussTexPath
+  catch {latex2pdf $abschlussTexPath}
 
   #3. Try printing OR view
   namespace eval Latex {}
