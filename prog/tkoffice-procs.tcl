@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 24feb20
+# Restored: 3mch20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -34,9 +34,10 @@ proc latex2pdf {texPath} {
   set fileName [file tail $texPath]
   if [regexp Abschluss $texPath] {
     set targetDir $reportDir
-  } else {
+  } elseif [regexp invoice $texPath] {
     set targetDir $spoolDir
   }
+  
   #TODO coordinate names with [printAbschluss]  !!!
   set jahr [.abschlussJahrSB get]
   set pdfName [file root $fileName] $jahr . pdf
@@ -487,14 +488,13 @@ proc deleteAddress {adrNo} {
 # resetArticleWin
 ##called by ... in Artikel verwalten
 proc resetArticleWin {} {
-
-  pack .confArtT .confArtM -in .n.t4.f1 -anchor w
-  pack .confArtL .confartnumSB .confArtUnitL .confArtPriceL .confartnameL .confArtTypeL -in .n.t4.f1 -side left
-  pack .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
-  pack forget .confArtSaveB .confarttypeACB .confarttypeRCB
+  pack .confartT .confartM -in .n.t4.f1 -anchor w
+  pack .confartL .confartnumSB .confartunitL .confartpriceL .confartnameL .confarttypeL -in .n.t4.f1 -side left
+  pack .confartdeleteB .confartcreateB -in .n.t4.f1 -side right
+  pack forget .confartsaveB .confarttypeACB .confarttypeRCB
   pack forget .confartnameE .confartunitE .confartpriceE
-  .confArtDeleteB conf -text "Artikel löschen" -command {deleteArticle}
-  .confArtCreateB conf -text "Artikel erfassen" -command {createArticle}
+  .confartdeleteB conf -text "Artikel löschen" -command {deleteArticle}
+  .confartcreateB conf -text "Artikel erfassen" -command {createArticle}
 }
 
 # setArticleLine
@@ -503,7 +503,7 @@ proc resetArticleWin {} {
 ##called by GUI + spinboxes .confartnumSB/.invartnumSB
 proc setArticleLine {tab} {
   global db
-  .confArtTypeL conf -bg #c3c3c3
+  .confarttypeL conf -bg #c3c3c3
   
   if {$tab == "TAB4"} {
     set artNum [.confartnumSB get]
@@ -540,9 +540,9 @@ proc setArticleLine {tab} {
       .mengeE delete 0 end
       .mengeE insert 0 "1"
       .mengeE conf -bg grey -fg silver -state readonly
-      .confArtTypeL conf -bg yellow
+      .confarttypeL conf -bg yellow
     } elseif {$artType == "A"} {
-      .confArtTypeL conf -bg orange
+      .confarttypeL conf -bg orange
     }
   }
   
@@ -553,12 +553,12 @@ proc setArticleLine {tab} {
 #TODO get order right! 
   namespace eval artikel {
     if {$artPrice == 0} {
-      set artPrice [.invArtPriceE get]
-      pack forget .invArtPriceL
-      pack .invArtUnitL .invArtNameL .invArtPriceE .invArtTypeL -in .n.t2.f2 -side left   
+      set artPrice [.invartpriceE get]
+      pack forget .invartpriceL
+      pack .invartunitL .invartnameL .invartpriceE .invarttypeL -in .n.t2.f2 -side left   
     } else {
-      pack forget .invArtPriceE
-      pack .invArtUnitL .invArtNameL .invArtPriceL .invArtTypeL -in .n.t2.f2 -side left
+      pack forget .invartpriceE
+      pack .invartunitL .invartnameL .invartpriceL .invarttypeL -in .n.t2.f2 -side left
     }
   }
   
@@ -572,7 +572,7 @@ proc createArticle {} {
  #clear previous entries & add .confArtSaveB
   .confartnumSB set ""
   .confartnumSB conf -bg lightgrey
-  pack .confArtSaveB -in .n.t4.f1 -side right
+  pack .confartsaveB -in .n.t4.f1 -side right
    
 #TODO:move to GUI?
   .confarttypeRCB conf -variable rabattselected -command {
@@ -595,11 +595,11 @@ proc createArticle {} {
   set ::artName "Bezeichnung"
   set ::artPrice "Preis"
   set ::artUnit "Einheit"
-  pack .confartnameL .confartnameE .confArtUnitL .confartunitE .confArtPriceL .confartpriceE .confarttypeACB .confarttypeRCB -in .n.t4.f1 -side left
-  pack forget .confArtDeleteB
+  pack .confartnameL .confartnameE .confartunitL .confartunitE .confartpriceL .confartpriceE .confarttypeACB .confarttypeRCB -in .n.t4.f1 -side left
+  pack forget .confartdeleteB
 
   #Rename Button
-  .confArtCreateB conf -text "Abbruch" -activebackground red -command {resetArticleWin}
+  .confartcreateB conf -text "Abbruch" -activebackground red -command {resetArticleWin}
   
 #TODO: articleWin is not reset after saving!!!
 } ;#END createArticle
@@ -642,9 +642,7 @@ proc saveArticle {} {
     pack forget $w
   }
 
-pack .confArtL .confartnumSB .confArtUnitL .confArtPriceL .confartnameL .confArtTypeL -in .n.t4.f1 -side left
-#pack .confArtSaveB .confArtDeleteB .confArtCreateB -in .n.t4.f1 -side right
-#  pack .confArtNameL .confArtPriceL .confArtUnitL .confArtTypeL -in .n.t4.f1 -side left
+pack .confartL .confartnumSB .confartunitL .confartpriceL .confartnameL .confarttypeL -in .n.t4.f1 -side left
   
   #Recreate article list
   updateArticleList
@@ -672,8 +670,6 @@ proc deleteArticle {} {
 ##called by saveArticle / ...
 proc updateArticleList {} {
   global db
-
-  #set spinbox article no. lists
   set token [pg_exec $db "SELECT artnum FROM artikel"] 
   .invartnumSB conf -values [pg_result $token -list]
   .confartnumSB conf -values [pg_result $token -list]

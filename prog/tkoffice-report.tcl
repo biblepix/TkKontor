@@ -283,7 +283,7 @@ proc abschluss2latex {} {
   set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
   set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
   set abschlussTexFile [file join $texDir Abschluss.tex]
-  set abschlussPdfFile [file join $reportDir Abschluss${jahr}.pdf]
+ # set abschlussPdfFile [file join $reportDir Abschluss${jahr}.pdf]
   
   set einnahmenTex [read [open $einnahmenTexFile]]
   set auslagenTex  [read [open $auslagenTexFile]]
@@ -367,7 +367,7 @@ append abschlTex {
 
 
 # printAbschluss
-##runs abschluss2latex & produces Print dialog
+##runs abschluss2latex & creates PDF & produces Print dialog
 ##called by .abschlussPrintB button
 proc printAbschluss {} {
   global texDir reportDir tmpDir

@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-invoice.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
-# Updated: 24feb20
+# Updated: 3mch20
 
 source $confFile
 ################################################################################################################
@@ -16,11 +16,10 @@ set itemFile [file join $texDir invitems.tex]
 ##called by Main + "Abbruch Rechnung"
 proc resetNewInvDialog {} {
 
-  #Cleanup ::rows, ::artikel & frame
+  #Cleanup
   catch {namespace delete rows}
-  catch {namespace delete artikel}
-  foreach w [pack slaves .invoiceFrame] {
-    pack forget $w
+  foreach w [winfo children .newInvoiceF] {
+    destroy $w
   }
 
   #Set vars to 0
@@ -28,12 +27,9 @@ proc resetNewInvDialog {} {
     set bill 0
     set buch 0
     set auslage 0
-#    catch {unset rabatt}
-#    catch {unset rabattProzent}
   }
   
   updateArticleList
-  #reseaArticleWin
   .invartnumSB invoke buttondown
   
   #Configure message labels & pack
@@ -42,22 +38,24 @@ proc resetNewInvDialog {} {
   .totalM conf -textvar rows::buch
   pack .subtotalL .subtotalM .abzugL .abzugM .totalL .totalM -side left -in .n.t2.bottomF
 
-  #create Addrow button
-  catch {button .addrowB -width 100 -text "Posten hinzufügen" -command addInvRow}
+  #create Addrow button w/dynamic width - funzt mit '-expand 1' bestens!
+  catch {button .addrowB}
+    
+  .addrowB conf -text "Posten hinzufügen" -command {addInvRow}
   catch {message .einheit -textvariable unit}
   catch {message .einzel -textvariable einzel}
 
   pack .invcondL .invcondSB .invauftrdatL .invauftrdatE .invrefL .invrefE .invcomL .invcomE -in .n.t2.f1 -side left -fill x 
-  pack .invArtlistL -in .n.t2.f1 -before .n.t2.f2 -anchor w 
-  pack .invartnumSB .mengeE .invArtUnitL .invArtNameL .invArtPriceL -in .n.t2.f2 -side left -fill x
-  pack .addrowB -in .n.t2.f2 -side right
+  pack .invartlistL -in .n.t2.f1 -before .n.t2.f2 -anchor w 
+  pack .invartnumSB .mengeE .invartunitL .invartnameL .invartpriceL -in .n.t2.f2 -side left -fill x
+  pack .addrowB -in .n.t2.f2 -side right -expand 1 -fill x
   
   #Reset Buttons
-  .abbruchInvB conf -state disabled
-  .saveInvB conf -state disabled -command "
-    .saveInvB conf -activebackground #ececec -state normal
+  .abbruchinvB conf -state disabled
+  .saveinvB conf -state disabled -command "
+    .saveinvB conf -activebackground #ececec -state normal
     doSaveInv
-    "
+  "
 } ;#END resetNewInvDialog
 
 # addInvRow
@@ -75,9 +73,10 @@ proc addInvRow {} {
   }
 
   #Configure Abbruch button
-  pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
-  .saveInvB conf -activebackground skyblue -state normal
-  .abbruchInvB conf -activebackground red -state normal -command {resetNewInvDialog}
+  pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
+  .saveinvB conf -activebackground skyblue -state normal
+  .abbruchinvB conf -activebackground red -state normal -command {resetNewInvDialog}
+
 
   ##get last namespace no.
   if [catch {namespace children rows}] {
@@ -95,39 +94,34 @@ proc addInvRow {} {
     #Create new row namespace
     namespace eval $rowNo  {
 
-      #get global vars
-#      set artName [.invArtNameL cget -text]
-#      set menge [.mengeE get]
-#      set artPrice [.invArtPriceL cget -text]
-#      set artUnit [.invArtUnitL cget -text]
-#      set artType [.invArtTypeL cget -text]
-      set artName $::artName
+      set artName [.invartnameL cget -text]
       set menge [.mengeE get]
-      set artPrice $::artPrice
-      set artUnit $::artUnit
-      set artType $::artType
+      set artPrice [.invartpriceL cget -text]
+      set artUnit [.invartunitL cget -text]
+      set artType [.invarttypeL cget -text]
       
       set rowNo $::rows::rowNo
       set rowtot [expr $menge * $artPrice]
 
       #Create row frame
-      catch {frame .invF${rowNo}}
-      pack .invF${rowNo} -in .invoiceFrame -fill x -anchor w    
+#      catch {frame .newInvoiceF}
+      set F [frame .newInvoiceF.invF${rowNo}]
+      pack $F -fill x -anchor w    
 
       #Create labels per row
-      catch {label .mengeL${rowNo} -text $menge -bg lightblue -width 20 -justify left -anchor w}
-      catch {label .artnameL${rowNo} -text $artName -bg lightblue -width 53 -justify left -anchor w}
-      catch {label .artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify right -anchor w}
-      catch {label .artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
-      catch {label .arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
-      catch {label .rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
+      catch {label $F.mengeL${rowNo} -text $menge -bg lightblue -width 20 -justify left -anchor w}
+      catch {label $F.artnameL${rowNo} -text $artName -bg lightblue -width 53 -justify left -anchor w}
+      catch {label $F.artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify right -anchor w}
+      catch {label $F.artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
+      catch {label $F.arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
+      catch {label $F.rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
 
       #Get current values from GUI
       set bill $rows::bill
       set buch $rows::buch
       set auslage $rows::auslage
 
-      #Handle types
+      # H a n d l e   t y p e s
               
       #Exit if rebate doubled
       if {$artType == "R" && [info exists ::rows::rabatt]} {
@@ -146,13 +140,9 @@ proc addInvRow {} {
 
           #compute this row's rebate
           set bill [expr $bill + $rowtot]
-puts "rowtot $rowtot"
-
           set newrabatt [expr ($rabattProzent * $rowtot) / 100]
-          
           set oldrabatt $::rows::rabatt
-puts "old $oldrabatt"
-puts "new $newrabatt"
+
           #update global rebate
           #TODO zis isnt working yet!
           set ::rows::rabatt [expr $oldrabatt + $newrabatt]
@@ -168,12 +158,11 @@ puts "new $newrabatt"
       ##b) Type is "Rabatt" - compute from $buch (abzgl. Spesen)
       } elseif {$artType == "R"} {
         
-        .artnameL${rowNo} conf -text "abzüglich $artName"
-        .artpriceL${rowNo} conf -bg yellow -textvar ::rows::rabatt
+        $F.artnameL${rowNo} conf -text "abzüglich $artName"
+        $F.artpriceL${rowNo} conf -bg yellow -textvar ::rows::rabatt
 
-      set ::rows::rabattProzent $artPrice
-puts $artPrice
-        
+        set ::rows::rabattProzent $artPrice
+      
         set rabatt [expr ($buch * $artPrice / 100)]
         set ::rows::buch [expr $buch - $rabatt]
         set ::rows::bill [expr $bill - $rabatt]
@@ -191,15 +180,14 @@ puts $artPrice
           set ::rows::auslage [expr $auslage + $rowtot]
           set ::rows::bill [expr $bill + $rowtot]
           set ::rows::buch [expr $bill - $auslage]
-          .arttypeL${rowNo} conf -bg orange
-          .rowtotL${rowNo} conf -bg orange
+          $F.arttypeL${rowNo} conf -bg orange
+          $F.rowtotL${rowNo} conf -bg orange
       }
 
-      
-      pack .artnameL${rowNo} .artpriceL${rowNo} .mengeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
-      pack .artunitL${rowNo} .rowtotL${rowNo} .arttypeL${rowNo} -in .invF${rowNo} -anchor w -fill x -side left
+      pack $F.artnameL${rowNo} $F.artpriceL${rowNo} $F.mengeL${rowNo} -anchor w -fill x -side left
+      pack $F.artunitL${rowNo} $F.rowtotL${rowNo} $F.arttypeL${rowNo} -anchor w -fill x -side left
 
-      #Reduce amounts to 2 decimal points
+      #Reduce amounts to 2 decimal points -TODO better use
       set ::rows::bill [expr {double(round(100*$rows::bill))/100}]
       set ::rows::buch [expr {double(round(100*$rows::buch))/100}]
       if [info exists ::rows::rabatt] {
@@ -428,21 +416,6 @@ proc fillAdrInvWin {adrId} {
     namespace delete verbucht
   }
 
-  #Show client credit
-#  set token [pg_exec $db "SELECT credit FROM address WHERE objectid=$adrId"]
-#  set credit [pg_result $token -list]
-#  if ![string is double $credit] {
-#    set credit 0.00
-#    .creditM conf -bg silver
-#  } elseif {$credit >0} {
-#    .creditM conf -bg lightgreen
-#    #set credit +${credit}
-#  } elseif {$credit <0} { 
-#    .creditM conf -bg red
-#  }
-#  set ::credit $credit
-  
-
   #Add new namespace no.
   namespace eval verbucht {
 
@@ -504,7 +477,7 @@ proc fillAdrInvWin {adrId} {
 
 			  #increase but don't overwrite frames per line	
 			  catch {frame $invF.$n}
-			  pack $invF.$n -anchor nw -side top -fill x
+			  pack $invF.$n -anchor nw -side top -fill x -expand 0
 
     		#create entries per line, or refill present entries
 			  catch {label $invF.$n.invNoL -width 10 -anchor w}
@@ -536,7 +509,7 @@ proc fillAdrInvWin {adrId} {
 			  
           $invF.$n.payedL conf -fg red    
           catch {entry $invF.$n.zahlenE -bg beige -fg black -width 7 -justify left}
-          $invF.$n.zahlenE conf -validate focusout -vcmd "saveInvEntry %P %W $n"
+          $invF.$n.zahlenE conf -validate focusout -vcmd "savePaymentEntry %P %W $n"
 
 			    set ::verbucht::eingabe 1
           set restbetrag "Restbetrag eingeben und mit Tab-Taste quittieren"
@@ -745,7 +718,7 @@ proc setInvPath {invNo type} {
 
 
 #TODO extend to be used by abschluss too >tkoffice-procs.tcl
-# viewInvoice
+# viewInvoice >>>>> viewDocument !!!
 ##checks out DVI/PS capable viewer
 ##sends rechnung.dvi / rechnung.ps to prog for viewing
 ##called by "Ansicht" & "Rechnung drucken" buttons
@@ -767,27 +740,6 @@ proc viewInvoice {invNo} {
       return
     }
   }
-
-proc meyutar! {} {
-  #B) Convert to PS & show
-  ##zathura can show & convert PS>PDf
-  if {[auto_execok XXzathura] != ""} {
-    set psViewer "zathura"
-  ##gv can show PS + PDF, not convert
-  } elseif {[auto_execok XXgv] != ""} {
-    set psViewer "gv"
-  }
-  if [info exists psViewer] {
-    set invPsPath [setInvPath $invNo ps]
-    catch {latexInvoice $invNo ps} ;#catch wegen garbage output!
-    
-#TODO if catch funktioniert nicht, da immer grabage output! - but test if just with gv, if so throw out!!!!
-    if [catch {exec $psViewer $invPsPath}] {
-      viewInvOnCanvas $invNo
-    }
-    return 0
-  }
-}
 
   #B) Last resort: Try showing PS on canvas OR convert to PDF
   viewInvOnCanvas $invNo
@@ -859,9 +811,9 @@ proc printInvoice {invNo} {
 } ;#END printInvoice
 
 
-# saveInvEntry
-###called by fillAdrInvWin by $invF.$n.zahlenE entry widget
-proc saveInvEntry {newPayedsum curEName ns} {
+# savePaymentEntry
+##called by fillAdrInvWin by $invF.$n.zahlenE entry widget
+proc savePaymentEntry {newPayedsum curEName ns} {
   global db invF
   set curNS "verbucht::${ns}"
   set rowNo [namespace tail $curNS]
@@ -873,7 +825,7 @@ proc saveInvEntry {newPayedsum curEName ns} {
   #avoid non-digit amounts
   if ![string is double $newPayedsum] {
     $curEName delete 0 end
-    $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
+    $curEName conf -validate focusout -vcmd "savePaymentEntry %P %W $ns"
     NewsHandler::QueryNews "Fehler: Konnte Zahlbetrag nicht speichern." red
     return 1
   }
@@ -890,49 +842,10 @@ proc saveInvEntry {newPayedsum curEName ns} {
     set finalsum $buchungssumme
   }
   
-
-  #Determine credit avoiding non-digit values
-  #TODO: which????
-  
-#  set oldCredit $::credit
-#  set oldCredit [pg_result [pg_exec $db "SELECT credit from address where objectid=$adrNo"] -list]
-#  
-#  if ![string is double $oldCredit] {
-#    set oldCredit 0
-#  }
     
   #Compute total payedsum:
   set totalPayedsum [expr $oldPayedsum + $newPayedsum] 
   set newCredit [expr $totalPayedsum - $finalsum]
-  
-  
-  
-#  ##is identical - don't touch credit
-#  if {$totalPayedsum == $finalsum} {
-#    set status 3
-#    set diff 0
-
-#  #diff is +
-#  } elseif {$totalPayedsum > $finalsum} {
-
-#    set totalPayedsum $finalsum
-#    set diff [expr $finalsum - $totalPayedsum]
-#set newCredit [expr $oldPayedsum - $diff]
-
-##    set newCredit [expr $oldCredit + $diff]
-#  
-#  
-#  
-#  #diff is -
-#  } elseif {$totalPayedsum < $finalsum} {
-
-#    set diff [expr $totalPayedsum - $finalsum]
-#  set newCredit $diff  
-#    
-#    
-#TODO zis dunno work!
-#    set newCredit [expr $oldCredit - $diff]    
-#  }
   
   #compute remaining credit + set status
   if {$newCredit >= 0} {
@@ -970,18 +883,18 @@ puts "status $status"
   } else {
   
     $curEName delete 0 end
-    $curEName conf -validate focusout -vcmd "saveInvEntry %P %W $ns"
+    $curEName conf -validate focusout -vcmd "savePaymentEntry %P %W $ns"
  		$invF.$rowNo.payedL conf -text $totalPayedsum -fg maroon
   }
     
   set ::credit [updateCredit $adrNo]
   #reportResult $token2 "Das aktuelle Kundenguthaben beträgt $newCredit"
   return 0
-} ;#END saveInvEntry
+} ;#END savePaymentEntry
 
 # updateCredit
 ##calculates total credit per customer
-##called by fillAdrInvWin + ?saveInvEntry
+##called by fillAdrInvWin + ?savePaymentEntry
 proc updateCredit {adrNo} {
   global db
   

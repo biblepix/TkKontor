@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 17feb20
+# Restored: 3mch20
 
 set version 1.0
 
@@ -8,6 +8,7 @@ package require Tk
 package require Img
 source [file join $progDir tkoffice-procs.tcl]
 source [file join $progDir tkoffice-invoice.tcl]
+source [file join $progDir tkoffice-report.tcl]
 source [file join $progDir pgin.tcl]
 source $confFile
 
@@ -19,10 +20,19 @@ label .titelL -text "Auftragsverwaltung" -pady $py -padx $px -font "TkHeadingFon
 
 #Eigenes Firmenlogo falls vorhanden
 catch setMyLogo
-
-#Create Notebook
 set screenX [winfo screenwidth .]
-ttk::notebook .n -width [expr round($screenX / 10 * 9)]
+set screenY [winfo screenheight .]
+
+#Create container frame
+pack [frame .containerF]
+
+#Create Notebook: (maxwidth+maxheight important to avoid overlapping of bottom frame)
+ttk::notebook .n -width [expr round($screenX / 10) * 9] -height [expr round($screenY / 10) * 8]
+pack .n -fill x -in .containerF -anchor nw ;# -expand 1
+
+#Create bottom frame
+pack [frame .bottomF] -in .containerF -side bottom -fill x -expand 0
+
 .n add [frame .n.t1] -text "Adressen + Aufträge"
 .n add [frame .n.t2] -text "Neue Rechnung"
 .n add [frame .n.t3] -text "Jahresabschlüsse"
@@ -30,15 +40,16 @@ ttk::notebook .n -width [expr round($screenX / 10 * 9)]
 
 #Pack all frames
 createTkOfficeLogo
-#pack .titelL -anchor nw -in .titelF -side left
-pack .n -fill y -expand 1
+pack [frame .umsatzF] -in .n.t1 -side bottom  -fill x
 
 #Tab 1
-pack [frame .n.t1.mainF] -fill both -expand 1
+pack [frame .n.t1.mainF] -fill x -expand 0
 pack [frame .n.t1.mainF.f2 -borderwidth 5 -relief ridge -pady 10 -padx 10] -anchor nw -fill x
 pack [frame .n.t1.mainF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
 
 #Tab 2
+#set f2Width [expr round($topwinX / 10 * 8)]
+
 pack [frame .n.t2.f1 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.f3 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
@@ -102,7 +113,8 @@ pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
 #########################################################################################
 # T A B 1 :  I N V O I C E   L I S T
 #########################################################################################
-pack [frame .umsatzF] -in .n.t1 -fill x -side bottom
+#pack [frame .umsatzF] -in .n.t1 -fill x -side bottom
+.umsatzF conf -bd 2 -relief sunken
 
 #Create "Rechnungen" Titel
 label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont 18"
@@ -120,7 +132,7 @@ pack .umsatzM .umsatzL -in .umsatzF -side right -anchor e
 #Create Rechnungen Kopfdaten
 label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 9
 label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 13
-label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 47
+label .invartH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 47
 label .invSumH -text "Betrag $currency" -font TkCaptionFont -justify right -anchor w -width 11
 label .invPayedH -text "Bezahlt $currency" -font TkCaptionFont -justify right -anchor w -width 10
 label .invcommH -text "Anmerkung" -font TkCaptionFont -justify right -anchor w -width 20
@@ -130,7 +142,7 @@ pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x
 pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x
 set invF .n.t1.mainF.invF
 set headF .n.t1.mainF.headF
-pack .invNoH .invDatH .invArtH .invSumH .invPayedH .invcommH -in $headF -side left
+pack .invNoH .invDatH .invartH .invSumH .invPayedH .invcommH -in $headF -side left
 pack .invShowH -in $headF -side right
 
 
@@ -177,39 +189,28 @@ label .totalL -text "Buchungssumme: "
 message .totalM -width 70 -bg lightgreen -padx 20 -anchor w
 
 #Set up Artikelliste, fill later when connected to DB
-label .invArtlistL -text "Artikelliste" -font "TkHeadingFont"
+label .invartlistL -text "Artikelliste" -font "TkHeadingFont"
 label .artL -text "Artikel Nr."
 spinbox .invartnumSB -width 2 -command {setArticleLine TAB2}
 
 #Make invoiceFrame
-catch {frame .invoiceFrame}
-pack .invoiceFrame -in .n.t2.f3 -side bottom -fill both
+#catch {frame .invoiceFrame}
+pack [frame .newInvoiceF] -in .n.t2.f3 -side bottom -fill both
 
 #Set KundenName in Invoice window
 label .clientL -text "Kunde:" -font "TkCaptionFont" -bg lightblue
-label .clientNameL -textvariable name2 -font "TkCaptionFont"
-pack .clientNameL .clientL -in .n.t2.f1 -side right
+label .clientnameL -textvariable name2 -font "TkCaptionFont"
+pack .clientnameL .clientL -in .n.t2.f1 -side right
 
-label .invArtPriceL -textvar artPrice -padx 20
-entry .invArtPriceE -textvar artPrice
-label .invArtNameL -textvar artName -padx 50
-label .invArtUnitL -textvar artUnit -padx 20
-label .invArtTypeL -textvar artType -padx 20
+label .invartpriceL -textvar artPrice -padx 20
+entry .invartpriceE -textvar artPrice
+label .invartnameL -textvar artName -padx 50
+label .invartunitL -textvar artUnit -padx 20
+label .invarttypeL -textvar artType -padx 20
 
-button .saveInvB -text "Rechnung verbuchen"
-button .abbruchInvB -text "Abbruch"
-pack .abbruchInvB .saveInvB -in .n.t2.bottomF -side right
-
-
-####################################################################################
-# P a c k   b o t t o m 
-###################################################################################
-pack [frame .bottomF] -side bottom -fill x
-button .abbruchB -text "Programm beenden" -activebackground red -command {
-	catch {pg_disconnect $dbname}
-	exit
-	}
-pack .abbruchB -in .bottomF -side right
+button .saveinvB -text "Rechnung verbuchen"
+button .abbruchinvB -text "Abbruch"
+pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
 
 
 ######################################################################################
@@ -247,48 +248,50 @@ pack .news -in .bottomF -side left -anchor nw -fill x -expand 1
 ######################################################################################
 
 #1. A R T I K E L   V E R W A L T E N
-label .confArtT -text "Artikel erfassen" -font "TkHeadingFont"
-message .confArtM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B. Std.) dürfen nicht leer sein.\nDie Kontrollkästchen 'Auslage' und 'Rabatt' für den Artikeltyp können leer sein. Wenn 'Rabatt' ein Häkchen bekommt, gilt der Artikel als Abzugswert in Prozent (im Feld 'Preis' Prozentzahl ohne %-Zeichen eingeben, z.B. 5.5). Der Rabatt wird in der Rechnung vom Gesamtbetrag abgezogen.\nFalls das Feld 'Auslage' angehakt wird (z.B. für Artikel 'Zugfahrt'), wird der Artikel in der Rechnung separat als Auslage aufgeführt, unterliegt nicht der Mehrwertsteuerpflicht und wird nicht als Einnahme verbucht."
+label .confartT -text "Artikel erfassen" -font "TkHeadingFont"
+message .confartM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B. Std.) dürfen nicht leer sein.\nDie Kontrollkästchen 'Auslage' und 'Rabatt' für den Artikeltyp können leer sein. Wenn 'Rabatt' ein Häkchen bekommt, gilt der Artikel als Abzugswert in Prozent (im Feld 'Preis' Prozentzahl ohne %-Zeichen eingeben, z.B. 5.5). Der Rabatt wird in der Rechnung vom Gesamtbetrag abgezogen.\nFalls das Feld 'Auslage' angehakt wird (z.B. für Artikel 'Zugfahrt'), wird der Artikel in der Rechnung separat als Auslage aufgeführt, unterliegt nicht der Mehrwertsteuerpflicht und wird nicht als Einnahme verbucht."
 
 
 #These are packed/unpacked later by article procs
-label .confArtL -text "Artikel Nr."
+label .confartL -text "Artikel Nr."
 
 namespace eval artikel {
   label .confartnameL -padx 7 -width 25 -textvar artName -anchor w
-  label .confArtPriceL -padx 10 -width 7 -textvar artPrice -anchor w
-  label .confArtUnitL -padx 10 -width 7 -textvar artUnit -anchor w
-  label .confArtTypeL -padx 10 -width 1 -textvar artType -anchor w
+  label .confartpriceL -padx 10 -width 7 -textvar artPrice -anchor w
+  label .confartunitL -padx 10 -width 7 -textvar artUnit -anchor w
+  label .confarttypeL -padx 10 -width 1 -textvar artType -anchor w
 }
 spinbox .confartnumSB -width 5 -command {setArticleLine TAB4}
-button .confArtSaveB -text "Artikel speichern" -command {saveArticle}
-button .confArtDeleteB -text "Artikel löschen" -command {deleteArticle} -activebackground red
-button .confArtCreateB -text "Artikel erfassen" -command {createArticle}
+button .confartsaveB -text "Artikel speichern" -command {saveArticle}
+button .confartdeleteB -text "Artikel löschen" -command {deleteArticle} -activebackground red
+button .confartcreateB -text "Artikel erfassen" -command {createArticle}
 entry .confartnameE -bg beige
 entry .confartunitE -bg beige -textvar artikel::rabatt
 entry .confartpriceE -bg beige
 ttk::checkbutton .confarttypeACB -text "Auslage"
 ttk::checkbutton .confarttypeRCB -text "Rabatt"
+#TODO
+#pack .confartcreateB -in .n.t4
 
 #DATENBANK SICHERN
-label .dumpDBT -text "Datenbank sichern" -font "TkHeadingFont"
-message .dumpDBM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner $dumpDir abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando \n\tsu postgres -c 'psql $dbname < $dbname-\[DATUM\].sql' \n wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
-button .dumpDBB -text "Datenbank sichern" -command {dumpDB}
-pack .dumpDBT -in .n.t4.f2 -anchor nw
-pack .dumpDBM -in .n.t4.f2 -anchor nw -side left
-pack .dumpDBB -in .n.t4.f2 -anchor se -side right
+label .dumpdbT -text "Datenbank sichern" -font "TkHeadingFont"
+message .dumpdbM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner $dumpDir abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando \n\tsu postgres -c 'psql $dbname < $dbname-\[DATUM\].sql' \n wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
+button .dumpdbB -text "Datenbank sichern" -command {dumpdb}
+pack .dumpdbT -in .n.t4.f2 -anchor nw
+pack .dumpdbM -in .n.t4.f2 -anchor nw -side left
+pack .dumpdbB -in .n.t4.f2 -anchor se -side right
 
 #DATENBANK EINRICHTEN
-label .confDBT -text "Datenbank einrichten" -font "TkHeadingFont"
-message .confDBM -width 800 -text "Fürs Einrichten der PostgreSQL-Datenbank sind folgende Schritte nötig:\n1. Das Programm PostgreSQL über die Systemsteuerung installieren.\n2. (optional) Einen Nutzernamen für PostgreSQL einrichten, welcher von TkOffice auf die Datenbank zugreifen darf. Normalerweise wird der privilegierte Nutzer 'postgres' automatisch erstellt. Sonst in einer Konsole als root (su oder sudo) folgendes Kommando eingeben: \n\t sudo useradd postgres \n3. Den Nutzernamen und einen beliebigen Namen für die TkOffice-Datenbank hier eingeben (z.B. tkofficedb).\n4. Den Knopf 'Datenbank erstellen' betätigen, um die Datenbank und die von TkOffice benötigten Tabellen einzurichten.\n5. TkOffice neu starten und hier weitermachen (Artikel erfassen, Angaben für die Rechnungsstellung)."
-label .confDBNameL -text "Name der Datenbank" -font "TKSmallCaptionFont"
-label .confDBUserL -text "Benutzer" -font "TkSmallCaptionFont"
-entry .confDBNameE -textvar dbname
-entry .confDBUserE -textvar dbuser -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
-button .initDBB -text "Datenbank erstellen" -command {initDB}
-pack .confDBT -in .n.t4.f3 -anchor nw 
-pack .confDBM -in .n.t4.f3 -anchor ne -side left
-pack .initDBB  .confDBNameE .confDBUserE -in .n.t4.f3 -anchor se -side right
+label .confdbT -text "Datenbank einrichten" -font "TkHeadingFont"
+message .confdbM -width 800 -text "Fürs Einrichten der PostgreSQL-Datenbank sind folgende Schritte nötig:\n1. Das Programm PostgreSQL über die Systemsteuerung installieren.\n2. (optional) Einen Nutzernamen für PostgreSQL einrichten, welcher von TkOffice auf die Datenbank zugreifen darf. Normalerweise wird der privilegierte Nutzer 'postgres' automatisch erstellt. Sonst in einer Konsole als root (su oder sudo) folgendes Kommando eingeben: \n\t sudo useradd postgres \n3. Den Nutzernamen und einen beliebigen Namen für die TkOffice-Datenbank hier eingeben (z.B. tkofficedb).\n4. Den Knopf 'Datenbank erstellen' betätigen, um die Datenbank und die von TkOffice benötigten Tabellen einzurichten.\n5. TkOffice neu starten und hier weitermachen (Artikel erfassen, Angaben für die Rechnungsstellung)."
+label .confdbnameL -text "Name der Datenbank" -font "TKSmallCaptionFont"
+label .confdbuserL -text "Benutzer" -font "TkSmallCaptionFont"
+entry .confdbnameE -textvar dbname
+entry .confdbuserE -textvar dbuser -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
+button .initdbB -text "Datenbank erstellen" -command {initdb}
+pack .confdbT -in .n.t4.f3 -anchor nw 
+pack .confdbM -in .n.t4.f3 -anchor ne -side left
+pack .initdbB  .confdbnameE .confdbuserE -in .n.t4.f3 -anchor se -side right
 
 #RECHNUNGSSTELLUNG
 pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
@@ -350,29 +353,48 @@ if {[info exists cond3] && $cond3!=""} {.billcond3E insert 0 $cond3; .billcond3E
 if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcurrencySB set $currency}
 
 
+####################################################################################
+# P a c k   b o t t o m 
+###################################################################################
+#pack [frame .bottomF] -in .n.containerF -side bottom -fill x -expand 0
+
+button .abbruchB -text "Programm beenden" -activebackground red -command {
+	catch {pg_disconnect $dbname}
+	exit
+	}
+pack .abbruchB -in .bottomF -side right
+
 
 #######################################################################
 ## F i n a l   a c t i o n s :    detect Fehlermeldung bzw. socket no.
 #######################################################################
 if {[string length $res] >20} {
   NewsHandler::QueryNews $res red 
-  .confDBNameE conf -text "Datenbankname eingeben" -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
-  .confDBUserE conf -text "Datenbanknutzer eingeben" -validate focusin -validatecommand {%W conf -text "Name eingeben" -bg beige -fg grey ; return 0}
+  .confdbnameE conf -text "Datenbankname eingeben" -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
+  .confdbUserE conf -text "Datenbanknutzer eingeben" -validate focusin -validatecommand {%W conf -text "Name eingeben" -bg beige -fg grey ; return 0}
   return 1
 }
 
+#Verify DB state
 NewsHandler::QueryNews "Mit Datenbank verbunden" lightgreen
 set db $res
+.confdbnameE conf -state disabled
+.confdbuserE conf -state disabled
+.initdbB conf -state disabled
+
+
+#TODO try below - separating "New invoice" procs from "Show old invoice" procs in tkoffice-invoice.tcl
+source [file join $progDir tkoffice-invoice.tcl]
 setAdrList
 resetAdrWin
-#fillAdrInvWin [$adrSpin get]
-.confDBNameE conf -state disabled
-.confDBUserE conf -state disabled
-.initDBB conf -state disabled
+
 resetNewInvDialog
+
+
 updateArticleList
 resetArticleWin
 setArticleLine TAB2
+
 setArticleLine TAB4
 
 #Execute once when specific TAB opened
@@ -383,10 +405,28 @@ bind .n <<NotebookTabChanged>> {
     set t3 1
   }
 }
-##Load progs for tab 3
-after 500 {
-  vwait t3
-  source [file join $progDir tkoffice-report.tcl]
+
+
+
+#after 1000 {
+#  vwait t2
+#  source [file join $progDir tkoffice-invoice.tcl]
+resetNewInvDialog
+#updateArticleList
+resetArticleWin
+setArticleLine TAB2
+#}
+##Load progs for tab 3 -TODO try this for TAB4 which should be least used!!!!
+#after 1500 {
+#  vwait t3
+#  source [file join $progDir tkoffice-report.tcl]
   setAbschlussjahrSB
-}
+#}
+#Recompute real widths
+#set topwinX [winfo width .]
+#puts $topwinX
+#set nbWidth [expr round($topwinX / 10) * 9]
+#.n conf -width $nbWidth
+#.n.t2.f2 conf -width [expr round($nbWidth / 10) * 9] 
+#set f2Width [winfo width .n.t2.f2]
 
