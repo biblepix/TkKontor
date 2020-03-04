@@ -1,6 +1,7 @@
+
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 3mch20
+# Restored: 4mch20
 
 set version 1.0
 
@@ -11,6 +12,10 @@ source [file join $progDir tkoffice-invoice.tcl]
 source [file join $progDir tkoffice-report.tcl]
 source [file join $progDir pgin.tcl]
 source $confFile
+
+#Create title font
+font create TIT
+font configure TIT -family Helvetica -size 16 -weight bold
 
 #Haupttitel & Frames
 set px 5
@@ -44,12 +49,10 @@ pack [frame .umsatzF] -in .n.t1 -side bottom  -fill x
 
 #Tab 1
 pack [frame .n.t1.mainF] -fill x -expand 0
-pack [frame .n.t1.mainF.f2 -borderwidth 5 -relief ridge -pady 10 -padx 10] -anchor nw -fill x
+pack [frame .n.t1.mainF.f2 -pady 10 -padx 10] -anchor nw -fill x
 pack [frame .n.t1.mainF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
 
 #Tab 2
-#set f2Width [expr round($topwinX / 10 * 8)]
-
 pack [frame .n.t2.f1 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.f3 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
@@ -71,7 +74,7 @@ pack [frame .n.t4.f5 -pady $py -padx $px -borderwidth 5 -highlightbackground sil
 
 #Pack 3 top frames seitwärts
 #Create "Adressen" title
-label .adrTitel -text "Adressverwaltung" -font "TkCaptionFont 18" -pady 5
+label .adrTitel -text "Adressverwaltung" -font TIT -pady 5 -padx 5 -anchor w -fg steelblue -bg silver
 pack .adrTitel -in .n.t1.mainF.f2 -anchor w -fill x
 ##obere Frames in .n.t1.f2
 pack [frame .adrF2 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
@@ -117,13 +120,13 @@ pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
 .umsatzF conf -bd 2 -relief sunken
 
 #Create "Rechnungen" Titel
-label .adrInvTitel -text "Verbuchte Rechnungen" -font "TkCaptionFont 18"
+label .adrInvTitel -justify center -text "Verbuchte Rechnungen" -font TIT -pady 5 -padx 5 -anchor w -fg steelblue -bg silver -padx 5
 label .creditL -text "Kundenguthaben: $currency " -font "TkCaptionFont"
 label .credit2L -text "\u2196 wird bei Zahlungseingang aktualisiert" -font "TkIconFont" -fg grey
 message .creditM -textvar credit -relief sunken -width 50
 label .umsatzL -text "Kundenumsatz: $currency " -font "TkCaptionFont"
 message .umsatzM -textvar umsatz -relief sunken -bg lightblue -width 50
-pack .adrInvTitel -in .n.t1.mainF.f3 -anchor w
+pack .adrInvTitel -in .n.t1.mainF.f3 -anchor w -fill x
 
 #Umsatz unten
 pack .creditL .creditM .credit2L -in .umsatzF -side left -anchor w
@@ -151,8 +154,8 @@ pack .invShowH -in $headF -side right
 ########################################################################################
 
 #Main Title
-label .titel3 -text "Neue Rechnung erfassen" -font "TkCaptionFont 18" -pady 15
-pack .titel3 -in .n.t2.f1
+label .titel3 -text "Rechnung erfassen" -font TIT -anchor w -pady 5 -padx 5 -fg steelblue -bg silver
+pack .titel3 -in .n.t2.f1 -fill x -anchor w
 
 #Get Zahlungsbedingungen from config
 set condList ""
@@ -217,7 +220,7 @@ pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
 # T A B  3 :  A B S C H L Ü S S E
 ######################################################################################
 
-message .abschlussM -justify left -width 1000 -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch. Die Auslagen und der Reingewinn sind von Hand zu berechnen und einzutragen. Die Auslagen können in der Vorlagedatei '$auslagenTxt' angepasst werden.\nAllfällige Mehrwertsteuer und kundenspezifische Spesen erscheinen neben der Rechnung.\nDer Ausdruck erfolgt phototechnisch nach PNG. Für PDF müssen die Programme Netpbm und GhostScript installiert sein.\nDer rohe Text steht in $reportDir zur weiteren Bearbeitung zur Verfügung."
+message .abschlussM -justify left -width 1000 -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch. \nAllfällige Mehrwertsteuer und kundenspezifische Spesen erscheinen neben der Rechnung.\nDer Ausdruck erfolgt phototechnisch nach PNG. Für PDF müssen die Programme Netpbm und GhostScript installiert sein.\nDer rohe Text steht in $reportDir zur weiteren Bearbeitung zur Verfügung."
 message .spesenM -justify left -width 1000 -text "Hier kommen die allgemeinen Geschäftsauslagen..."
 button .abschlussCreateB -text "Abschluss erstellen" -command {createAbschluss}
 button .abschlussPrintB -text "Abschluss drucken" -command {printAbschluss}
