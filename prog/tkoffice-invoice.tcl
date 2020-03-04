@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-invoice.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
-# Updated: 3mch20
+# Updated: 4mch20
 
 source $confFile
 ################################################################################################################
@@ -109,13 +109,18 @@ proc addInvRow {} {
       pack $F -fill x -anchor w    
 
       #Create labels per row
-      catch {label $F.mengeL${rowNo} -text $menge -bg lightblue -width 20 -justify left -anchor w}
-      catch {label $F.artnameL${rowNo} -text $artName -bg lightblue -width 53 -justify left -anchor w}
-      catch {label $F.artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify right -anchor w}
-      catch {label $F.artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
-      catch {label $F.arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
-      catch {label $F.rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
-
+#      catch {label $F.mengeL${rowNo} -text $menge -bg lightblue -width 20 -justify left -anchor w}
+#      catch {label $F.artnameL${rowNo} -text $artName -bg lightblue -width 53 -justify left -anchor w}
+#      catch {label $F.artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify right -anchor w}
+#      catch {label $F.artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
+#      catch {label $F.arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
+#      catch {label $F.rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
+      catch {label $F.mengeL -text $menge -bg lightblue -width 20 -justify left -anchor w}
+      catch {label $F.artnameL -text $artName -bg lightblue -width 53 -justify left -anchor w}
+      catch {label $F.artpriceL -text $artPrice -bg lightblue -width 10 -justify right -anchor w}
+      catch {label $F.artunitL -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
+      catch {label $F.arttypeL -text $artType -bg lightblue -width 20 -justify right -anchor e}
+      catch {label $F.rowtotL -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
       #Get current values from GUI
       set bill $rows::bill
       set buch $rows::buch
@@ -158,8 +163,8 @@ proc addInvRow {} {
       ##b) Type is "Rabatt" - compute from $buch (abzgl. Spesen)
       } elseif {$artType == "R"} {
         
-        $F.artnameL${rowNo} conf -text "abzüglich $artName"
-        $F.artpriceL${rowNo} conf -bg yellow -textvar ::rows::rabatt
+        $F.artnameL conf -text "abzüglich $artName"
+        $F.artpriceL conf -bg yellow -textvar ::rows::rabatt
 
         set ::rows::rabattProzent $artPrice
       
@@ -169,7 +174,7 @@ proc addInvRow {} {
 
         set ::rows::rabatt $rabatt
 
-        .arttypeL${rowNo} conf -bg yellow
+        $F.arttypeL conf -bg yellow
         .mengeE conf -state disabled
         set menge 1
       
@@ -180,12 +185,12 @@ proc addInvRow {} {
           set ::rows::auslage [expr $auslage + $rowtot]
           set ::rows::bill [expr $bill + $rowtot]
           set ::rows::buch [expr $bill - $auslage]
-          $F.arttypeL${rowNo} conf -bg orange
-          $F.rowtotL${rowNo} conf -bg orange
+          $F.arttypeL conf -bg orange
+          $F.rowtotL conf -bg orange
       }
 
-      pack $F.artnameL${rowNo} $F.artpriceL${rowNo} $F.mengeL${rowNo} -anchor w -fill x -side left
-      pack $F.artunitL${rowNo} $F.rowtotL${rowNo} $F.arttypeL${rowNo} -anchor w -fill x -side left
+      pack $F.artnameL $F.artpriceL $F.mengeL -anchor w -fill x -side left
+      pack $F.artunitL $F.rowtotL $F.arttypeL -anchor w -fill x -side left
 
       #Reduce amounts to 2 decimal points -TODO better use
       set ::rows::bill [expr {double(round(100*$rows::bill))/100}]
@@ -202,13 +207,12 @@ proc addInvRow {} {
       append ::rows::beschr $separator ${menge} { } $artName
     }
   }
-
 } ;#END addInvRow
 
 # doSaveInv
 ##coordinates invoice saving + printing progs
 ##evaluates exit codes
-##called by .saveInvB button
+##called by .saveinvB button
 proc doSaveInv {} {
 #TODO: remove catches, getting DVIPS and LATEX errors which are NOT errors!
   #1.Save to DB
@@ -235,6 +239,7 @@ proc saveInv2DB {} {
   global db env msg texDir itemFile
   global cond ref comm auftrDat vat
 
+  
   set adrNo [.adrSB get]
 
   #1. Get invNo & export to ::Latex 
@@ -251,12 +256,15 @@ proc saveInv2DB {} {
   set auslage $rows::auslage
     
   #Create itemList for itemFile (needed for LaTeX)
-  foreach w [namespace children rows] {
-    set artUnit [.artunitL[namespace tail $w] cget -text]
-    set artPrice [.artpriceL[namespace tail $w] cget -text]
-    set artType [.arttypeL[namespace tail $w] cget -text]
-    set artName [.artnameL[namespace tail $w] cget -text]
-    set menge [.mengeL[namespace tail $w] cget -text]
+  foreach rowNo [namespace children rows] {
+    set rowNo [namespace tail $rowNo]
+    set F .newInvoiceF.invF${rowNo}
+    
+    set artUnit [$F.artunitL cget -text]
+    set artPrice [$F.artpriceL cget -text]
+    set artType [$F.arttypeL cget -text]
+    set artName [$F.artnameL cget -text]
+    set menge [$F.mengeL cget -text]
     #Check if Discount
     if {$artType==""} {
       append itemList \\Fee\{ $artName { } \( pro { } $artUnit \) \} \{ $artPrice \} \{ $menge \} \n
@@ -327,7 +335,6 @@ proc saveInv2DB {} {
     '$cond',
     '$itemListHex'
     )"]
-
   
 #TODO does this belong here? should we use reportResult instead?
   if {[pg_result $token -error] != ""} {
@@ -336,7 +343,7 @@ proc saveInv2DB {} {
   } else {
    	NewsHandler::QueryNews "Rechnung $invNo gespeichert" lightgreen
     fillAdrInvWin $adrNo
-    .saveInvB conf -text "Rechnung drucken" -command "doPrintNewInv $invNo"
+    .saveinvB conf -text "Rechnung drucken" -command "doPrintNewInv $invNo"
     return 0
   } 
 
