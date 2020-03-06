@@ -1,7 +1,7 @@
 
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 4mch20
+# Restored: 6mch20
 
 set version 1.0
 
@@ -23,8 +23,8 @@ set py 5
 pack [frame .titelF -padx 10 -pady 10 -bg steelblue3] -fill x
 label .titelL -text "Auftragsverwaltung" -pady $py -padx $px -font "TkHeadingFont 80 bold" -fg silver -anchor w
 
-#Eigenes Firmenlogo falls vorhanden
-catch setMyLogo
+#Eigenes Firmenlogo falls vorhanden ???
+#catch setMyLogo
 set screenX [winfo screenwidth .]
 set screenY [winfo screenheight .]
 
@@ -159,16 +159,12 @@ pack .titel3 -in .n.t2.f1 -fill x -anchor w
 
 #Get Zahlungsbedingungen from config
 set condList ""
-label .invcondL -text "Zahlungsbedingung:"
-if [info exists cond1] {
-lappend condList $cond1
-}
-if [info exists cond2] {
-lappend condList $cond2
-}
-if [info exists cond3] {
-lappend condList $cond3
-}
+label .invcondL -text "Zahlungsbedingung:" -pady 10
+foreach cond [list $cond1 $cond2 $cond3] { 
+  if {$cond != ""} {
+    lappend condList $cond
+  }
+} 
 #Insert into spinbox
 spinbox .invcondSB -width 20 -values $condList -textvar cond -bg beige
 #Auftragsdatum: set to heute
