@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 3mch20
+# Restored: 10mch20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -18,34 +18,56 @@ proc roundDecimal {sum} {
 
 # latex2pdf
 ##produces PDF of any TeX file
+## args = invNo OR jahr
+
 ##called by ?printInvoice? & ?printReport?
-proc latex2pdf {texPath} {
-  global tmpDir spoolDir reportDir
+
+proc latex2pdf {num type} {
+  global tmpDir spoolDir reportDir texDir
   
+
+  #Copy PDF to correct location
+  
+  #A. Abschluss
+  if {$type == "rep"} {
+    
+    set jahr $num
+    set texName "Abschluss.tex"
+    set texPath [file join $texDir $texName]
+    append pdfName [file root $texName] . pdf  
+    set targetDir $reportDir
+    
+  #B. Invoice
+  } elseif {$type == "inv"} {
+
+    set invNo $num
+    set texPath [setInvPath $invNo tex]
+    set pdfPath [setInvPath $invNo pdf]
+    set pdfName [file tail $pdfPath]
+    set targetDir $spoolDir
+  }
+
   #Latex > PDF
   namespace eval Latex {}
   set Latex::texPath $texPath
   set Latex::tmpDir $tmpDir
+  set Latex::targetDir $targetDir
+    
   namespace eval Latex {
-    eval exec -- pdflatex -interaction nonstopmode -output-directory $tmpDir $texPath
-  }
-
-  #Copy PDF to correct location
-  set fileName [file tail $texPath]
-  if [regexp Abschluss $texPath] {
-    set targetDir $reportDir
-  } elseif [regexp invoice $texPath] {
-    set targetDir $spoolDir
+    eval exec -- pdflatex -interaction nonstopmode -output-directory $targetDir $texPath
   }
   
-  #TODO coordinate names with [printAbschluss]  !!!
-  set jahr [.abschlussJahrSB get]
-  set pdfName [file root $fileName] $jahr . pdf
-  file copy -force [file join $tmpDir $pdfName] $targetDir
+  #Rename Report to include year
+  if {$type == "rep"} {
+    cd $reportDir
+    set pdfNewName [file root $pdfName]${jahr}.pdf
+    set pdfName [file rename $pdfName $pdfNewName]
+  }
   
   NewsHandler::QueryNews "Die Datei $pdfName befindet sich in $targetDir zur weiteren Bearbeitung." lightgreen
   return 0
-}
+  
+} ;#END latex2pdf
 
 # viewDocument
 ##runs detectViewer & opens file with appropriate app
@@ -118,12 +140,12 @@ proc printPdf {pdfPath} {
   
   
   after 2000  {
-  NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wurde möglicherweise nicht gedruckt.\nIst der Drucker eingeschaltet?" red  
+    NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wurde möglicherweise nicht gedruckt.\nIst der Drucker eingeschaltet?" red  
   }
   
   #3. Retry printing OR view
   after 5000  {
-  NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wird noch einmal zum Drucker geschickt..." lightblue
+    NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wird noch einmal zum Drucker geschickt..." lightblue
     if [catch {exec lpr $Latex::pdfPath}] {
       NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wurde möglicherweise nicht gedruckt.\nEs wird nun zur Weiterverarbeitung angezeigt..." orange
       viewDocument $Latex::pdfPath pdf
@@ -812,3 +834,43 @@ proc dumpDB {} {
     NewsHandler::QueryNews "Datenbank erfolgreich gesichert in $dumppath" lightgreen
   }
 }
+
+# printDocument
+##latexes Abschluss.tex + Invoice[NR].tex & sends to Printer/Viewer
+##with type "report" num=jahr / with type "Invoice" num=invNo
+##called by .newinvprintB & .abschlussPrintB
+proc printDocument {num type} {
+
+  global texDir reportDir tmpDir spoolDir
+ 
+  #A.  A b s c h l u s s
+  if {$type == "rep"} {
+ 
+  #  set jahr [.abschlussJahrSB get]
+    set jahr $num
+    set texName Abschluss.tex
+    set texPath [file join $texDir $texName]
+    append pdfName [file root $texName] $jahr . pdf 
+    set pdfPath [file join $reportDir $pdfName]
+    
+    #1. run latexReport
+    if [catch latexReport] {
+      NewsHandler::QueryNews "Es ist ein Fehler aufgetreten..." red
+      return 1
+    }
+    
+  # B. I n v o i c e 
+  } elseif {$type == "inv"} { 
+
+    set invNo $num
+    set texPath [setInvPath $invNo tex]
+    set pdfPath [setInvPath $invNo pdf]
+     
+    #2. Run latex2pdf (not needed for Report!)
+    latex2pdf $invNo $type
+  }
+
+  #3. Try printing OR view
+  printPdf $pdfPath
+
+} ;# END printDocument

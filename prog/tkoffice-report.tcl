@@ -1,8 +1,8 @@
 # ~/TkOffice/prog/tkoffice-report.tcl
 # called by tkoffice-gui.tcl
-# Updated: 24feb20
+# Updated: 10mch20
 
-#sSrced by abschlussPrintB button & ?
+#sSrced by .abschlussPrintB button & ?
 
 ################################################################################
 ### A B S C H L Ü S S E  &  E X P E N S E S
@@ -270,13 +270,15 @@ proc createAbschluss {} {
   puts $chan $auslagenTex
   close $chan
 
+  #Configure print button
+  .abschlussPrintB conf -command "printDocument $jahr rep"
+  
 } ;#END createAbschluss 
 
-# abschluss2latex
-##recreates abschlussEinnahmen.tex & abschlussAuslagen.tex
-##recreates Abschluss.tex from above files
+# latexReport
+##recreates (abschlussEinnahmen.tex) + (abschlussAuslagen.tex) > Abschluss.tex 
 ##called by printAbschluss
-proc abschluss2latex {} {
+proc latexReport {} {
   global db myComp currency vat texDir reportDir
   
   set jahr [.abschlussJahrSB get]
@@ -360,41 +362,10 @@ append abschlTex {
   puts $chan $abschlTex
   close $chan
   
-  #TODO: for testing only > need PDF!
-  NewsHandler::QueryNews "$abschlussTexFile gespeichert" lightgreen
-  return 0
-} ;#END abschluss2latex
-
-
-# printAbschluss
-##runs abschluss2latex & creates PDF & produces Print dialog
-##called by .abschlussPrintB button
-proc printAbschluss {} {
-  global texDir reportDir tmpDir
-  set jahr [.abschlussJahrSB get]
-  
-  ##recreate TeX file
-  set abschlussTexName Abschluss.tex
-  set abschlussTexPath [file join $texDir $abschlussTexName]
-  ##create temporary Pdf file
-  append abschlussPdfName [file root $abschlussTexName] $jahr . pdf 
-  set abschlussPdfPath [file join $reportDir $abschlussPdfName]
-       
-  #1. run abschluss2latex
-  if [catch abschluss2latex] {
-    NewsHandler::QueryNews "Es ist ein Fehler aufgetreten..." red
+  if [catch {latex2pdf $jahr rep}] {
+    NewsHandler::QueryNews "$abschlussTexFile konnte nicht nach PDF umgewandelt werden." red
     return 1
   }
-  
-  #2. latex2pdf
-  catch {latex2pdf $abschlussTexPath}
-
-  #3. Try printing OR view
-  namespace eval Latex {}
-  set Latex::abschlussPdfPath $abschlussPdfPath
-  after 3000 {
-    printPdf $Latex::abschlussPdfPath
-  }
-
+      
   return 0
-}
+} ;#END latexReport

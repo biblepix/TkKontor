@@ -343,6 +343,9 @@ proc saveInv2DB {} {
   } else {
    	NewsHandler::QueryNews "Rechnung $invNo gespeichert" lightgreen
     fillAdrInvWin $adrNo
+    
+    #TODO how can we incorporate printDocument here instead? - needs number + type!
+    #Do we still need "doPrintNewInv" ?
     .saveinvB conf -text "Rechnung drucken" -command "doPrintNewInv $invNo"
     return 0
   } 
@@ -678,7 +681,6 @@ printInvoice $invNo
 return
 
 
-
  #TODO test this thoroughly, there may be no output at all!!!
   if [catch {printInvoice $invNo} res] {
     NewsHandler::QueryNews "$res\nDruck fehlgeschlagen!" red 
@@ -689,6 +691,7 @@ return
   after 5000 "NewsHandler::QueryNews 'Die Rechnung wird nun angezeigt. Sie können sie aus dem Anzeigeprogramm erneut ausdrucken bzw. nach PDF umwandeln.' orange"
   after 8000 "viewInvoice $invPsPath"
 }
+
 
 # setInvPath
 ##composes invoice name from company short name & invoice number
@@ -710,9 +713,9 @@ proc setInvPath {invNo type} {
     append invDviName $invName . dvi
     set invPath [file join $tmpDir $invDviName]
     
-  } elseif {$type == "ps"} {  
-    append invPsName $invName . ps
-    set invPath [file join $tmpDir $invPsName]
+#  } elseif {$type == "ps"} {  
+#    append invPsName $invName . ps
+#    set invPath [file join $tmpDir $invPsName]
     
   } elseif {$type == "pdf"} {  
     append invPdfName $invName . pdf
@@ -1012,5 +1015,6 @@ proc viewInvOnCanvas {invNo} {
   .topW.showinvprintB conf -command "printInvoice $invNo"  
 
   return 0
-}
+
+} ;#END viewInvOnCanvas
 

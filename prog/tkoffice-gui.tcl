@@ -1,7 +1,7 @@
 
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 6mch20
+# Restored: 10mch20
 
 set version 1.0
 
@@ -219,7 +219,7 @@ pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
 message .abschlussM -justify left -width 1000 -text "Wählen Sie das Jahr und bearbeiten Sie den Abschluss im Textfenster nach Wunsch. \nAllfällige Mehrwertsteuer und kundenspezifische Spesen erscheinen neben der Rechnung.\nDer Ausdruck erfolgt phototechnisch nach PNG. Für PDF müssen die Programme Netpbm und GhostScript installiert sein.\nDer rohe Text steht in $reportDir zur weiteren Bearbeitung zur Verfügung."
 message .spesenM -justify left -width 1000 -text "Hier kommen die allgemeinen Geschäftsauslagen..."
 button .abschlussCreateB -text "Abschluss erstellen" -command {createAbschluss}
-button .abschlussPrintB -text "Abschluss drucken" -command {printAbschluss}
+button .abschlussPrintB -text "Abschluss drucken" ;#configured in above proc
 
 button .spesenB -text "Spesen verwalten" -command {manageExpenses}
 button .spesenDeleteB -text "Eintrag löschen" -command {deleteExpenses}
