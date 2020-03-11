@@ -2,7 +2,7 @@
 # ~/TktkofficeDir/tkofficeDir.tcl
 # Main launcher prog for TktkofficeDir Business Software
 # Installation requirements: Tcl/Tk library, PostgreSQL database
-# Updated: 1nov19
+# Updated: 11mch20
 
 set tkofficeDir [file normalize [file dirname [info script]]]
 set confDir [file join $tkofficeDir conf]
@@ -14,6 +14,10 @@ set tmpDir /tmp
 set dumpDir [file join $tkofficeDir dump]
 set makeConfig [file join $progDir makeConfig.tcl]
 set texVorlage [file join $texDir rechnung-vorlage.tex]
+set reportDir [file join $tkofficeDir reports]
+set reportTexFiles "Abschluss.tex"
+
+file mkdir $confDir $dumpDir $spoolDir
 
 if [catch {source $confFile}] {
   set dbname "Datenbankname eingeben"

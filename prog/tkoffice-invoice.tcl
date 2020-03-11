@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-invoice.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
-# Updated: 4mch20
+# Updated: 11mch20
 
 source $confFile
 ################################################################################################################

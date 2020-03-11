@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 10mch20
+# Restored: 11mch20
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S  
@@ -24,9 +24,6 @@ proc roundDecimal {sum} {
 
 proc latex2pdf {num type} {
   global tmpDir spoolDir reportDir texDir
-  
-
-  #Copy PDF to correct location
   
   #A. Abschluss
   if {$type == "rep"} {
@@ -71,29 +68,34 @@ proc latex2pdf {num type} {
 
 # viewDocument
 ##runs detectViewer & opens file with appropriate app
-##works with DVI & PDF
-##called by ...
+##works with PDF
+##called by ? for viewing Abschluss.pdf ?
+##not to be confused with viewInvoice which allows for canvas viewing!
 proc viewDocument {file type} {
   set viewer [detectViewer $type]
   #open in $viewer if found, else use xdg-open
   if {$viewer==1} {
-    exec xdg-open $file
-  } else {
-    catch {exec $viewer $file}
+    set viewer "xdg-open"
   }
-  return
+
+  if [catch {exec $viewer $file}] {
+    NewsHandler::QueryNews "Kann $file nicht anzeigen. Öffnen Sie die Datei eigenhändig." red
+    return 1
+  }
+  
+  return 0
 }
 
 # detectViewer
 ##looks for DVI/PDF viewer
 ##returns 1 if none found
-##called by showInvoice (DVI) +  ? ?
+##called by showInvoice (DVI) + ? ?
 proc detectViewer {type} {
   
-  #Viewers for DVI+PDF
+  #Viewers for DVI+PDF (needed by viewInvoice)
   lappend viewerList evince okular
 
-  #Extra PDF viewers
+  #Extra PDF viewers (needed by viewDocument)
   if {$type == "pdf" } {
     lappend viewerList xpdf qpdf mupdf acroread zathura qpdfview pqiv gspdf pdf-reader
   }

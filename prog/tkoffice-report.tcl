@@ -23,6 +23,17 @@ proc setAbschlussjahrSB {} {
   .abschlussJahrSB set [expr $heuer - 1]
 }
 
+# setReportPath
+##adds year to reportName
+##called by various Abschluss procs
+setReportPdfPath {jahr} {
+  global texDir reportDir reportTexFile
+  set reportName [file root $reportTexFile]
+  append reportPdfName $reportName $jahr . pdf
+  set reportPdfPath [file join $reportDir $reportPdfName] 
+  return $reportPdfPath
+}
+
 #################################
 # A U S L A G E N
 #################################
@@ -279,12 +290,14 @@ proc createAbschluss {} {
 ##recreates (abschlussEinnahmen.tex) + (abschlussAuslagen.tex) > Abschluss.tex 
 ##called by printAbschluss
 proc latexReport {} {
-  global db myComp currency vat texDir reportDir
+  global db myComp currency vat texDir reportDir reportTexFile
   
   set jahr [.abschlussJahrSB get]
+#  set reportName [file root $reportTexFile]
+ 
   set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
   set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
-  set abschlussTexFile [file join $texDir Abschluss.tex]
+   
  # set abschlussPdfFile [file join $reportDir Abschluss${jahr}.pdf]
   
   set einnahmenTex [read [open $einnahmenTexFile]]
@@ -358,12 +371,12 @@ append abschlTex {
   }
   
   #Save to file
-  set chan [open $abschlussTexFile w]
+  set chan [open $reportTexFile w]
   puts $chan $abschlTex
   close $chan
   
   if [catch {latex2pdf $jahr rep}] {
-    NewsHandler::QueryNews "$abschlussTexFile konnte nicht nach PDF umgewandelt werden." red
+    NewsHandler::QueryNews "$reportTexFile konnte nicht nach PDF umgewandelt werden." red
     return 1
   }
       
