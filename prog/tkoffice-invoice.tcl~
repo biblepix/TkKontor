@@ -369,7 +369,7 @@ proc latexInvoice {invNo type} {
   #Prepare general vars & ::Latex namespace 
   set invDviPath [setInvPath $invNo dvi]
   
-  #catch {namespace delete Latex}
+  catch {namespace delete Latex}
   namespace eval Latex {}
   set Latex::invTexPath [setInvPath $invNo tex]
   set Latex::tmpDir $tmpDir

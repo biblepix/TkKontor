@@ -1,6 +1,7 @@
+
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 28mch20
+# Restored: 10mch20
 
 set version 1.0
 
@@ -9,7 +10,6 @@ package require Img
 source [file join $progDir tkoffice-procs.tcl]
 source [file join $progDir tkoffice-invoice.tcl]
 source [file join $progDir tkoffice-report.tcl]
-source [file join $progDir tkoffice-print.tcl]
 source [file join $progDir pgin.tcl]
 source $confFile
 
