@@ -18,7 +18,7 @@ proc setAbschlussjahrSB {} {
   set token [pg_exec $db "SELECT DISTINCT EXTRACT(year FROM f_date) FROM invoice"]
   set jahresliste [pg_result $token -list]
   lappend jahresliste $heuer
-   
+
   .abschlussJahrSB conf -values [lsort -decreasing $jahresliste]
   .abschlussJahrSB set [expr $heuer - 1]
 }
@@ -30,7 +30,7 @@ proc setReportPdfPath {jahr} {
   global texDir reportDir reportTexFile
   set reportName [file root $reportTexFile]
   append reportPdfName $reportName $jahr . pdf
-  set reportPdfPath [file join $reportDir $reportPdfName] 
+  set reportPdfPath [file join $reportDir $reportPdfName]
   return $reportPdfPath
 }
 
@@ -54,11 +54,11 @@ proc manageExpenses {} {
   pack .spesenLB -in .n.t3.mainF
 
   .spesenAddB conf -text "Eintrag hinzufügen" -command {addExpenses}
-  
+
   .spesenLB delete 0 end
   #get listbox values from DB
   set token [pg_exec $db "SELECT * FROM spesen"]
-  
+
   foreach tuple [pg_result $token -llist] {
     #set tuple [pg_result $token -getTuple $tupleNo]
     set name [lindex $tuple 1]
@@ -70,7 +70,7 @@ proc manageExpenses {} {
 proc addExpenses {} {
   pack .spesenAbbruchB .spesenAddB .expvalueE .expnameE -in .n.t3.mainF -side right -anchor se
   pack forget .spesenDeleteB
-  .spesenAddB conf -text "Speichern" -command {saveExpenses} 
+  .spesenAddB conf -text "Speichern" -command {saveExpenses}
   set ::expname "Bezeichnung"
   set ::expval "Betrag"
   .expnameE conf -fg grey -validate focusin -vcmd {%W delete 0 end;%W conf -fg black;return 0}
@@ -82,7 +82,7 @@ proc saveExpenses {} {
   set name [.expnameE get]
   set value [.expvalueE get]
   set token [pg_exec $db "INSERT INTO spesen (name,value) VALUES ('$name',$value)"]
-  
+
   NewsHandler::QueryNews [pg_result $token -error] red
   #reportResult $token "Eintrag gespeichert."
   manageExpenses
@@ -94,7 +94,7 @@ proc deleteExpenses {} {
   set value [lindex [.spesenLB get active] end]
   set token [pg_exec $db "DELETE FROM spesen WHERE value=$value"]
   reportResult $token "Eintrag gelöscht"
-  
+
   #2 update LB
   manageExpenses
 #  return 0
@@ -118,24 +118,24 @@ proc createAbschluss {} {
   set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
 
 	#get data from $jahr's invoices + 'payeddate = $jahr' from any previous invoices
-	set res [pg_exec $db "SELECT 
+	set res [pg_exec $db "SELECT
 	f_number,
 	f_date,
 	addressheader,
 	finalsum,
 	vatlesssum,
 	payedsum,
-	auslage FROM invoice 
-	WHERE EXTRACT(YEAR from payeddate) = $jahr 
-	OR EXTRACT(YEAR from f_date) = $jahr 
+	auslage FROM invoice
+	WHERE EXTRACT(YEAR from payeddate) = $jahr
+	OR EXTRACT(YEAR from f_date) = $jahr
 	ORDER BY f_number ASC"]
-	
+
 	#save result to var
 	if {[pg_result $res -error] != ""} {
 	  NewsHandler::QueryNews "[pg_result $res -error]" red
 	  return 1
   }
-	  
+
 	pg_result $res -assign j
 	set maxTuples [pg_result $res -numTuples]
 
@@ -148,7 +148,7 @@ proc createAbschluss {} {
   text .abschlussT
 #  canvas .abschlussC
   scrollbar .abschlussScr -orient vertical
-  
+
 	#Textwin dimensions Tk scaling factor:
 	##requires LETTER height + LINE width!
 	set scaling [tk scaling]
@@ -156,20 +156,20 @@ proc createAbschluss {} {
   set winLetW [expr round(3.5 * $winLetH)]
 	set winLetY [expr round($winLetH * $scaling)]
  	set winLetX [expr round($winLetW * $scaling)]
-  
+
   #Configure widgets & scroll bar
   $t conf -bg lightblue -bd 0 -width $winLetX -height $winLetY -padx 10 -pady 10 -yscrollcommand "$sb set"
   $sb conf -command "$t yview"
-  
+
   #Pack all
   pack $t $sb -in .n.t3.mainF -side left -fill both
 	pack .abschlussPrintB -in .n.t3.botF -anchor se
-	
+
 	# F i l l   t e x t w i n
 #	raise $t
 #	update
 #	$t delete 1.0 end
-  
+
   #Compute tabs for landscape layout (c=cm m=mm)
 	$t configure -tabs {
 	1.5c
@@ -179,43 +179,43 @@ proc createAbschluss {} {
 	22c numeric
 	25c numeric
   }
-	
-  #Configure font tags	
+
+  #Configure font tags
   $t tag conf T1 -font "TkHeadingFont 20"
   $t tag conf T2 -font "TkCaptionFont 16"
   $t tag conf T3 -font "TkSmallCaptionFont 10 bold"
-  
+
   #B u i l d   w i n d o w
 	$t insert 1.0 "$myComp\n" T1
 	$t insert end "Erfolgsrechnung $jahr\n\n" T1
   $t insert end "Einnahmen\n" T2
-  
+
   # E I N N A H M E N
-  
+
   $t insert end "Rch.Nr.\tDatum\tAnschrift\tNetto ${currency}\tMwst. ${vat}%\tSpesen\tBezahlt ${currency}\tTotal ${currency}\n" T3
 
 
 #TODO  'finalsum' is exclusive vat & Auslagen - list Auslagen anyway because payedsum may differ
-  	
+
 	#compute sum total & insert text lines
 	#TODO use sum(...) from DB instaead!
 	for {set no 0;set sumtotal 0} {$no <$maxTuples} {incr no} {
 		set total $j($no,payedsum)
 		catch {set sumtotal [expr $sumtotal + $total]}
 		set sumtotal [roundDecimal $sumtotal]
-		
+
 		##compute Mwst
 		set VAT $j($no,vatlesssum)
 		set finalsum $j($no,finalsum)
-		
+
 		if {! $vat > 0} {
   		set VAT ""
   		set vatlesssum $finalsum
 		} else {
   		set VAT [expr $finalsum - $vatlesssum]
   	}
-  	
-		##set spesen tab  		
+
+		##set spesen tab
 		set spesen $j($no,auslage)
     if ![string is double $spesen] {
 	    set spesen ""
@@ -226,19 +226,19 @@ proc createAbschluss {} {
 		set invDat $j($no,f_date)
 		set invAdr $j($no,addressheader)
 		set payedsum $j($no,payedsum)
-		
+
 		#1. list in text window
 		$t insert end "\n${invNo}\t${invDat}\t${invAdr}\t${vatlesssum}\t${VAT}\t${spesen}\t${payedsum}"
-		
+
 		#2.export to Latex
     append einnahmenTex $invNo & $invDat & $invAdr & $vatlesssum & $spesen & $VAT & $payedsum {\\} \n
 	}
 
 ### A U S L A G E N
-	
+
 	#Get 'spesen' from DB
 	set token [pg_exec $db "SELECT * FROM spesen"]
-  
+
   foreach tuple [pg_result $token -llist] {
     set name [lindex $tuple 1]
     set value [lindex $tuple 2]
@@ -248,7 +248,7 @@ proc createAbschluss {} {
     ##2.prepare for LateX
     append auslagenTex {\multicolumn{3}{l}} \{ $name \} &&& \{ \$ \- $value \$ \} {\\} \n
   }
- 
+
   if {$spesenAmounts == ""} {
     set spesenAmounts 0.00
   } else {
@@ -258,7 +258,7 @@ proc createAbschluss {} {
       }
   }
   set spesenTotal [roundDecimal $spesenTotal]
-  
+
 	#TODO insert further  ...
 	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
 	$t insert end "\n\nAuslagen\n" T2
@@ -284,32 +284,32 @@ proc createAbschluss {} {
 
   #Configure print button
   .abschlussPrintB conf -command "doPrintReport $jahr"
-  
-} ;#END createAbschluss 
+
+} ;#END createAbschluss
 
 # latexReport
-##recreates (abschlussEinnahmen.tex) + (abschlussAuslagen.tex) > Abschluss.tex 
+##recreates (abschlussEinnahmen.tex) + (abschlussAuslagen.tex) > Abschluss.tex
 ##called by printAbschluss
 proc latexReport {jahr} {
   global db myComp currency vat texDir reportDir reportTexFile
   set reportTexPath [file join $texDir $reportTexFile]
-  
+
 #  set jahr [.abschlussJahrSB get]
   set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
   set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
   set einnahmenTex [read [open $einnahmenTexFile]]
   set auslagenTex  [read [open $auslagenTexFile]]
-  
+
   #get netTot vatTot spesTot from DB
   ##TODO? Bedingung 'year = payeddate' könnte dazu führen, dass Gesamtbetrag in 2 Jahren aufgeführt wird, wenn Teilzahlung vorhanden!
-  set token [pg_exec $db "SELECT sum(vatlesssum),sum(finalsum),sum(auslage),sum(payedsum) 
+  set token [pg_exec $db "SELECT sum(vatlesssum),sum(finalsum),sum(auslage),sum(payedsum)
     FROM invoice AS total
     WHERE EXTRACT(YEAR from f_date) = $jahr OR
           EXTRACT(YEAR from payeddate) = $jahr
   "]
 
   set yearlyExpTot [pg_result [pg_exec $db "SELECT sum(value) from spesen"] -list]
-  
+
   ##compute all values for Abschluss
   set vatlessTot [lindex [pg_result $token -list] 0]
   set bruTot [roundDecimal [lindex [pg_result $token -list] 1]]
@@ -323,7 +323,7 @@ proc latexReport {jahr} {
     set netProfit 0.00
   }
 
-  #R E C R E A T E   A B S C H L U S S . T E X 
+  #R E C R E A T E   A B S C H L U S S . T E X
   ##header data
   append abschlTex {\documentclass[10pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
@@ -332,17 +332,17 @@ proc latexReport {jahr} {
 \author{}
 }
 append abschlTex {\title} \{ $myComp {\\} Erfolgsrechnung { } $jahr \}
-append abschlTex { 
+append abschlTex {
 \begin{document}
 \maketitle
 \begin{small}
 \begin{longtable}{ll p{0.4\textwidth} rrrr}
 %1. Einnahmen
 \caption{\textbf{EINNAHMEN}} \\
-\textbf{R.Nr} & \textbf{Datum} & \textbf{Adresse} & 
-\textbf{Netto} &  
-\textbf{Mwst.} & 
-\textbf{Spesen} & 
+\textbf{R.Nr} & \textbf{Datum} & \textbf{Adresse} &
+\textbf{Netto} &
+\textbf{Mwst.} &
+\textbf{Spesen} &
 \textbf{Bezahlt} \\
 \endhead
 }
@@ -352,7 +352,7 @@ append abschlTex {
   append abschlTex {\textbf} \{ $bruTot \} &
   append abschlTex {\textbf} \{ $vatTot \} &
   append abschlTex {\textbf} \{ $custExpTot \} &
-  
+
   append abschlTex [expr $bruTot - ($vatTot - $custExpTot)] {\\} \n
   append abschlTex {&&abzügl. Mehrwertsteuer&&&} \{ \$ \- $vatTot \$ \} {\\} \n
   append abschlTex {&&abzügl. Spesen&&&} \{ \$ \- $custExpTot \$ \} {\\} \n
@@ -371,7 +371,7 @@ append abschlTex {
   }
 
 #puts $abschlTex
-#puts $reportTexPath 
+#puts $reportTexPath
 
   #Save to file
   set chan [open $reportTexPath w]
@@ -380,22 +380,13 @@ append abschlTex {
 
 #Latex2pdf
 #latex2pdf $jahr rep
-  
+
 #TODO: latex catches don't work!!!!!!!!!!!!!!!!!!!!!!!!!!! - check all progs + find better solution.
 #  if [catch {latex2pdf $jahr rep}] {
 
 #    NewsHandler::QueryNews "$reportTexFile konnte nicht nach PDF umgewandelt werden." red
 #    return 1
 #  }
-      
+
   return 0
 } ;#END latexReport
-
-##called by .abschlussPrintB
-proc doPrintReport {jahr} {
-  
-  latexReport $jahr
-  
-  after 2000 
-  printDocument $jahr rep
-}

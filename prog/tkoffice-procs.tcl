@@ -4,12 +4,12 @@
 # Restored: 28mch20
 
 ##################################################################################################
-### G E N E R A L   &&   A D D R E S S  P R O C S  
+### G E N E R A L   &&   A D D R E S S  P R O C S
 ##################################################################################################
 
 # roundDecimal
 ##rounds any sum to $sum.$dp
-##called by various output progs 
+##called by various output progs
 proc roundDecimal {sum} {
   set dp 2 ;#no. of decimal places
   set rounded [format "%.${dp}f" $sum]
@@ -22,17 +22,17 @@ proc roundDecimal {sum} {
 ##called by printDocument
 proc latex2pdf {num type} {
   global tmpDir spoolDir reportDir texDir
-  
+
   #A. Abschluss
   if {$type == "rep"} {
-    
+
     set jahr $num
     set texName "Abschluss.tex"
     set texPath [file join $texDir $texName]
     append pdfName [file root $texName] . pdf
     set pdfPath [file join $tmpDir $pdfName]
     set targetDir $reportDir
-    
+
   #B. Invoice
   } elseif {$type == "inv"} {
 
@@ -49,11 +49,11 @@ proc latex2pdf {num type} {
   set Latex::texPath $texPath
   set Latex::tmpDir $tmpDir
   #set Latex::targetDir $targetDir
-    
+
   namespace eval Latex {
     eval exec -- pdflatex -interaction nonstopmode -output-directory $tmpDir $texPath
   }
-  
+
   #Rename 'Abschluss.pdf' to include year
   if {$type == "rep"} {
     while ![file exists $pdfPath] {
@@ -65,20 +65,20 @@ proc latex2pdf {num type} {
     file rename -force $pdfName $pdfNewName
     set pdfName $pdfNewName
   }
-  
-  #Copy any type PDF from $tmpDir to $targetDir 
+
+  #Copy any type PDF from $tmpDir to $targetDir
   cd $tmpDir
   file copy -force $pdfName $targetDir
-  
+
   #TODO include here tkoffice-reports.tcl p. 378 to catch any failure !!!
   ###NewsHandler::QueryNews "Die Datei $pdfName befindet sich in $targetDir zur weiteren Bearbeitung." lightgreen
   return 0
-  
+
 } ;#END latex2pdf
 
 
 # createTkOfficeLogo
-##called by tkoffice-gui.tcl 
+##called by tkoffice-gui.tcl
 proc createTkOfficeLogo {} {
 #Bitmap should work, but donno why it doesn't
 #$invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
@@ -104,7 +104,7 @@ proc createTkOfficeLogo {} {
 
   set schrift3 [.logoC create text 8 65 -anchor w]
   .logoC itemconf $schrift3 -font "TkCaptionFont 18 bold" -fill $blau -text "TkOffice Business Software"
-  
+
   set schrift4 [.logoC create text 0 110 -anchor w]
   .logoC itemconf $schrift4 -font "TkHeadingFont 50 bold" -fill red -text "Auftragsverwaltung" -angle 4.
   .logoC lower $schrift4
@@ -113,7 +113,7 @@ proc createTkOfficeLogo {} {
   .logoC itemconf $schrift5 -fill $blau -font "TkCaptionFont 14 bold"
 }
 
-#Create small bitmap ::verbucht::im 
+#Create small bitmap ::verbucht::im
 ##called by fillAdrInvWin
 #for printInvButton
 #Bitmap should work, but donno why it doesn't:
@@ -130,15 +130,15 @@ proc createPrintBitmap {} {
 }
 
 #############################################################################################
-###  A D D R E S S  P R O C S  
+###  A D D R E S S  P R O C S
 #############################################################################################
 
 proc setAdrList {} {
   global db adrSpin
   $adrSpin config -bg lightblue
 	set IDlist [pg_exec $db "SELECT objectid FROM address ORDER BY objectid DESC"]
-	$adrSpin conf -values [pg_result $IDlist -list] 
-	
+	$adrSpin conf -values [pg_result $IDlist -list]
+
 	$adrSpin conf -command {
 		fillAdrWin %s
 		fillAdrInvWin %s
@@ -147,10 +147,10 @@ proc setAdrList {} {
   	after idle {%W config -validate %v}
   	return 1
 	} -invcmd {}
-	
+
 	#set last entry at start
   fillAdrWin [$adrSpin get]
-  catch {pack forget .adrClearSelB} 
+  catch {pack forget .adrClearSelB}
 }
 
 proc fillAdrWin {adrId} {
@@ -181,7 +181,7 @@ global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
   if {[string is punct $mail] || $mail==""} {set ::mail "Mail" ; .mailE conf -fg silver} {set ::mail $mail}
   if {[string is punct $www] || $www==""} {set ::www "Internet" ; .wwwE conf -fg silver} {set ::www $www}
   if {[string is punct $fax] || $fax==""} {set ::fax "Telefax" ; .faxE conf -fg silver} {set ::fax $fax}
-  
+
   return 0
 } ;#END fillAdrWin
 
@@ -192,8 +192,8 @@ proc searchAddress {} {
   if {$s == ""} {return 0}
 
   #Search names/city/zip
-  set token [pg_exec $db "SELECT objectid FROM address WHERE 
-	  name1 ~ '$s' OR 
+  set token [pg_exec $db "SELECT objectid FROM address WHERE
+	  name1 ~ '$s' OR
 	  name2 ~ '$s' OR
     zip ~ '$s' OR
 	  city ~ '$s'
@@ -210,7 +210,7 @@ proc searchAddress {} {
     after 5000 {resetAdrSearch}
     return 1
   }
-  
+
   #A: open address if only 1 found
   if {$numTuples == 1} {
     $adrSpin set $adrNumList
@@ -258,9 +258,9 @@ proc resetAdrSearch {} {
   $adrSearch config -fg grey -validate focusin -vcmd {
     %W delete 0 end
     %W conf -fg black
-    after idle 
+    after idle
     %W conf -validate focusout -vcmd searchAddress
-    
+
     return 0
   }
 }
@@ -269,7 +269,7 @@ proc resetAdrSearch {} {
 ##called by GUI (first fill) + Abbruch btn + aveAddress
 proc resetAdrWin {} {
   global adrSpin adrSearch
-  
+
   pack .name1E .name2E .streetE -in .adrF2 -anchor nw
   pack .zipE .cityE -anchor nw -in .adrF2 -side left
   pack .tel1E .tel2E .faxE .mailE .wwwE -in .adrF4
@@ -280,7 +280,7 @@ proc resetAdrWin {} {
 
   .b1 config -text "Anschrift ändern" -command {changeAddress $adrNo}
   .b2 config -text "Anschrift löschen" -command {deleteAddress $adrNo}
-  pack .b1 .b2 .b0 -in .adrF3 -anchor se  
+  pack .b1 .b2 .b0 -in .adrF3 -anchor se
 
   $adrSpin conf -bg lightblue
   $adrSearch conf -state normal
@@ -306,7 +306,7 @@ proc newAddress {} {
 
   clearAdrWin
   $adrSpin delete 0 end
-  $adrSpin conf -bg #d9d9d9  
+  $adrSpin conf -bg #d9d9d9
 
   .b1 configure -text "Anschrift speichern" -command {saveAddress}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
@@ -329,7 +329,7 @@ proc saveAddress {} {
   global db adrSpin
 
   #get new values from entery widgets
-	set adrno [$adrSpin get]		
+	set adrno [$adrSpin get]
 	set name1 [.name1E get]
 	set name2 [.name2E get]
 	set street [.streetE get]
@@ -346,29 +346,29 @@ set tel2 $::tel2
 	if {$adrno == ""} {
 		set newNo [createNewNumber address]
 		set token [pg_exec $db "INSERT INTO address (
-      objectid, 
-      ts, 
-      name1, 
-      name2, 
-      street, 
-      zip, 
-      city, 
-      telephone, 
-      mobile, 
-      email, 
+      objectid,
+      ts,
+      name1,
+      name2,
+      street,
+      zip,
+      city,
+      telephone,
+      mobile,
+      email,
       www
-      ) 	
+      )
 		VALUES (
-      $newNo, 
-      $newNo, 
-      '$name1', 
-      '$name2', 
-      '$street', 
-      '$zip', 
-      '$city', 
-      '$tel1', 
-      '$tel2', 
-      '$mail', 
+      $newNo,
+      $newNo,
+      '$name1',
+      '$name2',
+      '$street',
+      '$zip',
+      '$city',
+      '$tel1',
+      '$tel2',
+      '$mail',
       '$www'
       )"
     ]
@@ -376,8 +376,8 @@ set tel2 $::tel2
 
 	#B: change old
 	} else {
-				
-	set token [pg_exec $db "UPDATE address SET 
+
+	set token [pg_exec $db "UPDATE address SET
 		name1='$name1',
 		name2='$name2',
 		street='$street',
@@ -397,7 +397,7 @@ set tel2 $::tel2
    	NewsHandler::QueryNews "Anschrift Nr. $adrno gespeichert" lightgreen
 	  #Update Address list
 	  catch setAdrList
-  } 
+  }
 
   resetAdrWin
 } ;#END saveAddress
@@ -411,13 +411,13 @@ proc deleteAddress {adrNo} {
 
     set res [tk_messageBox -message "Wollen Sie die Adresse $adrNo wirklich löschen?" -type yesno]
     if {!$res} {return 1}
-  	
+
     set token [pg_exec $db "DELETE FROM address WHERE objectid=$adrNo"]
     reportResult $token "Adresse $adrNo gelöscht."
     resetAdrWin
 
   } else {
-    reportResult $token "Adresse $adrNo nicht gelöscht, da mit Rechnung(en) [pg_result $token -list] verknüpft." 
+    reportResult $token "Adresse $adrNo nicht gelöscht, da mit Rechnung(en) [pg_result $token -list] verknüpft."
   }
 } ;#END deleteAddress
 
@@ -446,19 +446,19 @@ proc resetArticleWin {} {
 proc setArticleLine {tab} {
   global db
   .confarttypeL conf -bg #c3c3c3
-  
+
   if {$tab == "TAB4"} {
     set artNum [.confartnumSB get]
-    
+
   } elseif {$tab == "TAB2"} {
     .mengeE delete 0 end
     .mengeE conf -bg beige
-    .mengeE conf -insertbackground orange -insertwidth 10 -insertborderwidth 5 -insertofftime 500 -insertontime 1000  
+    .mengeE conf -insertbackground orange -insertwidth 10 -insertborderwidth 5 -insertofftime 500 -insertontime 1000
     .mengeE conf -state normal -validate key -vcmd {string is double %P} -invcmd {%W conf -bg red; after 2000 ; %W conf -bg beige}
     set artNum [.invartnumSB get]
     focus .invartnumSB
   }
-  
+
   #Read spinboxes
   if {$tab == "TAB2"} {
     namespace eval artikel {
@@ -477,7 +477,7 @@ proc setArticleLine {tab} {
     set artPrice [lindex [pg_result $token -list] 1]
     set artUnit [lindex [pg_result $token -list] 2]
     set artType [lindex [pg_result $token -list] 3]
-  
+
     if {$artType == "R"} {
       .mengeE delete 0 end
       .mengeE insert 0 "1"
@@ -487,23 +487,23 @@ proc setArticleLine {tab} {
       .confarttypeL conf -bg orange
     }
   }
-  
+
   if {$tab == "TAB4"} {
     return 0
   }
 
-#TODO get order right! 
+#TODO get order right!
   namespace eval artikel {
     if {$artPrice == 0} {
       set artPrice [.invartpriceE get]
       pack forget .invartpriceL
-      pack .invartunitL .invartnameL .invartpriceE .invarttypeL -in .n.t2.f2 -side left   
+      pack .invartunitL .invartnameL .invartpriceE .invarttypeL -in .n.t2.f2 -side left
     } else {
       pack forget .invartpriceE
       pack .invartunitL .invartnameL .invartpriceL .invarttypeL -in .n.t2.f2 -side left
     }
   }
-  
+
   return 0
 
 } ;#END setArticleLine
@@ -515,7 +515,7 @@ proc createArticle {} {
   .confartnumSB set ""
   .confartnumSB conf -bg lightgrey
   pack .confartsaveB -in .n.t4.f1 -side right
-   
+
 #TODO:move to GUI?
   .confarttypeRCB conf -variable rabattselected -command {
     if [.confarttypeRCB instate selected] {
@@ -533,7 +533,7 @@ proc createArticle {} {
   .confartunitE delete 0 end
   .confartpriceE delete 0 end
   .confartpriceE conf -validate key -vcmd {%W conf -bg beige ; string is double %P} -invcmd {%W conf -bg red}
-  #Rename list entries to headers  
+  #Rename list entries to headers
   set ::artName "Bezeichnung"
   set ::artPrice "Preis"
   set ::artUnit "Einheit"
@@ -542,7 +542,7 @@ proc createArticle {} {
 
   #Rename Button
   .confartcreateB conf -text "Abbruch" -activebackground red -command {resetArticleWin}
-  
+
 #TODO: articleWin is not reset after saving!!!
 } ;#END createArticle
 
@@ -571,7 +571,7 @@ proc saveArticle {} {
     artunit,
     artprice,
     arttype
-    ) 
+    )
     VALUES (
       '$artName',
       '$artUnit',
@@ -585,7 +585,7 @@ proc saveArticle {} {
   }
 
 pack .confartL .confartnumSB .confartunitL .confartpriceL .confartnameL .confarttypeL -in .n.t4.f1 -side left
-  
+
   #Recreate article list
   updateArticleList
   resetArticleWin
@@ -612,7 +612,7 @@ proc deleteArticle {} {
 ##called by saveArticle / ...
 proc updateArticleList {} {
   global db
-  set token [pg_exec $db "SELECT artnum FROM artikel"] 
+  set token [pg_exec $db "SELECT artnum FROM artikel"]
   .invartnumSB conf -values [pg_result $token -list]
   .confartnumSB conf -values [pg_result $token -list]
 }
@@ -625,60 +625,60 @@ proc updateArticleList {} {
 namespace eval NewsHandler {
 	namespace export QueryNews
   source $::progDir/JList.tcl
-	
+
 	variable queryTextJList ""
 	variable queryColorJList ""
 	variable counter 0
-	variable isShowing 0	
-	
+	variable isShowing 0
+
 	proc QueryNews {text color} {
 		variable queryTextJList
 		variable queryColorJList
 		variable counter
-		
+
 		set queryTextJList [jappend $queryTextJList $text]
 		set queryColorJList [jappend $queryColorJList $color]
-		
+
 		incr counter
-		
+
 		ShowNews
 	}
-	
+
 	proc ShowNews {} {
 		variable queryTextJList
 		variable queryColorJList
 		variable counter
 		variable isShowing
-	
+
 		if {$counter > 0} {
 			if {!$isShowing} {
 				set isShowing 1
-				
+
 				set text [jlfirst $queryTextJList]
 				set queryTextJList [jlremovefirst $queryTextJList]
-				
+
 				set color [jlfirst $queryColorJList]
 				set queryColorJList [jlremovefirst $queryColorJList]
-				
+
 				incr counter -1
-				
+
 				.news configure -bg $color
 				set ::news $text
-				
+
 				after 7000 {
 					NewsHandler::FinishShowing
 				}
 			}
 		}
 	}
-	
-	proc FinishShowing {} {	
+
+	proc FinishShowing {} {
 		variable isShowing
-		
+
 		.news configure -bg silver
 		set ::news "TkOffice $::version"
 		set isShowing 0
-		
+
 		ShowNews
 	}
 } ;#END NewsHandler
@@ -688,8 +688,8 @@ namespace eval NewsHandler {
 
 proc createNewNumber {objectKind} {
 #one for all!
-global db	
-#use new no. for all "integer not null" DB fields! (ref. saveAdress + saveInvoice)	
+global db
+#use new no. for all "integer not null" DB fields! (ref. saveAdress + saveInvoice)
 	if {$objectKind=="address"} {
 		set object "objectid"
 	} elseif {$objectKind=="invoice"} {
@@ -707,15 +707,15 @@ proc reportResult {token text} {
   	NewsHandler::QueryNews "[pg_result $token -error]" red
 
   #if empty - TODO: falsches ERgebnis bei Zahlungseingang!
-#FOR deletions? insertions? 
+#FOR deletions? insertions?
   } elseif {[pg_result $token -oid] != ""} {
 
     NewsHandler::QueryNews "$text [pg_result $token -oid]" lightgreen
-  } 
+  }
 }
 
 proc initialiseDB {dbname} {
-  global db
+  global ?db?
   #1. Create DB
 
   #2. Create tables
@@ -728,14 +728,26 @@ proc initialiseDB {dbname} {
       artprice NUMERIC
     )"
     ]
-    
+  ##2. Spesen
   set token [pg_exec $db "CREATE TABLE spesen (
     num SERIAL,
     name text NOT NULL,
     value NUMERIC NOT NULL
   )"
   ]
-}
+  ##3. Invoice
+  #Invoice with yearly changing no.
+  set token [pg_exec $db "CREATE TABLE invoice (
+    ?f_number? SERIAL,
+    ...
+    ...
+    ...
+  )"
+  ]
+  #include this command somewhere in tkoffice for future Jahreswechsel!!
+  ALTER SEQUENCE [get correct serial name from above, prob. invoice_num_sec ] RESTART WITH "(GET CURRENT YEAR...)0001";
+
+  } ;#END initialiseDB
 
 # dumpDB
 ##called by 'Datenbank sichern' button
@@ -747,7 +759,7 @@ proc dumpDB {} {
   set dumpfile $dbname-${date}.sql
   set dumppath [file join $dumpDir $dumpfile]
   catch {exec pg_dump -U $dbuser $dbname > $dumppath} err
-  
+
   if {$err != ""} {
     NewsHandler::QueryNews "Datenbank konnte nicht gesichert werden;\n$err" red
   } else {
