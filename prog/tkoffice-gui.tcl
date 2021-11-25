@@ -1,8 +1,10 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 28mch20
-
-set version 1.0
+# Restored: 28nov21
+		
+set version 1.1
+set px 5
+set py 5
 
 package require Tk
 package require Img
@@ -17,31 +19,32 @@ source $confFile
 font create TIT
 font configure TIT -family Helvetica -size 16 -weight bold
 
-#Haupttitel & Frames
-set px 5
-set py 5
-pack [frame .titelF -padx 10 -pady 10 -bg steelblue3] -fill x
-label .titelL -text "Auftragsverwaltung" -pady $py -padx $px -font "TkHeadingFont 80 bold" -fg silver -anchor w
+#Create frames
+pack [frame .topF -bg steelblue3] -fill x
+pack [frame .midF -bg steelblue3] -fill x
+pack [frame .botF -bg steelblue3] -fill x
 
-#Eigenes Firmenlogo falls vorhanden ???
-#catch setMyLogo
-set screenX [winfo screenwidth .]
-set screenY [winfo screenheight .]
-
-#Create container frame
-pack [frame .containerF]
+#Firmenname
+label .firmaL -text "$compName" -font "TkHeadingFont 20 bold" -fg silver -bg steelblue3 -anchor w
+pack .firmaL -in .topF -side right -padx 10 -pady 3 -anchor e
 
 #Create Notebook: (maxwidth+maxheight important to avoid overlapping of bottom frame)
-ttk::notebook .n -width [expr round($screenX / 10) * 9] -height [expr round($screenY / 10) * 8]
-pack .n -fill x -in .containerF -anchor nw ;# -expand 1
-
-#Create bottom frame
-pack [frame .bottomF] -in .containerF -side bottom -fill x -expand 0
-
+set screenX [winfo screenwidth .]
+set screenY [winfo screenheight .]
+ttk::notebook .n 
+.n conf -width [expr round($screenX / 10) * 9] -height [expr round($screenY / 10) * 8]
 .n add [frame .n.t1] -text "Adressen + Aufträge"
 .n add [frame .n.t2] -text "Neue Rechnung"
 .n add [frame .n.t3] -text "Jahresabschlüsse"
 .n add [frame .n.t4] -text "Einstellungen"
+pack .n -fill x -in .midF -anchor center -padx 10 -pady 0
+
+
+button .abbruchB -text "Programm beenden" -activebackground red -command {
+	catch {pg_disconnect $dbname}
+	exit
+	}
+pack .abbruchB -in .botF -side right -pady 3 -padx 10
 
 #Pack all frames
 createTkOfficeLogo
@@ -233,17 +236,18 @@ entry .expnameE
 entry .expvalueE
 
 spinbox .abschlussJahrSB -width 4
-message .news -textvar news -width 1000 -relief sunken -pady 5 -padx 10 -justify center -anchor n
+message .news -textvar news -relief sunken -pady 5 -padx 10 -justify center -anchor n -fg gold -bg steelblue3 -width 300
+
 pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
 pack [frame .n.t3.mainF -padx 15 -pady 15] -fill both -expand 1
-pack [frame .n.t3.botF] -fill x
+#pack [frame .n.t3.bottomF] -fill x
 
 pack .abschlussJahrSB .abschlussCreateB .spesenB -in .n.t3.topF -side right
 pack .abschlussM -in .n.t3.topF -side left
 
 #Execute initial commands if connected to DB
 catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res
-pack .news -in .bottomF -side left -anchor nw -fill x -expand 1
+pack .news -in .botF -side left -anchor center
 
 ######################################################################################
 # T A B 4 :  C O N F I G U R A T I O N
@@ -287,13 +291,13 @@ pack .dumpdbB -in .n.t4.f2 -anchor se -side right
 label .confdbT -text "Datenbank einrichten" -font "TkHeadingFont"
 message .confdbM -width 800 -text "Fürs Einrichten der PostgreSQL-Datenbank sind folgende Schritte nötig:\n1. Das Programm PostgreSQL über die Systemsteuerung installieren.\n2. (optional) Einen Nutzernamen für PostgreSQL einrichten, welcher von TkOffice auf die Datenbank zugreifen darf. Normalerweise wird der privilegierte Nutzer 'postgres' automatisch erstellt. Sonst in einer Konsole als root (su oder sudo) folgendes Kommando eingeben: \n\t sudo useradd postgres \n3. Den Nutzernamen und einen beliebigen Namen für die TkOffice-Datenbank hier eingeben (z.B. tkofficedb).\n4. Den Knopf 'Datenbank erstellen' betätigen, um die Datenbank und die von TkOffice benötigten Tabellen einzurichten.\n5. TkOffice neu starten und hier weitermachen (Artikel erfassen, Angaben für die Rechnungsstellung)."
 label .confdbnameL -text "Name der Datenbank" -font "TKSmallCaptionFont"
-label .confdbuserL -text "Benutzer" -font "TkSmallCaptionFont"
+label .confdbUserL -text "Benutzer" -font "TkSmallCaptionFont"
 entry .confdbnameE -textvar dbname
-entry .confdbuserE -textvar dbuser -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
+entry .confdbUserE -textvar dbuser -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
 button .initdbB -text "Datenbank erstellen" -command {initdb}
 pack .confdbT -in .n.t4.f3 -anchor nw 
 pack .confdbM -in .n.t4.f3 -anchor ne -side left
-pack .initdbB  .confdbnameE .confdbuserE -in .n.t4.f3 -anchor se -side right
+pack .initdbB  .confdbnameE .confdbUserE -in .n.t4.f3 -anchor se -side right
 
 #RECHNUNGSSTELLUNG
 pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
@@ -358,13 +362,7 @@ if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcur
 ####################################################################################
 # P a c k   b o t t o m 
 ###################################################################################
-#pack [frame .bottomF] -in .n.containerF -side bottom -fill x -expand 0
 
-button .abbruchB -text "Programm beenden" -activebackground red -command {
-	catch {pg_disconnect $dbname}
-	exit
-	}
-pack .abbruchB -in .bottomF -side right
 
 
 #######################################################################
@@ -381,7 +379,7 @@ if {[string length $res] >20} {
 NewsHandler::QueryNews "Mit Datenbank verbunden" lightgreen
 set db $res
 .confdbnameE conf -state disabled
-.confdbuserE conf -state disabled
+.confdbUserE conf -state disabled
 .initdbB conf -state disabled
 
 

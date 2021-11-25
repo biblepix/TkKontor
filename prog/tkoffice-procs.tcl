@@ -88,29 +88,29 @@ proc createTkOfficeLogo {} {
   set blau lightblue2
   set dunkelblau steelblue3
 
-  canvas .logoC -width $bildschirmbreite -height 30 -borderwidth 7 -bg $dunkelblau
-  pack .logoC -in .titelF -side left -anchor nw
+  canvas .logoC -width 500 -height 45 -bg $dunkelblau -highlightthickness 0
+  pack .logoC -in .topF -side left -anchor w
 
-  set kreis [.logoC create oval 7 7 50 50]
-  .logoC itemconf $kreis -fill orange -outline red
+  set kreis [.logoC create oval 1 1 40 40]
+  .logoC itemconf $kreis -fill orange -outline red -width 1
 
-  set schrift0 [.logoC create text 23 28]
+  set schrift0 [.logoC create text 15 20]
   .logoC itemconf $schrift0 -font "TkHeadingFont 18 bold" -fill $dunkelblau -text "T"
-  set schrift1 [.logoC create text 32 32]
+  set schrift1 [.logoC create text 27 26]
   .logoC itemconf $schrift1 -font "TkCaptionFont 18 bold" -fill $dunkelblau -text "k"
 
-  set schrift2 [.logoC create text 95 30]
-  .logoC itemconf $schrift2 -font "TkHeadingFont 20 bold" -fill orange -text "f f i c e"
+  set schrift2 [.logoC create text 120 25]
+  .logoC itemconf $schrift2 -font "TkHeadingFont 20 bold" -fill orange -text {f  f  i  c  e}
 
-  set schrift3 [.logoC create text 8 65 -anchor w]
-  .logoC itemconf $schrift3 -font "TkCaptionFont 18 bold" -fill $blau -text "TkOffice Business Software"
+#  set schrift3 [.logoC create text [expr $bildschirmbreite - 100] 30 -anchor e]
+ # .logoC itemconf $schrift3 -font "TkCaptionFont 18 bold" -fill $blau -text "TkOffice [mc auftragsverw]" -justify right
 
-  set schrift4 [.logoC create text 0 110 -anchor w]
-  .logoC itemconf $schrift4 -font "TkHeadingFont 50 bold" -fill red -text "Auftragsverwaltung" -angle 4.
-  .logoC lower $schrift4
+#  set schrift4 [.logoC create text 0 110 -anchor w]
+#  .logoC itemconf $schrift4 -font "TkHeadingFont 50 bold" -fill red -text "Auftragsverwaltung" -angle 4.
+#  .logoC lower $schrift4
 
-  set schrift5 [.logoC create text 900 128 -justify right -text TkOffice.vollmar.ch]
-  .logoC itemconf $schrift5 -fill $blau -font "TkCaptionFont 14 bold"
+#  set schrift5 [.logoC create text 900 128 -justify right -text TkOffice.vollmar.ch]
+#  .logoC itemconf $schrift5 -fill $blau -font "TkCaptionFont 14 bold"
 }
 
 #Create small bitmap ::verbucht::im

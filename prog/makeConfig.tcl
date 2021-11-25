@@ -5,8 +5,8 @@ proc makeConfig {} {
   global confFile adrpos
 
   #Get DB name & User
-  set dbname [.confDBNameE get]
-  set dbuser [.confDBUserE get]
+  set dbname [.confdbnameE get]
+  set dbuser [.confdbUserE get]
   append setDbName set { } dbname { } \" $dbname \"
   append setDbUser set { } dbuser { } \" $dbuser \"
 
