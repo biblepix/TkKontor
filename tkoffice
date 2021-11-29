@@ -2,34 +2,66 @@
 # ~/TktkofficeDir/tkofficeDir.tcl
 # Main launcher prog for TktkofficeDir Business Software
 # Installation requirements: Tcl/Tk library, PostgreSQL database
-# Updated: 11mch20
+# Updated: 24nov21
 
+package require msgcat
+namespace import msgcat::mc msgcat::mcset
+
+set tko "TkOffice"
 set tkofficeDir [file normalize [file dirname [info script]]]
 set confDir [file join $tkofficeDir conf]
+
 set confFile [file join $confDir config.tcl]
 set progDir [file join $tkofficeDir prog]
 set spoolDir [file join $tkofficeDir spool]
 set texDir [file join $tkofficeDir tex]
+set reportDir [file join $tkofficeDir reports]
 set tmpDir /tmp
 set dumpDir [file join $tkofficeDir dump]
 set makeConfig [file join $progDir makeConfig.tcl]
 set texVorlage [file join $texDir rechnung-vorlage.tex]
-set reportDir [file join $tkofficeDir reports]
-set reportTexFiles "Abschluss.tex"
+set reportTexFile "Abschluss.tex"
+set msgDir [file join $tkofficeDir msg]
 
-file mkdir $confDir $dumpDir $spoolDir
+file mkdir $confDir $dumpDir $spoolDir $msgDir
 
+msgcat::mcload $msgDir
+  
+proc chooseTkoLang {}  {
+  global tko
+  package require Tk
+  
+  toplevel .tl
+  wm title .tl "$tko Language Selection"
+  wm withdraw .
+
+  label .tl.msgL -width 70 -bg orange -text "* Please choose a language for $tko! \n* Bitte wählen Sie eine Sprache für $tko!"
+	radiobutton .tl.deRB -text Deutsch -value de -variable lang -command {wm forget .tl}
+  radiobutton .tl.enRB -text English -value en -variable lang -command {wm forget .tl}
+  
+  pack .tl.msgL .tl.deRB .tl.enRB -anchor center
+}
+
+#TODO test again! 
 if [catch {source $confFile}] {
+
+	chooseTkoLang
+  
   set dbname "Datenbankname eingeben"
   set dbuser "Nutzername eingeben"
   source [file join $progDir tkoffice-gui.tcl]
+  
   after 7000 {
     .n select 3
   }
+  
+  
   NewsHandler::QueryNews "Keine Konfigurationsdatei gefunden. Sie müssen das Programm erst einrichten." red
 
 } else {
 
   source [file join $progDir tkoffice-gui.tcl]
+	msgcat::mclocale $lang
+
 }
 

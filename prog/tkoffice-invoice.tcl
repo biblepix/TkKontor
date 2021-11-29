@@ -337,10 +337,10 @@ proc saveInv2DB {} {
   
 #TODO does this belong here? should we use reportResult instead?
   if {[pg_result $token -error] != ""} {
-    NewsHandler::QueryNews "Rechnung $invNo nicht gespeichert:\n[pg_result $token -error ]" red
+    NewsHandler::QueryNews "[mc invNotsaved $invNo]:\n[pg_result $token -error ]" red
     return 1
   } else {
-   	NewsHandler::QueryNews "Rechnung $invNo gespeichert" lightgreen
+   	NewsHandler::QueryNews "[mc invSaved $invNo]" lightgreen
     fillAdrInvWin $adrNo
     
     
@@ -350,7 +350,7 @@ proc saveInv2DB {} {
     
     #TODO how can we incorporate printDocument here instead? - needs number + type!
     #Do we still need "doPrintNewInv" ?
-    .saveinvB conf -text "Rechnung drucken" -command "printDocument $invNo inv"
+    .saveinvB conf -text [mc printInv] -command "printDocument $invNo inv" -bg orange
     return 0
   } 
 

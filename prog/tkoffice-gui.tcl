@@ -31,14 +31,17 @@ pack .firmaL -in .topF -side right -padx 10 -pady 3 -anchor e
 #Create Notebook: (maxwidth+maxheight important to avoid overlapping of bottom frame)
 set screenX [winfo screenwidth .]
 set screenY [winfo screenheight .]
+
 ttk::notebook .n 
 .n conf -width [expr round($screenX / 10) * 9] -height [expr round($screenY / 10) * 8]
-.n add [frame .n.t1] -text "Adressen + Aufträge"
-.n add [frame .n.t2] -text "Neue Rechnung"
-.n add [frame .n.t3] -text "Jahresabschlüsse"
-.n add [frame .n.t4] -text "Einstellungen"
-pack .n -fill x -in .midF -anchor center -padx 10 -pady 0
+.n add [frame .n.t1] -text "[mc adr+orders]"
+.n add [frame .n.t2] -text "[mc newInv]"
+.n add [frame .n.t3] -text "[mc reports]"
+.n add [frame .n.t4] -text "[mc settings]"
+.n add [frame .n.t5] -text "[mc info]"
 
+pack .n -fill x -in .midF -anchor center -padx 10 -pady 0
+set winW [winfo width .n]
 
 button .abbruchB -text "Programm beenden" -activebackground red -command {
 	catch {pg_disconnect $dbname}
@@ -90,7 +93,7 @@ set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -bg lightblue -justify right]
 focus $adrSpin
 
 ##Create search field
-set adrSearch [entry .adrSearchE -width 50 -borderwidth 3 -bg beige -fg grey]
+set adrSearch [entry .adrsearchE -width 50 -borderwidth 3 -bg beige -fg grey]
 resetAdrSearch
 
 #Create address entries, to be packed when 'changeAddress' or 'newAddress' are invoked
@@ -236,7 +239,7 @@ entry .expnameE
 entry .expvalueE
 
 spinbox .abschlussJahrSB -width 4
-message .news -textvar news -relief sunken -pady 5 -padx 10 -justify center -anchor n -fg gold -bg steelblue3 -width 300
+message .news -textvar news -relief sunken -pady 5 -padx 10 -justify center -anchor n -width 700
 
 pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
 pack [frame .n.t3.mainF -padx 15 -pady 15] -fill both -expand 1
@@ -247,7 +250,7 @@ pack .abschlussM -in .n.t3.topF -side left
 
 #Execute initial commands if connected to DB
 catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res
-pack .news -in .botF -side left -anchor center
+pack .news -in .botF -side left -anchor center -expand 1
 
 ######################################################################################
 # T A B 4 :  C O N F I G U R A T I O N

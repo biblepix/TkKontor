@@ -237,7 +237,7 @@ proc searchAddress {} {
 proc clearAdrWin {} {
   global adrSpin adrSearch
   foreach e "[pack slaves .adrF2] [pack slaves .adrF4]" {
-    $e conf -bg beige -fg silver -state normal -validate focusin -validatecommand {
+    $e conf -bg beige -fg silver -state normal -validate focusin -vcmd {
     %W delete 0 end
   catch {  %W conf -fg black}
     return 0
@@ -258,9 +258,9 @@ proc resetAdrSearch {} {
   $adrSearch config -fg grey -validate focusin -vcmd {
     %W delete 0 end
     %W conf -fg black
-    after idle
-    %W conf -validate focusout -vcmd searchAddress
-
+    after idle {
+    	%W conf -validate focusout -vcmd searchAddress
+		}
     return 0
   }
 }
@@ -675,7 +675,7 @@ namespace eval NewsHandler {
 	proc FinishShowing {} {
 		variable isShowing
 
-		.news configure -bg silver
+		.news configure -bg #d9d9d9
 		set ::news "TkOffice $::version"
 		set isShowing 0
 

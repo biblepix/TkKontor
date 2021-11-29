@@ -155,6 +155,9 @@ proc makeTexVorlage {} {
   return 0
 } ;#END makeTexVorlage
 
+#TODO add set lang & set compName
+
+#TODO scrap?
 #Setzt Firmenlogo rechts oben, falls existent
 proc setMyLogo {} {
   global myLogo

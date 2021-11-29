@@ -31,7 +31,7 @@ proc detectViewer {type} {
 
   #Viewers for DVI+PDF (needed by viewInvoice)
   if {$type == "dvi"} {
-    lappend viewerList evince okular
+    lappend viewerList evince okular xdvi
 
   #Extra PDF viewers (needed by viewDocument)
   } elseif {$type == "pdf" } {
@@ -170,6 +170,6 @@ proc doPrintReport {jahr} {
 
   latexReport $jahr
   NewsHandler::QueryNews "Das Dokument Abschluss ${jahr} wird zum Drucker geschickt..." orange
-  after 500 printDocument $jahr rep
+  after 3000 printDocument $jahr rep
   return 0
 }
