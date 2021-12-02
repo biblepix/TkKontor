@@ -59,7 +59,8 @@ pack [frame .n.t1.mainF.f2 -pady 10 -padx 10] -anchor nw -fill x
 pack [frame .n.t1.mainF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
 
 #Tab 2
-pack [frame .n.t2.f1 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
+pack [frame .n.t2.f1a -pady $py -padx $px -bd 5] -anchor nw -fill x
+pack [frame .n.t2.f1 -pady $py -padx $px -bd 5] -anchor nw -fill x
 pack [frame .n.t2.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.f3 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.bottomF] -anchor nw -padx 20 -pady 20 -fill both -expand 1
@@ -89,7 +90,7 @@ pack [frame .adrF1] -anchor nw -in .n.t1.mainF.f2 -side left
 pack [frame .adrF3] -anchor se -in .n.t1.mainF.f2 -expand 1 -side left
 
 ##create Address number Spinbox
-set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -bg lightblue -justify right]
+set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -bg lightblue -justify right -textvar adrNo]
 focus $adrSpin
 
 ##Create search field
@@ -109,9 +110,9 @@ entry .mailE -width 25 -textvar mail -justify right
 entry .wwwE -width 25 -textvar www -justify right
 
 #create Address buttons
-button .b0 -text "Neue Anschrift" -width 20 -command {newAddress}
-button .b1 -text "Anschrift ändern" -width 20 -command {changeAddress $adrNo}
-button .b2 -text "Anschrift löschen" -width 20 -command {deleteAddress $adrNo} -activebackground red
+button .b0 -text [mc adrNew] -width 20 -command {newAddress}
+button .b1 -text [mc adrChange] -width 20 -command {changeAddress $adrNo}
+button .b2 -text [mc adrDelete] -width 20 -command {deleteAddress $adrNo} -activebackground red
 
 #Pack adrF1 spinbox
 pack $adrSpin -in .adrF1 -anchor nw
@@ -159,9 +160,10 @@ pack .invShowH -in $headF -side right
 # T A B  2 :   N E W   I N V O I C E
 ########################################################################################
 
-#Main Title
-label .titel3 -text "Rechnung erfassen" -font TIT -anchor w -pady 5 -padx 5 -fg steelblue -bg silver
-pack .titel3 -in .n.t2.f1 -fill x -anchor w
+#Main Title with customer name
+label .titel3 -text "[mc invCreate]" -font TIT -anchor w -pady 5 -padx 5 -fg steelblue -bg silver
+label .titel3name -textvar name2 -font TIT -anchor w -pady 5 -padx 5 -fg steelblue -bg silver
+pack .titel3 .titel3name -in .n.t2.f1a -fill x -anchor w -side left
 
 #Get Zahlungsbedingungen from config
 set condList ""
@@ -196,16 +198,36 @@ message .totalM -width 70 -bg lightgreen -padx 20 -anchor w
 #Set up Artikelliste, fill later when connected to DB
 label .invartlistL -text "Artikelliste" -font "TkHeadingFont"
 label .artL -text "Artikel Nr."
+
+#TODO replace with tk_optionMenu????
 spinbox .invartnumSB -width 2 -command {setArticleLine TAB2}
+
+#menubutton .artMbtn -label [mc article] 
+#TODO get list (Num+Name) from DB! #TODO test!
+
+proc menuBtn {} {
+set tokenL [pg_exec $db "SELECT artname,artprice FROM artikel"]
+#set artNumL [lindex [pg_result $token -list] 0]
+set artNameL [lindex [pg_result $token -list] 0]
+set artPriceL [lindex [pg_result $token -list] 0]
+
+pack [label .artL -text Artikel]
+menu .m ;#-type normal|menubar?
+foreach num [ART.NUMBER+NAME-LIST] {
+.m add command -label "$num $artName" -command {setArticleLine ?var TAB2}
+}
+#Bind .arttn
+bind .artL <1> {tk_popup .m %X %Y}
+}
 
 #Make invoiceFrame
 #catch {frame .invoiceFrame}
 pack [frame .newInvoiceF] -in .n.t2.f3 -side bottom -fill both
 
 #Set KundenName in Invoice window
-label .clientL -text "Kunde:" -font "TkCaptionFont" -bg lightblue
-label .clientnameL -textvariable name2 -font "TkCaptionFont"
-pack .clientnameL .clientL -in .n.t2.f1 -side right
+#label .clientL -text "Kunde:" -font "TkCaptionFont" -bg lightblue
+#label .clientnameL -textvariable name2 -font "TkCaptionFont"
+#pack .clientnameL .clientL -in .n.t2.f1 -side right
 
 label .invartpriceL -textvar artPrice -padx 20
 entry .invartpriceE -textvar artPrice
@@ -257,7 +279,7 @@ pack .news -in .botF -side left -anchor center -expand 1
 ######################################################################################
 
 #1. A R T I K E L   V E R W A L T E N
-label .confartT -text "Artikel erfassen" -font "TkHeadingFont"
+label .confartT -text [mc artManage] -font "TkHeadingFont"
 message .confartM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B. Std.) dürfen nicht leer sein.\nDie Kontrollkästchen 'Auslage' und 'Rabatt' für den Artikeltyp können leer sein. Wenn 'Rabatt' ein Häkchen bekommt, gilt der Artikel als Abzugswert in Prozent (im Feld 'Preis' Prozentzahl ohne %-Zeichen eingeben, z.B. 5.5). Der Rabatt wird in der Rechnung vom Gesamtbetrag abgezogen.\nFalls das Feld 'Auslage' angehakt wird (z.B. für Artikel 'Zugfahrt'), wird der Artikel in der Rechnung separat als Auslage aufgeführt, unterliegt nicht der Mehrwertsteuerpflicht und wird nicht als Einnahme verbucht."
 
 
@@ -271,9 +293,9 @@ namespace eval artikel {
   label .confarttypeL -padx 10 -width 1 -textvar artType -anchor w
 }
 spinbox .confartnumSB -width 5 -command {setArticleLine TAB4}
-button .confartsaveB -text "Artikel speichern" -command {saveArticle}
-button .confartdeleteB -text "Artikel löschen" -command {deleteArticle} -activebackground red
-button .confartcreateB -text "Artikel erfassen" -command {createArticle}
+button .confartsaveB -text [mc artSave] -command {saveArticle}
+button .confartdeleteB -text [mc artDelete] -command {deleteArticle} -activebackground red
+button .confartcreateB -text [mc artCreate] -command {createArticle}
 entry .confartnameE -bg beige
 entry .confartunitE -bg beige -textvar artikel::rabatt
 entry .confartpriceE -bg beige

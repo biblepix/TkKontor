@@ -25,7 +25,7 @@ proc viewDocument {file type} {
 
 # detectViewer
 ##looks for DVI/PDF viewer
-##returns 1 if none found
+##returns name or nothing 1 if none found
 ##called by showInvoice (DVI) + ? ?
 proc detectViewer {type} {
 
@@ -48,9 +48,7 @@ proc detectViewer {type} {
 
   if [info exists viewer] {
     return $viewer
-  } else {
-    return 1
-  }
+  } 
 
 } ;#END detectViewer
 

@@ -268,7 +268,7 @@ proc resetAdrSearch {} {
 # resetAdrWin
 ##called by GUI (first fill) + Abbruch btn + aveAddress
 proc resetAdrWin {} {
-  global adrSpin adrSearch
+  global adrSpin adrNo adrSearch
 
   pack .name1E .name2E .streetE -in .adrF2 -anchor nw
   pack .zipE .cityE -anchor nw -in .adrF2 -side left
@@ -613,7 +613,11 @@ proc deleteArticle {} {
 proc updateArticleList {} {
   global db
   set token [pg_exec $db "SELECT artnum FROM artikel"]
+  
+  
+  #TODO replace?
   .invartnumSB conf -values [pg_result $token -list]
+  #.invartOM artNo [pg_result $token -list]
   .confartnumSB conf -values [pg_result $token -list]
 }
 

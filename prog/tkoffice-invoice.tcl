@@ -734,7 +734,7 @@ proc setInvPath {invNo type} {
 } ;#END setInvPath
 
 
-# viewOldInvoice
+# viewOldInvoice - TODO why not provide PDF view?!
 ##checks out DVI/PS capable viewer
 ##sends rechnung.dvi / rechnung.ps to prog for viewing
 ##called by "Ansicht" & "Rechnung drucken" buttons
@@ -746,7 +746,7 @@ proc viewInvoice {invNo} {
   #A) Show DVI in viewer
   set dviViewer [detectViewer dvi]
 
-  if {! $dviViewer} {  
+  if {$dviViewer != ""} {  
     catch {exec $dviViewer $invDviPath}
   
   #B) Show PS on canvas
