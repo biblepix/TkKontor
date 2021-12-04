@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-invoice.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
-# Updated: 25mch20
+# Updated: 4dec21
 
 source $confFile
 ################################################################################################################
@@ -30,7 +30,8 @@ proc resetNewInvDialog {} {
   }
   
   updateArticleList
-  .invartnumSB invoke buttondown
+  #TODO anpassen
+#  .invartnumSB invoke buttondown
   
   #Configure message labels & pack
   .subtotalM conf -textvar rows::bill
@@ -45,8 +46,11 @@ proc resetNewInvDialog {} {
   catch {message .einzel -textvariable einzel}
 
   pack .invcondL .invcondSB .invauftrdatL .invauftrdatE .invrefL .invrefE .invcomL .invcomE -in .n.t2.f1 -side left -fill x 
-  pack .invartlistL -in .n.t2.f1 -before .n.t2.f2 -anchor w 
-  pack .invartnumSB .mengeE .invartunitL .invartnameL .invartpriceL -in .n.t2.f2 -side left -fill x
+  pack .invartlistMB -in .n.t2.f1 -before .n.t2.f2 -anchor w -padx 20 -pady 5 
+ 
+ #TODO anpassen
+ # pack .invartnumSB .mengeE .invartunitL .invartnameL .invartpriceL -in .n.t2.f2 -side left -fill x
+pack .mengeE .invartunitL .invartnameL .invartpriceL -in .n.t2.f2 -side left -fill x
   pack .addrowB -in .n.t2.f2 -side right -expand 1 -fill x
   
   #Reset Buttons

@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 28mch20
+# Restored: 4dec21
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S
@@ -92,7 +92,7 @@ proc createTkOfficeLogo {} {
   pack .logoC -in .topF -side left -anchor w
 
   set kreis [.logoC create oval 1 1 40 40]
-  .logoC itemconf $kreis -fill orange -outline red -width 1
+  .logoC itemconf $kreis -fill orange -outline gold -width 1
 
   set schrift0 [.logoC create text 15 20]
   .logoC itemconf $schrift0 -font "TkHeadingFont 18 bold" -fill $dunkelblau -text "T"
@@ -439,11 +439,32 @@ proc resetArticleWin {} {
   .confartcreateB conf -text "Artikel erfassen" -command {createArticle}
 }
 
+proc createArtMenu {} {
+	global db
+	set token [pg_exec $db "SELECT artnum,artname FROM artikel"]
+	array set artArr [pg_result $token -list]
+
+
+	#TODO extract artNum from string
+	foreach artNum [array names artArr] {
+		set s [array get artArr $artNum]
+	#set artNo $artNum
+		
+	puts $artNum			
+	puts $s
+		#set artNum  [lindex $s 0]
+#		set artName [lindex $s end]
+		set artName $artArr($artNum)
+		
+		.invartlistMB.menu add radiobutton -label $artName -value $artNum -command {setArticleLine TAB2}
+	}
+}
+	
 # setArticleLine
 ##sets Artikel line in New Invoice window + Artikelverwaltung
 ##needs TAB2 / TAB4 args
 ##called by GUI + spinboxes .confartnumSB/.invartnumSB
-proc setArticleLine {tab} {
+proc setArticleLine {tab args} {
   global db
   .confarttypeL conf -bg #c3c3c3
 
@@ -455,15 +476,18 @@ proc setArticleLine {tab} {
     .mengeE conf -bg beige
     .mengeE conf -insertbackground orange -insertwidth 10 -insertborderwidth 5 -insertofftime 500 -insertontime 1000
     .mengeE conf -state normal -validate key -vcmd {string is double %P} -invcmd {%W conf -bg red; after 2000 ; %W conf -bg beige}
-    set artNum [.invartnumSB get]
-    focus .invartnumSB
+#    set artNum [.invartnumSB get]
+#    focus .invartnumSB
   }
 
   #Read spinboxes
   if {$tab == "TAB2"} {
     namespace eval artikel {
-      set artNum [.invartnumSB get]
+#      set artNum [.invartnumSB get]
+  	set artNum [.invartlistMB.menu entrycget active -value]
     }
+
+
   } else {
     namespace eval artikel {
       set artNum [.confartnumSB get]
@@ -616,7 +640,7 @@ proc updateArticleList {} {
   
   
   #TODO replace?
-  .invartnumSB conf -values [pg_result $token -list]
+  #.invartnumSB conf -values [pg_result $token -list]
   #.invartOM artNo [pg_result $token -list]
   .confartnumSB conf -values [pg_result $token -list]
 }
@@ -679,7 +703,7 @@ namespace eval NewsHandler {
 	proc FinishShowing {} {
 		variable isShowing
 
-		.news configure -bg #d9d9d9
+		.news configure -bg steelblue3 -fg silver ;#d9d9d9
 		set ::news "TkOffice $::version"
 		set isShowing 0
 

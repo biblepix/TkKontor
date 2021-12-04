@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 28nov21
+# Restored: 4dec21
 		
 set version 1.1
 set px 5
@@ -61,12 +61,12 @@ pack [frame .n.t1.mainF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
 #Tab 2
 pack [frame .n.t2.f1a -pady $py -padx $px -bd 5] -anchor nw -fill x
 pack [frame .n.t2.f1 -pady $py -padx $px -bd 5] -anchor nw -fill x
-pack [frame .n.t2.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
+pack [frame .n.t2.f2 -relief ridge -pady $py -padx $px -borderwidth 5] -anchor nw -fill x -padx 20 -pady 15
 pack [frame .n.t2.f3 -pady $py -padx $px -borderwidth 5] -anchor nw -fill x
 pack [frame .n.t2.bottomF] -anchor nw -padx 20 -pady 20 -fill both -expand 1
 
 #Tab 3
-pack [frame .n.t3.f1 -relief ridge -pady $py -padx $px -borderwidth 5] -fill x
+pack [frame .n.t3.f1 -relief ridge -pady $py -padx 20 -borderwidth 5] -fill x
 pack [frame .n.t3.bottomF] -anchor nw -padx 20 -pady 20 -fill x
 #Tab 4
 pack [frame .n.t4.f3 -pady $py -padx $px -borderwidth 5 -highlightbackground silver -highlightthickness 5] -anchor nw -fill x
@@ -176,17 +176,17 @@ foreach cond [list $cond1 $cond2 $cond3] {
 #Insert into spinbox
 spinbox .invcondSB -width 20 -values $condList -textvar cond -bg beige
 #Auftragsdatum: set to heute
-label .invauftrdatL -text "Auftragsdatum:"
+label .invauftrdatL -text "\tAuftragsdatum:"
 entry .invauftrdatE -width 9 -textvar auftrDat -bg beige
 set auftrDat [clock format [clock seconds] -format %d.%m.%Y]
 #Referenz
-label .invrefL -text "Ihre Referenz:"
+label .invrefL -text "\tIhre Referenz:"
 entry .invrefE -width 20 -bg beige -textvar ref
 #Int. Kommentar
-label .invcomL -text "Interne Bemerkung:"
+label .invcomL -text "\tInterne Bemerkung:"
 entry .invcomE -width 30 -bg beige -textvar comm
 
-#Packed later by resetNewInvoice
+#Packed later by resetNewInvoiceDialog
 entry .mengeE -width 7 -bg yellow -fg grey
 label .subtotalL -text "Rechnungssumme: "
 message .subtotalM -width 70 -bg lightblue -padx 20 -anchor w
@@ -195,30 +195,23 @@ message .abzugM -width 70 -bg orange -padx 20 -anchor w
 label .totalL -text "Buchungssumme: "
 message .totalM -width 70 -bg lightgreen -padx 20 -anchor w
 
+
 #Set up Artikelliste, fill later when connected to DB
-label .invartlistL -text "Artikelliste" -font "TkHeadingFont"
-label .artL -text "Artikel Nr."
+menubutton .invartlistMB -text [mc artSelect] -direction below -relief raised -menu .invartlistMB.menu
+
+menu .invartlistMB.menu -tearoff 0 ;# -postcommand {setArticleLine TAB2}
+
+label .arttitL -text "Artikel Nr."
 
 #TODO replace with tk_optionMenu????
-spinbox .invartnumSB -width 2 -command {setArticleLine TAB2}
+#spinbox .invartnumSB -width 2 -command {setArticleLine TAB2}
 
-#menubutton .artMbtn -label [mc article] 
-#TODO get list (Num+Name) from DB! #TODO test!
+#pack [label .artLabel -text Artikel]
 
-proc menuBtn {} {
-set tokenL [pg_exec $db "SELECT artname,artprice FROM artikel"]
-#set artNumL [lindex [pg_result $token -list] 0]
-set artNameL [lindex [pg_result $token -list] 0]
-set artPriceL [lindex [pg_result $token -list] 0]
-
-pack [label .artL -text Artikel]
-menu .m ;#-type normal|menubar?
-foreach num [ART.NUMBER+NAME-LIST] {
-.m add command -label "$num $artName" -command {setArticleLine ?var TAB2}
-}
-#Bind .arttn
-bind .artL <1> {tk_popup .m %X %Y}
-}
+#menu .artMenu -tearoff 0 -title Artikel
+#bind .artLabel <1> {tk_popup .artMenu post %X %Y}
+# bind .artmenuBtn <1> {tk_popup .artMenu %X %Y}
+ #createArtMenu
 
 #Make invoiceFrame
 #catch {frame .invoiceFrame}
@@ -235,8 +228,8 @@ label .invartnameL -textvar artName -padx 50
 label .invartunitL -textvar artUnit -padx 20
 label .invarttypeL -textvar artType -padx 20
 
-button .saveinvB -text "Rechnung verbuchen"
-button .abbruchinvB -text "Abbruch"
+button .saveinvB -text [mc invEnter]
+button .abbruchinvB -text [mc cancel]
 pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
 
 
@@ -254,14 +247,14 @@ button .abschlussPrintB -text "Abschluss drucken" ;#configured in above proc
 
 button .spesenB -text "Jahresspesen verwalten" -command {manageExpenses}
 button .spesenDeleteB -text "Eintrag löschen" -command {deleteExpenses}
-button .spesenAbbruchB -text "Abbruch" -command {manageExpenses}
+button .spesenAbbruchB -text [mc cancel] -command {manageExpenses}
 button .spesenAddB -text "Eintrag hinzufügen" -command {addExpenses}
 listbox .spesenLB -width 100 -height 40 -bg lightblue
 entry .expnameE
 entry .expvalueE
 
 spinbox .abschlussJahrSB -width 4
-message .news -textvar news -relief sunken -pady 5 -padx 10 -justify center -anchor n -width 700
+message .news -textvar news -pady 5 -padx 10 -justify center -anchor n -width 700 -fg silver -bg steelblue3
 
 pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
 pack [frame .n.t3.mainF -padx 15 -pady 15] -fill both -expand 1
@@ -366,7 +359,7 @@ foreach e [pack slaves .billing2F] {
 #Configure vat entry to accept only numbers like 0 / 1.0 / 7.5
 #.billvatE conf -validate key -vcmd {%W conf -bg beige ; string is double %P} -invcmd {%W conf -bg red}
 
-button .billingSaveB -text "Einstellungen speichern" -command {source $makeConfig ; makeConfig}
+button .billingSaveB -text [mc saveConf] -command {source $makeConfig ; makeConfig}
 pack .billingSaveB -in .billing2F -side bottom -anchor se
 
 #Check if vars in config
@@ -418,7 +411,7 @@ resetNewInvDialog
 
 updateArticleList
 resetArticleWin
-setArticleLine TAB2
+#setArticleLine TAB2
 
 setArticleLine TAB4
 
@@ -455,3 +448,4 @@ setArticleLine TAB2
 #.n.t2.f2 conf -width [expr round($nbWidth / 10) * 9] 
 #set f2Width [winfo width .n.t2.f2]
 
+createArtMenu
