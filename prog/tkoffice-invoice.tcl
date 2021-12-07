@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-invoice.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
-# Updated: 4dec21
+# Updated: 7dec21
 
 source $confFile
 ################################################################################################################
@@ -344,7 +344,7 @@ proc saveInv2DB {} {
     NewsHandler::QueryNews "[mc invNotsaved $invNo]:\n[pg_result $token -error ]" red
     return 1
   } else {
-   	NewsHandler::QueryNews "[mc invSaved $invNo]" lightgreen
+   	NewsHandler::QueryNews "[mc invSaved $invNo]" green
     fillAdrInvWin $adrNo
     
     
@@ -405,7 +405,7 @@ proc latexInvoice {invNo type} {
       eval exec -- pdflatex -draftmode -interaction nonstopmode -output-directory $spoolDir $invTexPath
     }  
     set invPdfPath [setInvPath $invNo pdf]
-    NewsHandler::QueryNews "Das PDF-Dokument '[file tail $invPdfPath]' befindet sich in $spoolDir zur weiteren Bearbeitung." lightblue
+    NewsHandler::QueryNews "Das PDF-Dokument '[file tail $invPdfPath]' befindet sich in $spoolDir zur weiteren Bearbeitung." orange
     return 0
   }
 
@@ -672,7 +672,7 @@ proc doPrintOldInv {invNo} {
     NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
     return 1
   }
-  NewsHandler::QueryNews "Rechnung Nr. $invNo wird nun angezeigt.\nEine weitere Bearbeitung (Ausdruck/Versand) ist  aus dem Anzeigeprogramm möglich." lightblue
+  NewsHandler::QueryNews "Rechnung Nr. $invNo wird nun angezeigt.\nEine weitere Bearbeitung (Ausdruck/Versand) ist  aus dem Anzeigeprogramm möglich." orange
 
   after 5000 "latexInvoice $invNo dvi"
   after 9000 "viewInvoice $invNo"
@@ -687,7 +687,7 @@ proc doPrintNewInv {invNo} {
   latexInvoice $invNo ps
   
   #2. try printing to lpr
-  NewsHandler::QueryNews "Sende Rechnung $invNo zum Drucker..." lightblue
+  NewsHandler::QueryNews "Sende Rechnung $invNo zum Drucker..." orange
 printInvoice $invNo
 return
 
@@ -746,19 +746,32 @@ proc viewInvoice {invNo} {
   #global db itemFile vorlageTex texDir spoolDir
 
   set invDviPath [setInvPath $invNo dvi]
+	
+	
+#Convert to pdf
+if [catch {dvipdf $invDviPath}] {
 
-  #A) Show DVI in viewer
-  set dviViewer [detectViewer dvi]
-
-  if {$dviViewer != ""} {  
-    catch {exec $dviViewer $invDviPath}
+	#Try viewing PDF
+	if ![catch {$pdfviewer ?$invpath? }] {
   
-  #B) Show PS on canvas
-  } else {
-    viewInvOnCanvas $invNo  
+  	#TODO make sure name or 1/nothing is returned
+	  if [catch {set pdfViewer [detectViewer pdf]} {		
+  		
+  		#Try viewing DVI if Ghostscript/dvipdf missing
+  		if ![catch {set dviViewer [detectViewer dvi]} {
+	
+  	  	exec $dviViewer $invDviPath ?AUSGABEDATEI?
+  	
+  		#B) Show warning
+  		}	 else {
+  	
+	  		NewsHandler::QueryNews "No PDF viewer found. Please open ?$file? from your file manager ..." red
+  		}
+  	}
   }
-    
-  return
+    	
+  return ?
+  
 } ;#END viewInvoice
 
 
@@ -960,10 +973,10 @@ proc doInvoicPdf {invNo} {
       NewsHandler::QueryNews "Es konnte kein PDF der Rechnung Nr. $invNo erstellt werden: \n$res" red
       exec dvips $invDviPath
       exec psViewer $invPsPath
-      NewsHandler::QueryNews "Die Rechnung Nr. $invNo liegt im PostScript-Format vor. Druck/Versand über $psViewer" lightblue
+      NewsHandler::QueryNews "Die Rechnung Nr. $invNo liegt im PostScript-Format vor. Druck/Versand über $psViewer" orange
 
     } else {
-      NewsHandler::QueryNews "Das PDF der Rechnung finden Sie in $invPdfPath" lightgreen
+      NewsHandler::QueryNews "Das PDF der Rechnung finden Sie in $invPdfPath" green
     }
 
   }
@@ -1009,7 +1022,7 @@ proc viewInvOnCanvas {invNo} {
     set invPsPath [setInvPath $invNo ps]
     set invPdfPath [setInvPath $invNo pdf]  
     exec ps2pdf $invPsPath $invPdfPath
-    NewsHandler::QueryNews "Das PDF finden Sie unter $invPdfPath." lightgreen
+    NewsHandler::QueryNews "Das PDF finden Sie unter $invPdfPath." green
     return 0
   }
   

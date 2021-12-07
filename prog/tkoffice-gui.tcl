@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 4dec21
+# Restored: 6dec21
 		
 set version 1.1
 set px 5
@@ -254,7 +254,7 @@ entry .expnameE
 entry .expvalueE
 
 spinbox .abschlussJahrSB -width 4
-message .news -textvar news -pady 5 -padx 10 -justify center -anchor n -width 700 -fg silver -bg steelblue3
+message .news -textvar news -pady 5 -padx 10 -justify center -anchor n -width 700 -bg steelblue3 -fg white
 
 pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
 pack [frame .n.t3.mainF -padx 15 -pady 15] -fill both -expand 1

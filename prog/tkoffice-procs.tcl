@@ -703,7 +703,7 @@ namespace eval NewsHandler {
 	proc FinishShowing {} {
 		variable isShowing
 
-		.news configure -bg steelblue3 -fg silver ;#d9d9d9
+		.news configure -bg steelblue3 -fg white
 		set ::news "TkOffice $::version"
 		set isShowing 0
 

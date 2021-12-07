@@ -29,14 +29,19 @@ proc viewDocument {file type} {
 ##called by showInvoice (DVI) + ? ?
 proc detectViewer {type} {
 
+#TODO avoid DVI por completo!
   #Viewers for DVI+PDF (needed by viewInvoice)
   if {$type == "dvi"} {
     lappend viewerList evince okular xdvi
+  } 
 
-  #Extra PDF viewers (needed by viewDocument)
-  } elseif {$type == "pdf" } {
+#A) search xdg default PDF viewer
+if ! [catch {xdg-mime query default application/pdf} res] {
+	set viewer [string trim $res .desktop]
+
+} else {
+
     lappend viewerList evince okular xpdf qpdf mupdf acroread zathura qpdfview pqiv gspdf pdf-reader
-  }
 
   #Detect 1st installed viewer
   foreach p $viewerList {
@@ -45,11 +50,12 @@ proc detectViewer {type} {
       break
     }
   }
+}
 
   if [info exists viewer] {
     return $viewer
-  } 
-
+  }
+  
 } ;#END detectViewer
 
 # printDocument
