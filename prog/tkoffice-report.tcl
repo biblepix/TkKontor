@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-report.tcl
 # called by tkoffice-gui.tcl
-# Updated: 27mch20
+# Updated: 5feb22
 
 #sSrced by .abschlussPrintB button & ?
 
@@ -23,15 +23,17 @@ proc setAbschlussjahrSB {} {
   .abschlussJahrSB set [expr $heuer - 1]
 }
 
-# setReportPath
-##adds year to reportName
+# setReportPsPath
+##adds year to reportName & gives out PS path
 ##called by various Abschluss procs
-proc setReportPdfPath {jahr} {
-  global texDir reportDir reportTexFile
-  set reportName [file root $reportTexFile]
-  append reportPdfName $reportName $jahr . pdf
-  set reportPdfPath [file join $reportDir $reportPdfName]
-  return $reportPdfPath
+proc setReportPsPath {jahr} {
+  global reportDir
+  
+  #TODO Mc
+  append reportName report _ $jahr . ps
+  set reportPath [file join $reportDir $reportName] 
+  
+  return $reportPath
 }
 
 #################################
@@ -48,7 +50,7 @@ proc manageExpenses {} {
   .expvalueE conf -bg beige -fg grey -width 7 -textvar ::expval
 
   #pack Listbox & buttons
-  pack forget .abschlussM .spesenAbbruchB .abschlussT .abschlussScr .abschlussPrintB .expnameE .expvalueE
+  pack forget .abschlussM .spesenAbbruchB .reportT .abschlussScr .reportPrintB .expnameE .expvalueE
   pack .spesenM -side left
   pack .spesenAddB .spesenDeleteB -in .n.t3.mainF -side right -anchor se
   pack .spesenLB -in .n.t3.mainF
@@ -105,14 +107,21 @@ proc deleteExpenses {} {
 # A B S C H L U S S
 ############################
 
-# createAbschluss
+# createReport
 ##Creates yearly report for display in text window
 ##called by .abschlussCreateB button
-proc createAbschluss {} {
+proc createReport {} {
   global db myComp currency vat texDir reportDir
   pack forget .spesenM .spesenLB .spesenAbbruchB .spesenAddB .spesenDeleteB
   pack .abschlussM -side top
 
+  # C r e a t e      t e x t w i n
+  #catch {destroy $t $sb}
+#packed later by canvasReport
+  catch {text .reportT}
+  set t .reportT
+  $t delete 1.0 end
+  
   set jahr [.abschlussJahrSB get]
   set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
   set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
@@ -139,16 +148,6 @@ proc createAbschluss {} {
 	pg_result $res -assign j
 	set maxTuples [pg_result $res -numTuples]
 
-
-  # C r e a t e      t e x t w i n
-  set t .abschlussT
-#  set c .abschlussC
-  set sb .abschlussScr
-  destroy $t $sb
-  text .abschlussT
-#  canvas .abschlussC
-  scrollbar .abschlussScr -orient vertical
-
 	#Textwin dimensions Tk scaling factor:
 	##requires LETTER height + LINE width!
 	set scaling [tk scaling]
@@ -158,12 +157,16 @@ proc createAbschluss {} {
  	set winLetX [expr round($winLetW * $scaling)]
 
   #Configure widgets & scroll bar
-  $t conf -bg lightblue -bd 0 -width $winLetX -height $winLetY -padx 10 -pady 10 -yscrollcommand "$sb set"
-  $sb conf -command "$t yview"
-
+  $t conf -bg lightblue -bd 0 
+  
+  #TODO testing
+    catch {scrollbar .reportSB -orient vertical}
+  $t conf -width $winLetX -height $winLetY -padx 10 -pady 10 -yscrollcommand {.reportSB set}
+  #$t conf -width 500 -height 500
+  
   #Pack all
-  pack $t $sb -in .n.t3.mainF -side left -fill both
-	pack .abschlussPrintB -in .n.t3.botF -anchor se
+  pack $t -in .n.t3.mainF -side left  
+	#pack .abschlussPrintB -in .n.t3.botF -anchor se
 
 	# F i l l   t e x t w i n
 #	raise $t
@@ -272,121 +275,252 @@ proc createAbschluss {} {
 
   $t insert end "\nAuslagen total\t\t\t\t\t\t\t-${spesenTotal}\n\n" T3
   $t insert end "Reingewinn\t\t\t\t\t\t\t$netProfit" T2
-  $t conf -state disabled
+  
+  #TODO for testing
+#  $t conf -state disabled
+
+#Canvas report & PS
+  canvasReport $t
+ # canv2ps .reportC  
+
+
 
   #Save Einnahmen & Auslagen to LateX for printAbschluss
-  set chan [open $einnahmenTexFile w]
-  puts $chan $einnahmenTex
-  close $chan
-  set chan [open $auslagenTexFile w]
-  puts $chan $auslagenTex
-  close $chan
+#  set chan [open $einnahmenTexFile w]
+#  puts $chan $einnahmenTex
+#  close $chan
+#  set chan [open $auslagenTexFile w]
+#  puts $chan $auslagenTex
+#  close $chan
 
   #Configure print button
-  .abschlussPrintB conf -command "doPrintReport $jahr"
+  #TODO zis aynt workin!
+  #TODO prepack from beginning
+  #moved to canvasReport
+  #catch {button .reportPrintB}
+  #.reportPrintB conf -text "Bericht als PDf zum Druck darstellen" -command "doPrintReport $jahr"
+  
+  #pack .reportPrintB -in .n.t3.mainF -side right
 
-} ;#END createAbschluss
+} ;#END createReport
+
+proc canvasReport {t} {
+  update
+set jahr [.abschlussJahrSB get]  
+  set w [winfo width $t]
+  set h [winfo height $t]
+
+  #Create canvas & put report into window  
+  catch {canvas .reportC -width $w -height $h}
+  
+#  pack $t -in .n.t3.mainF
+  .reportC create window 0 0 -tags repwin -window $t -anchor nw -width $w -height $h
+  .reportC itemconf repwin -height $h -width $w
+    
+  #Create scrollbar
+ # catch {scrollbar .reportSB -orient vertical}
+  .reportC conf -yscrollcommand {.reportSB set}
+  .reportSB conf -command {.reportC yview}
+  
+  #Create print button
+  catch {button .reportPrintB}
+  .reportPrintB conf -text "Bericht drucken" -command "canvas2ps .reportC $jahr"
+  
+  #Final packing of canvas & scrollbar
+  pack .reportC -in .n.t3.mainF -side left -fill none
+  pack .reportSB -in .n.t3.mainF -fill y -side left
+  pack .reportPrintB -in .n.t3.mainF -side right
+
+  raise $t
+
+} ;#END canvasReport
+
+# canv2ps
+ # Capture a window into an image
+ # Author: David Easton
+##called by .reportPrintBtn
+#TODO get PS into viewer!
+proc canvas2ps {canv jahr} {
+  global reportDir tmpDir
+  set win .reportT
+
+#TODO testing
+#set win .reportC
+
+  set origCanvHeight [winfo height $canv]
+    
+  #1. move win to top position + make first PS page
+    raise $win
+    update
+    $win yview moveto 0.0 
+    raise $win
+    update
+
+  #A) Für 1 page 
+  #$canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
+  $canv postscript -file [file join $tmpDir abschluss_$jahr.ps]
+  
+  #move 1 page for multiple pages
+  set visFraction [$win yview]
+  set begVisible [lindex $visFraction 0] 
+  set endVisible [lindex $visFraction 1]
+  $win yview moveto $endVisible
+
+set pageNo 1
+set lastVisible $endVisible
+
+  while {$endVisible < 1.0} {
+
+    incr pageNo
+        
+    set lastVisible $endVisible
+    raise $win
+    update
+    $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
+
+    #move 1 page
+    set visFraction [$win yview]
+    set begVisible $endVisible
+    set endVisible [lindex $visFraction 1]
+    $win yview moveto $endVisible      
+    
+	}
+
+#puts $endVisible
+#puts $lastVisible	
+
+	#3. Compute remaining page height & adapt window dimension
+    if {$begVisible < $lastVisible} {
+        set cutoutPercent [expr $begVisible - $lastVisible]
+        set hiddenHeight [expr round($cutoutPercent * $origCanvHeight)]
+        set visHeight [expr $origCanvHeight - $hiddenHeight]
+        $canv itemconf textwin -height $visHeight
+        $canv conf -height $visHeight 
+    }
+
+  incr pageNo
+  
+  #4. Make last page
+  raise $win
+  update
+  
+  append reportName report . $jahr _ $pageNo . ps
+  set reportPath [file join $reportDir $reportName]
+  $canv postscript -colormode gray -file $reportPath
+  
+
+  printDocument $jahr rep
+  
+  
+  #5. Restore original dimensions
+  $canv itemconf textwin -height $origCanvHeight
+  $canv conf -height $origCanvHeight 
+
+} ;#END canv2ps
+
 
 # latexReport
 ##recreates (abschlussEinnahmen.tex) + (abschlussAuslagen.tex) > Abschluss.tex
 ##called by printAbschluss
-proc latexReport {jahr} {
-  global db myComp currency vat texDir reportDir reportTexFile
-  set reportTexPath [file join $texDir $reportTexFile]
+#proc latexReport {jahr} {
+#  global db myComp currency vat texDir reportDir reportTexFile
+#  set reportTexPath [file join $texDir $reportTexFile]
 
-#  set jahr [.abschlussJahrSB get]
-  set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
-  set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
-  set einnahmenTex [read [open $einnahmenTexFile]]
-  set auslagenTex  [read [open $auslagenTexFile]]
+##  set jahr [.abschlussJahrSB get]
+#  set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
+#  set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
+#  set einnahmenTex [read [open $einnahmenTexFile]]
+#  set auslagenTex  [read [open $auslagenTexFile]]
 
-  #get netTot vatTot spesTot from DB
-  ##TODO? Bedingung 'year = payeddate' könnte dazu führen, dass Gesamtbetrag in 2 Jahren aufgeführt wird, wenn Teilzahlung vorhanden!
-  set token [pg_exec $db "SELECT sum(vatlesssum),sum(finalsum),sum(auslage),sum(payedsum)
-    FROM invoice AS total
-    WHERE EXTRACT(YEAR from f_date) = $jahr OR
-          EXTRACT(YEAR from payeddate) = $jahr
-  "]
+#  #get netTot vatTot spesTot from DB
+#  ##TODO? Bedingung 'year = payeddate' könnte dazu führen, dass Gesamtbetrag in 2 Jahren aufgeführt wird, wenn Teilzahlung vorhanden!
+#  set token [pg_exec $db "SELECT sum(vatlesssum),sum(finalsum),sum(auslage),sum(payedsum)
+#    FROM invoice AS total
+#    WHERE EXTRACT(YEAR from f_date) = $jahr OR
+#          EXTRACT(YEAR from payeddate) = $jahr
+#  "]
 
-  set yearlyExpTot [pg_result [pg_exec $db "SELECT sum(value) from spesen"] -list]
+#  set yearlyExpTot [pg_result [pg_exec $db "SELECT sum(value) from spesen"] -list]
 
-  ##compute all values for Abschluss
-  set vatlessTot [lindex [pg_result $token -list] 0]
-  set bruTot [roundDecimal [lindex [pg_result $token -list] 1]]
-  set custExpTot [lindex [pg_result $token -list] 2]
-  set payTot [lindex [pg_result $token -list] 3]
-  set vatTot [roundDecimal [expr $bruTot - $vatlessTot]]
-  set netTot [roundDecimal [expr $payTot - $vatTot - $custExpTot]]
+#  ##compute all values for Abschluss
+#  set vatlessTot [lindex [pg_result $token -list] 0]
+#  set bruTot [roundDecimal [lindex [pg_result $token -list] 1]]
+#  set custExpTot [lindex [pg_result $token -list] 2]
+#  set payTot [lindex [pg_result $token -list] 3]
+#  set vatTot [roundDecimal [expr $bruTot - $vatlessTot]]
+#  set netTot [roundDecimal [expr $payTot - $vatTot - $custExpTot]]
 
-  set netProfit [roundDecimal [expr $netTot - $yearlyExpTot]]
-  if {$netProfit < 0} {
-    set netProfit 0.00
-  }
-
-  #R E C R E A T E   A B S C H L U S S . T E X
-  ##header data
-  append abschlTex {\documentclass[10pt,a4paper]{article}
-\usepackage[utf8]{inputenc}
-\usepackage{german}
-\usepackage{longtable}
-\author{}
-}
-append abschlTex {\title} \{ $myComp {\\} Erfolgsrechnung { } $jahr \}
-append abschlTex {
-\begin{document}
-\maketitle
-\begin{small}
-\begin{longtable}{ll p{0.4\textwidth} rrrr}
-%1. Einnahmen
-\caption{\textbf{EINNAHMEN}} \\
-\textbf{R.Nr} & \textbf{Datum} & \textbf{Adresse} &
-\textbf{Netto} &
-\textbf{Mwst.} &
-\textbf{Spesen} &
-\textbf{Bezahlt} \\
-\endhead
-}
-  ##1.Einnahmen
-  append abschlTex $einnahmenTex
-  append abschlTex {\multicolumn{3}{l}{\textbf{Einnahmen total}}} &
-  append abschlTex {\textbf} \{ $bruTot \} &
-  append abschlTex {\textbf} \{ $vatTot \} &
-  append abschlTex {\textbf} \{ $custExpTot \} &
-
-  append abschlTex [expr $bruTot - ($vatTot - $custExpTot)] {\\} \n
-  append abschlTex {&&abzügl. Mehrwertsteuer&&&} \{ \$ \- $vatTot \$ \} {\\} \n
-  append abschlTex {&&abzügl. Spesen&&&} \{ \$ \- $custExpTot \$ \} {\\} \n
-  append abschlTex {\multicolumn{3}{l}{\textbf{EINNAHMEN TOTAL NETTO}}&&&&\textbf} \{ $netTot \} {\\} \n
-  ##2.Auslagen
-  append abschlTex {\caption{\textbf{AUSLAGEN}} \\} \n
-  append abschlTex $auslagenTex
-  append abschlTex {\multicolumn{3}{l}{\textbf{AUSLAGEN TOTAL}} &&&& \textbf} \{ \- $yearlyExpTot \} {\\\\} \n
-  ##3. Reingewinn
-  append abschlTex {\multicolumn{3}{l}{\textbf{REINGEWINN}} &&&& \textbf} \{ $netProfit \} {\\} \n
-  ##4. End
-  append abschlTex {
-\end{longtable}
-\end{small}
-\end{document}
-  }
-
-#puts $abschlTex
-#puts $reportTexPath
-
-  #Save to file
-  set chan [open $reportTexPath w]
-  puts $chan $abschlTex
-  close $chan
-
-#Latex2pdf
-#latex2pdf $jahr rep
-
-#TODO: latex catches don't work!!!!!!!!!!!!!!!!!!!!!!!!!!! - check all progs + find better solution.
-#  if [catch {latex2pdf $jahr rep}] {
-
-#    NewsHandler::QueryNews "$reportTexFile konnte nicht nach PDF umgewandelt werden." red
-#    return 1
+#  set netProfit [roundDecimal [expr $netTot - $yearlyExpTot]]
+#  if {$netProfit < 0} {
+#    set netProfit 0.00
 #  }
 
-  return 0
-} ;#END latexReport
+#  #R E C R E A T E   A B S C H L U S S . T E X
+#  ##header data
+#  append abschlTex {\documentclass[10pt,a4paper]{article}
+#\usepackage[utf8]{inputenc}
+#\usepackage{german}
+#\usepackage{longtable}
+#\author{}
+#}
+#append abschlTex {\title} \{ $myComp {\\} Erfolgsrechnung { } $jahr \}
+#append abschlTex {
+#\begin{document}
+#\maketitle
+#\begin{small}
+#\begin{longtable}{ll p{0.4\textwidth} rrrr}
+#%1. Einnahmen
+#\caption{\textbf{EINNAHMEN}} \\
+#\textbf{R.Nr} & \textbf{Datum} & \textbf{Adresse} &
+#\textbf{Netto} &
+#\textbf{Mwst.} &
+#\textbf{Spesen} &
+#\textbf{Bezahlt} \\
+#\endhead
+#}
+#  ##1.Einnahmen
+#  append abschlTex $einnahmenTex
+#  append abschlTex {\multicolumn{3}{l}{\textbf{Einnahmen total}}} &
+#  append abschlTex {\textbf} \{ $bruTot \} &
+#  append abschlTex {\textbf} \{ $vatTot \} &
+#  append abschlTex {\textbf} \{ $custExpTot \} &
+
+#  append abschlTex [expr $bruTot - ($vatTot - $custExpTot)] {\\} \n
+#  append abschlTex {&&abzügl. Mehrwertsteuer&&&} \{ \$ \- $vatTot \$ \} {\\} \n
+#  append abschlTex {&&abzügl. Spesen&&&} \{ \$ \- $custExpTot \$ \} {\\} \n
+#  append abschlTex {\multicolumn{3}{l}{\textbf{EINNAHMEN TOTAL NETTO}}&&&&\textbf} \{ $netTot \} {\\} \n
+#  ##2.Auslagen
+#  append abschlTex {\caption{\textbf{AUSLAGEN}} \\} \n
+#  append abschlTex $auslagenTex
+#  append abschlTex {\multicolumn{3}{l}{\textbf{AUSLAGEN TOTAL}} &&&& \textbf} \{ \- $yearlyExpTot \} {\\\\} \n
+#  ##3. Reingewinn
+#  append abschlTex {\multicolumn{3}{l}{\textbf{REINGEWINN}} &&&& \textbf} \{ $netProfit \} {\\} \n
+#  ##4. End
+#  append abschlTex {
+#\end{longtable}
+#\end{small}
+#\end{document}
+#  }
+
+##puts $abschlTex
+##puts $reportTexPath
+
+#  #Save to file
+#  set chan [open $reportTexPath w]
+#  puts $chan $abschlTex
+#  close $chan
+
+##Latex2pdf
+##latex2pdf $jahr rep
+
+##TODO: latex catches don't work!!!!!!!!!!!!!!!!!!!!!!!!!!! - check all progs + find better solution.
+##  if [catch {latex2pdf $jahr rep}] {
+
+##    NewsHandler::QueryNews "$reportTexFile konnte nicht nach PDF umgewandelt werden." red
+##    return 1
+##  }
+
+#  return 0
+#} ;#END latexReport
+
+

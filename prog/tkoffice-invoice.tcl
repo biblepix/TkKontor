@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-invoice.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
-# Updated: 7dec21
+# Updated: 29jan22
 
 source $confFile
 ################################################################################################################
@@ -15,7 +15,8 @@ set itemFile [file join $texDir invitems.tex]
 # resetNewInvDialog
 ##called by Main + "Abbruch Rechnung"
 proc resetNewInvDialog {} {
-
+  global heute cond1
+  
   #Cleanup
   catch {namespace delete rows}
   foreach w [winfo children .newInvoiceF] {
@@ -46,6 +47,15 @@ proc resetNewInvDialog {} {
   catch {message .einzel -textvariable einzel}
 
   pack .invcondL .invcondSB .invauftrdatL .invauftrdatE .invrefL .invrefE .invcomL .invcomE -in .n.t2.f1 -side left -fill x 
+  #Empty entry widgets
+  .invrefE delete 0 end
+  .invcomE delete 0 end
+  .invcomE delete 0 end
+  
+  #Set back global vars
+  set ::cond $cond1
+  set ::auftrDat $heute
+ 
   pack .invartlistMB -in .n.t2.f1 -before .n.t2.f2 -anchor w -padx 20 -pady 5 
  
  #TODO anpassen
@@ -54,7 +64,9 @@ pack .mengeE .invartunitL .invartnameL .invartpriceL -in .n.t2.f2 -side left -fi
   pack .addrowB -in .n.t2.f2 -side right -expand 1 -fill x
   
   #Reset Buttons
-  .abbruchinvB conf -state disabled
+##TODO testing
+#  .abbruchinvB conf -state disabled
+ # .abbruchinvB conf -activebackground red -state normal
   .saveinvB conf -state disabled -command "
     .saveinvB conf -activebackground #ececec -state normal
     doSaveInv
@@ -112,12 +124,6 @@ proc addInvRow {} {
       pack $F -fill x -anchor w    
 
       #Create labels per row
-#      catch {label $F.mengeL${rowNo} -text $menge -bg lightblue -width 20 -justify left -anchor w}
-#      catch {label $F.artnameL${rowNo} -text $artName -bg lightblue -width 53 -justify left -anchor w}
-#      catch {label $F.artpriceL${rowNo} -text $artPrice -bg lightblue -width 10 -justify right -anchor w}
-#      catch {label $F.artunitL${rowNo} -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
-#      catch {label $F.arttypeL${rowNo} -text $artType -bg lightblue -width 20 -justify right -anchor e}
-#      catch {label $F.rowtotL${rowNo} -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
       catch {label $F.mengeL -text $menge -bg lightblue -width 20 -justify left -anchor w}
       catch {label $F.artnameL -text $artName -bg lightblue -width 53 -justify left -anchor w}
       catch {label $F.artpriceL -text $artPrice -bg lightblue -width 10 -justify right -anchor w}
@@ -223,8 +229,10 @@ proc doSaveInv {} {
     NewsHandler::QueryNews $res red
     return 1
   } 
+  
+  #TODO wie kommt/kam invNo nach ::Latex?
   #2. LatexInvoice
-  if [catch {latexInvoice $::Latex::invNo dvi} res] {
+  if [catch {latexInvoice $::Latex::invNo} res] {
     NewsHandler::QueryNews $res red
     return 1
   }
@@ -241,8 +249,6 @@ proc doSaveInv {} {
 proc saveInv2DB {} {
   global db env msg texDir itemFile
   global cond ref comm auftrDat vat
-
-  
   set adrNo [.adrSB get]
 
   #1. Get invNo & export to ::Latex 
@@ -347,11 +353,6 @@ proc saveInv2DB {} {
    	NewsHandler::QueryNews "[mc invSaved $invNo]" green
     fillAdrInvWin $adrNo
     
-    
-    
-    
-    
-    
     #TODO how can we incorporate printDocument here instead? - needs number + type!
     #Do we still need "doPrintNewInv" ?
     .saveinvB conf -text [mc printInv] -command "printDocument $invNo inv" -bg orange
@@ -360,62 +361,45 @@ proc saveInv2DB {} {
 
 } ;#END saveInv2DB
 
+
 # latexInvoice
 ##executes latex on vorlageTex OR dvips OR dvipdf on vorlageDvi
-##with end types: DVI / PS / PDF
+##with end type: PDF
 ##called by doPrintNewInv & doPrintOldInv
 #code from DKF: " With plenty of experience, 'nonstopmode' or 'batchmode' are most useful
 # eval [list exec -- pdflatex --interaction=nonstopmode] $args
-proc latexInvoice {invNo type} {
+proc latexInvoice {invNo} {
 
   global db adrSpin spoolDir vorlageTex texDir tmpDir
-    
-  #Prepare general vars & ::Latex namespace 
-  set invDviPath [setInvPath $invNo dvi]
-  
+
   #catch {namespace delete Latex}
   namespace eval Latex {}
   set Latex::invTexPath [setInvPath $invNo tex]
   set Latex::tmpDir $tmpDir
   set Latex::spoolDir $spoolDir
   
-  #A. do DVI > tmpDir
-  if {$type == "dvi"} {
-    namespace eval Latex {
-      eval exec -- latex -draftmode -interaction nonstopmode -output-directory $tmpDir $invTexPath
-    }
-    return 0
-  }
+  namespace eval Latex {
   
-  #B. do PS > tmpDir - TODO test namespacing for all 3 functions
-  if {$type == "ps"} {
-    set Latex::invPsPath [setInvPath $invNo ps]
-    set Latex::invDviPath $invDviPath
-    namespace eval Latex {
-      eval exec dvips -o $invPsPath $invDviPath
-    }
-    return 0
-  }
-    
-  #C. do PDF > spoolDir
-  if {$type == "pdf"} {
-  
-    namespace eval Latex {
-    #TODO can pdf be done in draftmode?!
-      eval exec -- pdflatex -draftmode -interaction nonstopmode -output-directory $spoolDir $invTexPath
-    }  
-    set invPdfPath [setInvPath $invNo pdf]
-    NewsHandler::QueryNews "Das PDF-Dokument '[file tail $invPdfPath]' befindet sich in $spoolDir zur weiteren Bearbeitung." orange
-    return 0
-  }
+    #TODO can pdf be done in draftmode?!  - NO!
+    #  eval exec -- pdflatex -draftmode -interaction nonstopmode -output-directory $spoolDir $invTexPath
+    eval exec -- pdflatex -interaction nonstopmode -output-directory $tmpDir $invTexPath
+  }  
 
-  return 1
+	set invPdfTmpPath [setInvPath $invNo pdftmp] 
+  set invPdfPath [setInvPath $invNo pdf]
+
+	#copy PDF to spool
+	while ![file exists $invPdfTmpPath] {
+		after 2000
+	}
+  file copy -force $invPdfTmpPath $invPdfPath
+ 
+ #moved to printDocument   
+#    NewsHandler::QueryNews "Das PDF-Dokument '[file tail $invPdfPath]' befindet sich in $spoolDir zur weiteren Bearbeitung." maroon
+    
+    
 } ;#END latexInvoice
 
-
-###############################################################################################
-#### O L D   I N V O I C E   P R O C S  #######################################################
-###############################################################################################
 
 # fillAdrInvWin
 ##called by .adrSB 
@@ -550,7 +534,7 @@ proc fillAdrInvWin {adrId} {
         catch {set itemlist [pg_result $itemsT -getTuple $n] }
         if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
           set ::verbucht::anzeige 1
-          $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "doPrintOldInv $invNo"
+          $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "printDocument $invNo inv"
           pack $invF.$n.invshowB -anchor e -side right
         }
 
@@ -565,212 +549,218 @@ proc fillAdrInvWin {adrId} {
   
 } ;#END fillAdrInvWin
 
-# fetchInvData
-##1.retrieves invoice data from DB
-##2.gets some vars from Config
-##3.saves dataFile & itemFile for Latex processing
-##called by latexInvoice & showInvoice
-proc fetchInvData {invNo} {
-  global db texDir confFile itemFile dataFile
 
-  #1.get some vars from config
-  source $confFile
-  if {![string is digit $vat]} {set vat 0.0}
-  if {$currency=="$"} {set currency \\textdollar}
-  if {$currency=="£"} {set currency \\textsterling}
-  if {$currency=="€"} {set currency \\texteuro}
-  if {$currency=="CHF"} {set currency {Fr.}}
+###############################################################################################
+#### O L D   I N V O I C E   P R O C S  ####################################################?????
+###############################################################################################
 
-  #2.Get invoice data from DB
-  set invToken [pg_exec $db "SELECT 
-    ref,
-    cond,
-    f_date,
-    items,
-    customeroid
-  FROM invoice WHERE f_number = $invNo"
-  ]
+## fetchInvData
+###1.retrieves invoice data from DB
+###2.gets some vars from Config
+###3.saves dataFile & itemFile for Latex processing
+###called by latexInvoice
+#proc fetchInvData {invNo} {
+#  global db texDir confFile itemFile dataFile
 
-  if { [pg_result $invToken -error] != ""} {
-    NewsHandler::QueryNews "Konnte Rechnungsdaten Nr. $invNo nicht wiederherstellen.\n[pg_result $invToken -error]" red
-    return 1
-  }
-  
-  set ref       [lindex [pg_result $invToken -list] 0]
-  set cond      [lindex [pg_result $invToken -list] 1]
-  set auftrDat  [lindex [pg_result $invToken -list] 2]
-  
-  #make sure below signs are escaped since they interfere with LaTex commands
-  set itemsHex  [lindex [pg_result $invToken -list] 3]
-  set adrNo     [lindex [pg_result $invToken -list] 4]
+#  #1.get some vars from config
+#  source $confFile
+#  if {![string is digit $vat]} {set vat 0.0}
+#  if {$currency=="$"} {set currency \\textdollar}
+#  if {$currency=="£"} {set currency \\textsterling}
+#  if {$currency=="€"} {set currency \\texteuro}
+#  if {$currency=="CHF"} {set currency {Fr.}}
 
-  #3.Get address data from DB & format for Latex
-  set adrToken [pg_exec $db "SELECT 
-    name1,
-    name2,
-    street,
-    zip,
-    city 
-  FROM address WHERE ts=$adrNo"
-  ]
+#  #2.Get invoice data from DB
+#  set invToken [pg_exec $db "SELECT 
+#    ref,
+#    cond,
+#    f_date,
+#    items,
+#    customeroid
+#  FROM invoice WHERE f_number = $invNo"
+#  ]
 
-  lappend custAdr [lindex [pg_result $adrToken -list] 0] {\\}
-  lappend custAdr [lindex [pg_result $adrToken -list] 1] {\\}
-  lappend custAdr [lindex [pg_result $adrToken -list] 2] {\\}
-  lappend custAdr [lindex [pg_result $adrToken -list] 3] { }
-  lappend custAdr [lindex [pg_result $adrToken -list] 4]
-    
-  #4.set dataList for usepackage letter
-  append dataList \\newcommand\{\\referenz\} \{ $ref \} \n
-  append dataList \\newcommand\{\\cond\} \{ $cond \} \n
-  append dataList \\newcommand\{\\dat\} \{ $auftrDat \} \n
-  append dataList \\newcommand\{\\invNo\} \{ $invNo \} \n
-  append dataList \\newcommand\{\\custAdr\} \{ $custAdr \} \n
-  append dataList \\newcommand\{\\myBank\} \{ $myBank \} \n
-  append dataList \\newcommand\{\\myName\} \{ $myComp \} \n
-  append dataList \\newcommand\{\\myAddress\} \{ $myAdr \} \n
-  append dataList \\newcommand\{\\myPhone\} \{ $myPhone \} \n
-  append dataList \\newcommand\{\\vat\} \{ $vat \} \n
-  append dataList \\newcommand\{\\currency\} \{ $currency \} \n
+#  if { [pg_result $invToken -error] != ""} {
+#    NewsHandler::QueryNews "[mc invRecovErr $invNo]\n[pg_result $invToken -error]" red
+#    return 1
+#  }
+#  
+#  set ref       [lindex [pg_result $invToken -list] 0]
+#  set cond      [lindex [pg_result $invToken -list] 1]
+#  set auftrDat  [lindex [pg_result $invToken -list] 2]
+#  
+#  #make sure below signs are escaped since they interfere with LaTex commands
+#  set itemsHex  [lindex [pg_result $invToken -list] 3]
+#  set adrNo     [lindex [pg_result $invToken -list] 4]
 
-  ##save dataList to dataFile
-  set chan [open $dataFile w] 
-  puts $chan $dataList
-  close $chan
+#  #3.Get address data from DB & format for Latex
+#  set adrToken [pg_exec $db "SELECT 
+#    name1,
+#    name2,
+#    street,
+#    zip,
+#    city 
+#  FROM address WHERE ts=$adrNo"
+#  ]
 
-  #save itemList to itemFile  
-  set itemList [binary decode hex $itemsHex]
-  if {$itemList == ""} {
-    reportResult "Keine Posten für Rechnung $invNo gefunden. Kann Rechnung nicht anzeigen oder ausdrucken." red 
-    return 1
-  }
-  #get rid of Latex code signs
-  regsub -all {%} $itemList {\%} itemList
-  regsub -all {&} $itemList {\&} itemList
-  regsub -all {$} $itemList {\$} itemList
-  regsub -all {#} $itemList {\#} itemList
-  regsub -all {_} $itemList {\_} itemList
-  
-  set chan [open $itemFile w]
-  puts $chan $itemList
-  close $chan
+#  lappend custAdr [lindex [pg_result $adrToken -list] 0] {\\}
+#  lappend custAdr [lindex [pg_result $adrToken -list] 1] {\\}
+#  lappend custAdr [lindex [pg_result $adrToken -list] 2] {\\}
+#  lappend custAdr [lindex [pg_result $adrToken -list] 3] { }
+#  lappend custAdr [lindex [pg_result $adrToken -list] 4]
+#    
+#  #4.set dataList for usepackage letter
+#  append dataList \\newcommand\{\\referenz\} \{ $ref \} \n
+#  append dataList \\newcommand\{\\cond\} \{ $cond \} \n
+#  append dataList \\newcommand\{\\dat\} \{ $auftrDat \} \n
+#  append dataList \\newcommand\{\\invNo\} \{ $invNo \} \n
+#  append dataList \\newcommand\{\\custAdr\} \{ $custAdr \} \n
+#  append dataList \\newcommand\{\\myBank\} \{ $myBank \} \n
+#  append dataList \\newcommand\{\\myName\} \{ $myComp \} \n
+#  append dataList \\newcommand\{\\myAddress\} \{ $myAdr \} \n
+#  append dataList \\newcommand\{\\myPhone\} \{ $myPhone \} \n
+#  append dataList \\newcommand\{\\vat\} \{ $vat \} \n
+#  append dataList \\newcommand\{\\currency\} \{ $currency \} \n
 
-  #Cleanup
-  pg_result $invToken -clear
-  pg_result $adrToken -clear
+#  ##save dataList to dataFile
+#  set chan [open $dataFile w] 
+#  puts $chan $dataList
+#  close $chan
 
-  return 0
-  
-} ;#END fetchInvData
+#  #save itemList to itemFile  
+#  set itemList [binary decode hex $itemsHex]
+#  if {$itemList == ""} {
+#    reportResult "Keine Posten für Rechnung $invNo gefunden. Kann Rechnung nicht anzeigen oder ausdrucken." red 
+#    return 1
+#  }
+#  #get rid of Latex code signs
+#  regsub -all {%} $itemList {\%} itemList
+#  regsub -all {&} $itemList {\&} itemList
+#  regsub -all {$} $itemList {\$} itemList
+#  regsub -all {#} $itemList {\#} itemList
+#  regsub -all {_} $itemList {\_} itemList
+#  
+#  set chan [open $itemFile w]
+#  puts $chan $itemList
+#  close $chan
+
+#  #Cleanup
+#  pg_result $invToken -clear
+#  pg_result $adrToken -clear
+
+#  return 0
+#  
+#} ;#END recoverInvData
 
 #TODO obsoLETE! > printDocument
 #Invoice view/print wrappers
-proc doPrintOldInv {invNo} {
+#proc doPrintOldInv {invNo} {
 
-  #1. Get invoice data from DB
-  if [catch "fetchInvData $invNo"] {
-    NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
-    return 1
-  }
-  NewsHandler::QueryNews "Rechnung Nr. $invNo wird nun angezeigt.\nEine weitere Bearbeitung (Ausdruck/Versand) ist  aus dem Anzeigeprogramm möglich." orange
+#  #1. Get invoice data from DB
+#  if [catch "recoverInvData $invNo"] {
+#    NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
+#    return 1
+#  }
+#  NewsHandler::QueryNews "Rechnung Nr. $invNo wird nun angezeigt.\nEine weitere Bearbeitung (Ausdruck/Versand) ist  aus dem Anzeigeprogramm möglich." orange
 
-  after 5000 "latexInvoice $invNo dvi"
-  after 9000 "viewInvoice $invNo"
-  return 0
-}
-
-
-#TODO this is replaced by printDocument !
-proc doPrintNewInv {invNo} {
-  
-  #1.convert DVI to PostScript
-  latexInvoice $invNo ps
-  
-  #2. try printing to lpr
-  NewsHandler::QueryNews "Sende Rechnung $invNo zum Drucker..." orange
-printInvoice $invNo
-return
+#  #after 5000 "latexInvoice $invNo"
+#  #after 9000 "viewInvoice $invNo"
+#  
+#  return 0
+#}
 
 
- #TODO test this thoroughly, there may be no output at all!!!
-  if [catch {printInvoice $invNo} res] {
-    NewsHandler::QueryNews "$res\nDruck fehlgeschlagen!" red 
-  }
-  
-  #3. viewInvoice anyway
-  set invPsPath [setInvPath ps]
-  after 5000 "NewsHandler::QueryNews 'Die Rechnung wird nun angezeigt. Sie können sie aus dem Anzeigeprogramm erneut ausdrucken bzw. nach PDF umwandeln.' orange"
-  after 8000 "viewInvoice $invPsPath"
-}
+##TODO this is replaced by printDocument !
+#proc doPrintNewInv {invNo} {
+#  
+#  #1.convert DVI to PostScript
+#  latexInvoice $invNo ps
+#  
+#  #2. try printing to lpr
+#  NewsHandler::QueryNews "Sende Rechnung $invNo zum Drucker..." orange
+#printInvoice $invNo
+#return
+
+
+# #TODO test this thoroughly, there may be no output at all!!!
+#  if [catch {printInvoice $invNo} res] {
+#    NewsHandler::QueryNews "$res\nDruck fehlgeschlagen!" red 
+#  }
+#  
+#  #3. viewInvoice anyway
+#  set invPsPath [setInvPath ps]
+#  after 5000 "NewsHandler::QueryNews 'Die Rechnung wird nun angezeigt. Sie können sie aus dem Anzeigeprogramm erneut ausdrucken bzw. nach PDF umwandeln.' orange"
+#  after 8000 "viewInvoice $invPsPath"
+#}
 
 
 # setInvPath
 ##composes invoice name from company short name & invoice number
-##returns invoice path with required ending: TEX / DVI / PS / PDF
-##called by doPrintOldInv & doPrintNewInv
+##returns invoice path with required ending: TEX + PDF
+##required types: tex / pdf / pdftmp
+##called by printDocument
 proc setInvPath {invNo type} {
   global spoolDir myComp vorlageTex tmpDir
   
   set compShortname [lindex $myComp 0]
   append invName invoice _ $compShortname - $invNo
 
-  #Copy vorlageTex to $tmpDir/invName.tex for all types
   if {$type == "tex"} {
     append invTexName $invName . tex
     set invPath [file join $tmpDir $invTexName]
-    file copy -force $vorlageTex $invPath
-    
-  } elseif {$type == "dvi"} {
-    append invDviName $invName . dvi
-    set invPath [file join $tmpDir $invDviName]
-    
-#  } elseif {$type == "ps"} {  
-#    append invPsName $invName . ps
-#    set invPath [file join $tmpDir $invPsName]
-    
-  } elseif {$type == "pdf"} {  
-    append invPdfName $invName . pdf
-    set invPath [file join $spoolDir $invPdfName]
-  }
-
-  return $invPath
   
+    file copy -force $vorlageTex $invPath
+  
+  } elseif {$type == "pdf" || $type == "pdftmp"} {
+    
+    append invPdfName $invName . pdf
+    
+    if {$type == "pdftmp"} {
+	    set invPath [file join $tmpDir $invPdfName]
+  	} elseif {$type == "pdf"} {  
+    	set invPath [file join $spoolDir $invPdfName]
+  	}
+  
+  }
+  
+  return $invPath
+
 } ;#END setInvPath
 
 
-# viewOldInvoice - TODO why not provide PDF view?!
+# viewInvoice - TODO why not provide PDF view?!
 ##checks out DVI/PS capable viewer
 ##sends rechnung.dvi / rechnung.ps to prog for viewing
 ##called by "Ansicht" & "Rechnung drucken" buttons
 proc viewInvoice {invNo} {
-  #global db itemFile vorlageTex texDir spoolDir
-
   set invDviPath [setInvPath $invNo dvi]
+	set invPdfPath [setInvPath $invNo pdf]
 	
 	
-#Convert to pdf
-if [catch {dvipdf $invDviPath}] {
+	#TODO wo ist Tex-Datei?????????????????????????
+	
+	#Convert to pdf
+	if [catch {dvipdf $invDviPath}] {
+	
+		#Try viewing PDF
+		if ![catch {$pdfviewer ?$invpath? }] {
+  	
+	  	set pdfViewer [detectViewer pdf]
+	  	set dviViewer [detectViewer dvi]
+	  	
+	  	if {$pdfViewer == ""} {	
 
-	#Try viewing PDF
-	if ![catch {$pdfviewer ?$invpath? }] {
-  
-  	#TODO make sure name or 1/nothing is returned
-	  if [catch {set pdfViewer [detectViewer pdf]} {		
+ 	  		exec $dviViewer $invDviPath ?AUSGABEDATEI?
   		
-  		#Try viewing DVI if Ghostscript/dvipdf missing
-  		if ![catch {set dviViewer [detectViewer dvi]} {
-	
-  	  	exec $dviViewer $invDviPath ?AUSGABEDATEI?
-  	
-  		#B) Show warning
-  		}	 else {
-  	
-	  		NewsHandler::QueryNews "No PDF viewer found. Please open ?$file? from your file manager ..." red
+  			#B) Show warning
+  			}	 else {
+  		
+	  			NewsHandler::QueryNews "No PDF viewer found. Please open ?$file? from your file manager ..." red
+  			}
   		}
   	}
-  }
-    	
-  return ?
+   	
+
   
 } ;#END viewInvoice
 
@@ -781,61 +771,72 @@ if [catch {dvipdf $invDviPath}] {
 ##prints to printer or shows in view prog
 ##called after latex - TODO: what inv.name to print?
 ##called by "Rechnung drucken" button (neue Rechnung)
-proc printInvoice {invNo} {
+#proc printInvoice {invNo} {
 
-  #1. try direct printing to lpr  
-  set invPsPath [setInvPath $invNo ps]
-  NewsHandler::QueryNews "Die Rechnung $invNo wird zum Drucker geschickt." orange
+#  #1. try direct printing to lpr  
+#  set invPsPath [setInvPath $invNo ps]
+#  NewsHandler::QueryNews "Die Rechnung $invNo wird zum Drucker geschickt." orange
 
-#TODO Hängt wenn lpr auf Drucker wartet!
-  if {[auto_execok lpr] != ""} {
-    
-    set textChan [open $invPsPath]
-    set t [read $textChan]
-    close $textChan
+##TODO Hängt wenn lpr auf Drucker wartet!
+#  if {[auto_execok lpr] != ""} {
+#    
+#    set textChan [open $invPsPath]
+#    set t [read $textChan]
+#    close $textChan
 
-    set printChan [open |/usr/bin/lpr w]    
-    puts $printChan $t
-    close $rintChan
-#    catch {close $printChan}
-  NewsHandler::QueryNews "Die Rechnung $invNo wurde zum Drucker geschickt." orange
-#    return 0
-    #after 5000 {return 1}
- #   catch {exec lpr $invPsPath}
-      return 0  
-  } 
-
-
-  #2. try direct printing vie GhostScript
-#TODO: zis not working yet!
-  if {[auto_execok gs] != ""} {
-    
-    set invPsPath [setInvPath $invNo ps]
-    set device "ps2write"
-    set printer "/dev/usb/lp0" 
-    catch {
-      eval exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invPsPath 
-    }
-  return 0
-  }
-
-  #3. Print to PS or PDF 
-  NewsHandler::QueryNews "Die Rechnung $invNo kann nicht gedruckt werden." red
-  NewsHandler::QueryNews "Installieren Sie ein Betrachtungsprogramm wie 'evince' oder 'okular' für besseres Druck-Handling." orange
-  
-  set invPdfPath [setInvPath $invNo pdf]
-  if ![catch {exec ps2pdf $invPsPath $invPdfPath}] {
-    set path $invPdfPath
-  } else {
-    set path $invPsPath
-  }
-  NewsHandler::QueryNews "Sie finden Rechnung $invNo unter $path zur weiteren Bearbeitung." orange
-  return 1
-
-} ;#END printInvoice
+#    set printChan [open |/usr/bin/lpr w]    
+#    puts $printChan $t
+#    close $rintChan
+##    catch {close $printChan}
+#  NewsHandler::QueryNews "Die Rechnung $invNo wurde zum Drucker geschickt." orange
+##    return 0
+#    #after 5000 {return 1}
+# #   catch {exec lpr $invPsPath}
+#      return 0  
+#  } 
 
 
-# savePaymentEntry
+#  #2. try direct printing vie GhostScript
+##TODO: zis not working yet!
+#  if {[auto_execok gs] != ""} {
+#    
+#    set invPsPath [setInvPath $invNo ps]
+#    set device "ps2write"
+#    set printer "/dev/usb/lp0" 
+#    catch {
+#      eval exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invPsPath 
+#    }
+#  return 0
+#  }
+
+#  #3. Print to PS or PDF 
+#  NewsHandler::QueryNews "Die Rechnung $invNo kann nicht gedruckt werden." red
+#  NewsHandler::QueryNews "Installieren Sie ein Betrachtungsprogramm wie 'evince' oder 'okular' für besseres Druck-Handling." orange
+#  
+#  set invPdfPath [setInvPath $invNo pdf]
+#  if ![catch {exec ps2pdf $invPsPath $invPdfPath}] {
+#    set path $invPdfPath
+#  } else {
+#    set path $invPsPath
+#  }
+#  NewsHandler::QueryNews "Sie finden Rechnung $invNo unter $path zur weiteren Bearbeitung." orange
+#  return 1
+
+#} ;#END printInvoice
+
+
+
+# missing operand at _@_
+#in expression "0.00 + _@_"
+#missing operand at _@_
+#in expression "0.00 + _@_"
+#    (parsing expression "0.00 + ")
+#    invoked from within
+#"expr $oldPayedsum + $newPayedsum"
+#    (procedure "savePaymentEntry" line 32)
+#
+# savePaymentEntry #TODO see error above!!!!
+#passiert beim Eintreten/Austreten? wenn keine Zahl angegeben
 ##called by fillAdrInvWin by $invF.$n.zahlenE entry widget
 proc savePaymentEntry {newPayedsum curEName ns} {
   global db invF
@@ -961,74 +962,74 @@ proc updateCredit {adrNo} {
 
 # doInvoicePdf  - obsolete!!! 
 ##creates invoice PDF if so desired by user
-##called by showInvoice
-proc doInvoicPdf {invNo} {
-  global invDviName invDviPath invPdfName invPdfPath 
-  global psViewer invPsPath
+##called by viewInvoice
+#proc doInvoicPdf {invNo} {
+#  global invDviName invDviPath invPdfName invPdfPath 
+#  global psViewer invPsPath
 
-  set reply [tk_messageBox -type yesno -message "Möchten Sie von der Rechnung Nr. $invNo ein PDF zum Versand/Ausdruck erstellen?"]
-  if {$reply == "yes"} {
+#  set reply [tk_messageBox -type yesno -message "Möchten Sie von der Rechnung Nr. $invNo ein PDF zum Versand/Ausdruck erstellen?"]
+#  if {$reply == "yes"} {
 
-    if [catch {exec dvipdf $invDviPath} res] {
-      NewsHandler::QueryNews "Es konnte kein PDF der Rechnung Nr. $invNo erstellt werden: \n$res" red
-      exec dvips $invDviPath
-      exec psViewer $invPsPath
-      NewsHandler::QueryNews "Die Rechnung Nr. $invNo liegt im PostScript-Format vor. Druck/Versand über $psViewer" orange
+#    if [catch {exec dvipdf $invDviPath} res] {
+#      NewsHandler::QueryNews "Es konnte kein PDF der Rechnung Nr. $invNo erstellt werden: \n$res" red
+#      exec dvips $invDviPath
+#      exec psViewer $invPsPath
+#      NewsHandler::QueryNews "Die Rechnung Nr. $invNo liegt im PostScript-Format vor. Druck/Versand über $psViewer" orange
 
-    } else {
-      NewsHandler::QueryNews "Das PDF der Rechnung finden Sie in $invPdfPath" green
-    }
+#    } else {
+#      NewsHandler::QueryNews "Das PDF der Rechnung finden Sie in $invPdfPath" green
+#    }
 
-  }
-}
+#  }
+#}
 
 # viewInvOnCanvas
 ##shows invoice in toplevel window
 ##called by viewInvoice if no viewer found
-proc viewInvOnCanvas {invNo} {
-  global adrSpin
- 
-  NewsHandler::QueryNews "Kein externes Betrachtungsprogramm gefunden." orange
-  NewsHandler::QueryNews "Installieren Sie zur bequemen Anzeige/Bearbeitung von Rechnungen eines der Programme 'evince' oder 'okular'." orange  
+#  global adrSpin
+#proc viewInvOnCanvas {invNo} {
+# 
+#  NewsHandler::QueryNews "Kein externes Betrachtungsprogramm gefunden." orange
+#  NewsHandler::QueryNews "Installieren Sie zur bequemen Anzeige/Bearbeitung von Rechnungen eines der Programme 'evince' oder 'okular'." orange  
 
-  set invPsPath [setInvPath $invNo ps]
-  catch {latexInvoice $invNo ps}
-  
-  #Create toplevel window with canvas & buttons
-  destroy .topW
-  toplevel .topW -borderwidth 7 -relief sunken
-  button .topW.showinvexitB -text "Schliessen"
-  button .topW.showinvpdfB -text "PDF erzeugen"
-  button .topW.showinvprintB -text "Drucken"
-  canvas .topW.invC -yscrollc ".topW.yScroll set"
-  scrollbar .topW.yScroll -ori vert -command ".topW.invC yview"
+#  set invPsPath [setInvPath $invNo ps]
+#  catch {latexInvoice $invNo ps}
+#  
+#  #Create toplevel window with canvas & buttons
+#  destroy .topW
+#  toplevel .topW -borderwidth 7 -relief sunken
+#  button .topW.showinvexitB -text "Schliessen"
+#  button .topW.showinvpdfB -text "PDF erzeugen"
+#  button .topW.showinvprintB -text "Drucken"
+#  canvas .topW.invC -yscrollc ".topW.yScroll set"
+#  scrollbar .topW.yScroll -ori vert -command ".topW.invC yview"
 
-  #Create PostScript image (height/width nicht beeinflussbar!)
-  image create photo psIm -file $invPsPath
-  .topW.invC create image 0 0 -image psIm -anchor nw
-  .topW.invC configure -scrollregion [.topW.invC bbox all]
-  .topW.invC conf -width [image width psIm] -height [image height psIm]
-    
-  pack .topW.invC
-  pack .topW.yScroll -side left
-  pack .topW.showinvexitB .topW.showinvpdfB .topW.showinvprintB -side right
+#  #Create PostScript image (height/width nicht beeinflussbar!)
+#  image create photo psIm -file $invPsPath
+#  .topW.invC create image 0 0 -image psIm -anchor nw
+#  .topW.invC configure -scrollregion [.topW.invC bbox all]
+#  .topW.invC conf -width [image width psIm] -height [image height psIm]
+#    
+#  pack .topW.invC
+#  pack .topW.yScroll -side left
+#  pack .topW.showinvexitB .topW.showinvpdfB .topW.showinvprintB -side right
 
-  .topW.showinvexitB conf -command "wm forget .topW"
-  
-#TODO export to function - what about ps2pdf in latexPdf???
-  .topW.showinvpdfB conf -command "doPdf $invNo"
-  
-  proc doPdf {invNo} {
-    set invPsPath [setInvPath $invNo ps]
-    set invPdfPath [setInvPath $invNo pdf]  
-    exec ps2pdf $invPsPath $invPdfPath
-    NewsHandler::QueryNews "Das PDF finden Sie unter $invPdfPath." green
-    return 0
-  }
-  
-  .topW.showinvprintB conf -command "printInvoice $invNo"  
+#  .topW.showinvexitB conf -command "wm forget .topW"
+#  
+##TODO export to function - what about ps2pdf in latexPdf???
+#  .topW.showinvpdfB conf -command "doPdf $invNo"
+#  
+#  proc doPdf {invNo} {
+#    set invPsPath [setInvPath $invNo ps]
+#    set invPdfPath [setInvPath $invNo pdf]  
+#    exec ps2pdf $invPsPath $invPdfPath
+#    NewsHandler::QueryNews "Das PDF finden Sie unter $invPdfPath." green
+#    return 0
+#  }
+#  
+#  .topW.showinvprintB conf -command "printDocument $invNo inv"  
 
-  return 0
+#  return 0
 
-} ;#END viewInvOnCanvas
+#} ;#END viewInvOnCanvas
 

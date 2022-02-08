@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 6dec21
+# Restored: 7feb22
 		
 set version 1.1
 set px 5
@@ -25,7 +25,7 @@ pack [frame .midF -bg steelblue3] -fill x
 pack [frame .botF -bg steelblue3] -fill x
 
 #Firmenname
-label .firmaL -text "$compName" -font "TkHeadingFont 20 bold" -fg silver -bg steelblue3 -anchor w
+label .firmaL -text "$myComp" -font "TkHeadingFont 20 bold" -fg silver -bg steelblue3 -anchor w
 pack .firmaL -in .topF -side right -padx 10 -pady 3 -anchor e
 
 #Create Notebook: (maxwidth+maxheight important to avoid overlapping of bottom frame)
@@ -38,6 +38,14 @@ ttk::notebook .n
 .n add [frame .n.t2] -text "[mc newInv]"
 .n add [frame .n.t3] -text "[mc reports]"
 .n add [frame .n.t4] -text "[mc settings]"
+
+#TODO integrate CONFIGUARATION in these submenus!
+ttk::notebook .n2
+.n2 add [frame .n2.dbF] -text "Datenbank einrichten"
+.n2 add [frame .n2.artF] -text "Artikel verwalten"
+.n2 add [frame .n2.expF] -text "Jahresspesen verwalten"
+.n2 add [frame .n2.bilF] -text "Rechnungsstellung"
+
 .n add [frame .n.t5] -text "[mc info]"
 
 pack .n -fill x -in .midF -anchor center -padx 10 -pady 0
@@ -126,6 +134,9 @@ pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
 #pack [frame .umsatzF] -in .n.t1 -fill x -side bottom
 .umsatzF conf -bd 2 -relief sunken
 
+#TODO pack all into canvas w/ scrollbar!
+#main prog is fillAdrInvWin, but it may not have to be changed...
+
 #Create "Rechnungen" Titel
 label .adrInvTitel -justify center -text "Verbuchte Rechnungen" -font TIT -pady 5 -padx 5 -anchor w -fg steelblue -bg silver -padx 5
 label .creditL -text "Kundenguthaben: $currency " -font "TkCaptionFont"
@@ -179,6 +190,8 @@ spinbox .invcondSB -width 20 -values $condList -textvar cond -bg beige
 label .invauftrdatL -text "\tAuftragsdatum:"
 entry .invauftrdatE -width 9 -textvar auftrDat -bg beige
 set auftrDat [clock format [clock seconds] -format %d.%m.%Y]
+set heute $auftrDat
+
 #Referenz
 label .invrefL -text "\tIhre Referenz:"
 entry .invrefE -width 20 -bg beige -textvar ref
@@ -229,7 +242,7 @@ label .invartunitL -textvar artUnit -padx 20
 label .invarttypeL -textvar artType -padx 20
 
 button .saveinvB -text [mc invEnter]
-button .abbruchinvB -text [mc cancel]
+button .abbruchinvB -text [mc cancel] -command {resetNewInvDialog} -activebackground red
 pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
 
 
@@ -242,10 +255,10 @@ pack .titel4 -in .n.t3 -fill x -anchor nw
 
 message .abschlussM -justify left -width 1000 -text "Text..."
 message .spesenM -justify left -width 1000 -text "Text..."
-button .abschlussCreateB -text "Abschluss erstellen" -command {createAbschluss}
+button .abschlussCreateB -text "Abschluss erstellen" -command {createReport	}
 button .abschlussPrintB -text "Abschluss drucken" ;#configured in above proc
 
-button .spesenB -text "Jahresspesen verwalten" -command {manageExpenses}
+#button .spesenB -text "Jahresspesen verwalten" -command {manageExpenses}
 button .spesenDeleteB -text "Eintrag löschen" -command {deleteExpenses}
 button .spesenAbbruchB -text [mc cancel] -command {manageExpenses}
 button .spesenAddB -text "Eintrag hinzufügen" -command {addExpenses}
@@ -258,10 +271,14 @@ message .news -textvar news -pady 5 -padx 10 -justify center -anchor n -width 70
 
 pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
 pack [frame .n.t3.mainF -padx 15 -pady 15] -fill both -expand 1
-#pack [frame .n.t3.bottomF] -fill x
+pack [frame .n.t3.botF] -fill x
 
-pack .abschlussJahrSB .abschlussCreateB .spesenB -in .n.t3.topF -side right
+pack .abschlussJahrSB .abschlussCreateB -in .n.t3.topF -side right
 pack .abschlussM -in .n.t3.topF -side left
+
+#TODO Spesenverwaltung buggy, needs exit button & must be cleared at the end!
+##moved to EINSTELLUNGEN tab!
+#pack .spesenB -in .n.t3.topF -side right -padx 50 
 
 #Execute initial commands if connected to DB
 catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res
@@ -313,9 +330,11 @@ label .confdbUserL -text "Benutzer" -font "TkSmallCaptionFont"
 entry .confdbnameE -textvar dbname
 entry .confdbUserE -textvar dbuser -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
 button .initdbB -text "Datenbank erstellen" -command {initdb}
-pack .confdbT -in .n.t4.f3 -anchor nw 
-pack .confdbM -in .n.t4.f3 -anchor ne -side left
-pack .initdbB  .confdbnameE .confdbUserE -in .n.t4.f3 -anchor se -side right
+
+#TODO testing
+pack .confdbT -in .n2.dbF -anchor nw 
+pack .confdbM -in .n2.dbF -anchor ne -side left
+pack .initdbB  .confdbnameE .confdbUserE -in .n2.dbF -anchor se -side right
 
 #RECHNUNGSSTELLUNG
 pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
@@ -342,9 +361,10 @@ button .billcomplogoB -text "Firmenlogo hinzufügen" -command {
   set ::logoPath [tk_getOpenFile]
   return 0
 }
-pack .billingT .billingM -in .n.t4.f5 -anchor nw
-pack .billformatlinksRB .billformatrechtsRB -in .n.t4.f5 -anchor se -side bottom
-pack .billcomplogoB .billcurrencySB .billvatE .billownerE .billcompE .billstreetE .billcityE .billphoneE .billbankE .billcond1E .billcond2E .billcond3E -in .billing2F
+
+#pack .billingT .billingM -in .n.t4.f5 -anchor nw
+#pack .billformatlinksRB .billformatrechtsRB -in .n.t4.f5 -anchor se -side bottom
+#pack .billcomplogoB .billcurrencySB .billvatE .billownerE .billcompE .billstreetE .billcityE .billphoneE .billbankE .billcond1E .billcond2E .billcond3E -in .billing2F
 
 #Configure all entries to change colour & be emptied when focused
 foreach e [pack slaves .billing2F] {
@@ -360,7 +380,7 @@ foreach e [pack slaves .billing2F] {
 #.billvatE conf -validate key -vcmd {%W conf -bg beige ; string is double %P} -invcmd {%W conf -bg red}
 
 button .billingSaveB -text [mc saveConf] -command {source $makeConfig ; makeConfig}
-pack .billingSaveB -in .billing2F -side bottom -anchor se
+#pack .billingSaveB -in .billing2F -side bottom -anchor se
 
 #Check if vars in config
 if {[info exists vat] && $vat != ""} {.billvatE insert 0 $vat; .billvatE conf -bg "#d9d9d9"} {.billvatE conf -bg beige ; .billvatE insert 0 "Mehrwertsteuersatz %"}

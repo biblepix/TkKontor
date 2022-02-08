@@ -76,7 +76,6 @@ proc latex2pdf {num type} {
 
 } ;#END latex2pdf
 
-
 # createTkOfficeLogo
 ##called by tkoffice-gui.tcl
 proc createTkOfficeLogo {} {
@@ -94,7 +93,7 @@ proc createTkOfficeLogo {} {
   set kreis [.logoC create oval 1 1 40 40]
   .logoC itemconf $kreis -fill orange -outline gold -width 1
 
-  set schrift0 [.logoC create text 15 20]
+  set schrift0 [.logoC create text 15 20]	
   .logoC itemconf $schrift0 -font "TkHeadingFont 18 bold" -fill $dunkelblau -text "T"
   set schrift1 [.logoC create text 27 26]
   .logoC itemconf $schrift1 -font "TkCaptionFont 18 bold" -fill $dunkelblau -text "k"
