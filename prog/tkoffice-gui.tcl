@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 7feb22
+# Restored: 14feb22
 		
 set version 1.1
 set px 5
@@ -19,10 +19,9 @@ source $confFile
 font create TIT
 font configure TIT -family Helvetica -size 16 -weight bold
 
-#Create frames
+#Create top & bottom frames with fix positions
 pack [frame .topF -bg steelblue3] -fill x
-pack [frame .midF -bg steelblue3] -fill x
-pack [frame .botF -bg steelblue3] -fill x
+pack [frame .botF -bg steelblue3] -fill x -side bottom
 
 #Firmenname
 label .firmaL -text "$myComp" -font "TkHeadingFont 20 bold" -fg silver -bg steelblue3 -anchor w
@@ -31,6 +30,7 @@ pack .firmaL -in .topF -side right -padx 10 -pady 3 -anchor e
 #Create Notebook: (maxwidth+maxheight important to avoid overlapping of bottom frame)
 set screenX [winfo screenwidth .]
 set screenY [winfo screenheight .]
+. conf -bg steelblue3
 
 ttk::notebook .n 
 .n conf -width [expr round($screenX / 10) * 9] -height [expr round($screenY / 10) * 8]
@@ -48,7 +48,11 @@ ttk::notebook .n2
 
 .n add [frame .n.t5] -text "[mc info]"
 
-pack .n -fill x -in .midF -anchor center -padx 10 -pady 0
+#TODO nogo
+#pack [frame .midF -bg steelblue3] -fill x
+#pack .n -in .midF -anchor center -padx 10 -pady 10 -fill x
+pack .n -anchor center -padx 15 -pady 15 -fill x
+
 set winW [winfo width .n]
 
 button .abbruchB -text "Programm beenden" -activebackground red -command {
@@ -91,6 +95,7 @@ pack [frame .n.t4.f5 -pady $py -padx $px -borderwidth 5 -highlightbackground sil
 #Create "Adressen" title
 label .adrTitel -text "Adressverwaltung" -font TIT -pady 5 -padx 5 -anchor w -fg steelblue -bg silver
 pack .adrTitel -in .n.t1.mainF.f2 -anchor w -fill x
+
 ##obere Frames in .n.t1.f2
 pack [frame .adrF2 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
 pack [frame .adrF4 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
@@ -113,19 +118,24 @@ entry .zipE -width 7 -textvar zip -justify left
 entry .cityE -width 43 -textvar city -justify left
 entry .tel1E -width 25 -textvar tel1 -justify right
 entry .tel2E -width 25 -textvar tel2 -justify right
-entry .faxE -width 25 -textvar fax -justify right
+#entry .faxE -width 25 -textvar fax -justify right
 entry .mailE -width 25 -textvar mail -justify right
 entry .wwwE -width 25 -textvar www -justify right
 
 #create Address buttons
-button .b0 -text [mc adrNew] -width 20 -command {newAddress}
+button .b0 -text [mc adrNew] -width 20 -command {
+  #clearAddressWin
+  newAddress
+#  .b0 conf -bg #d9d9d9
+  }
+  
 button .b1 -text [mc adrChange] -width 20 -command {changeAddress $adrNo}
 button .b2 -text [mc adrDelete] -width 20 -command {deleteAddress $adrNo} -activebackground red
 
 #Pack adrF1 spinbox
 pack $adrSpin -in .adrF1 -anchor nw
 #Pack adrF3 buttons
-pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor se
+pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor ne
 
 
 #########################################################################################
@@ -425,14 +435,11 @@ set db $res
 source [file join $progDir tkoffice-invoice.tcl]
 setAdrList
 resetAdrWin
-
 resetNewInvDialog
-
-
 updateArticleList
 resetArticleWin
-#setArticleLine TAB2
 
+#setArticleLine TAB2
 setArticleLine TAB4
 
 #Execute once when specific TAB opened
@@ -445,15 +452,11 @@ bind .n <<NotebookTabChanged>> {
 }
 
 
-
-#after 1000 {
-#  vwait t2
-#  source [file join $progDir tkoffice-invoice.tcl]
 resetNewInvDialog
 #updateArticleList
 resetArticleWin
 setArticleLine TAB2
-#}
+
 ##Load progs for tab 3 -TODO try this for TAB4 which should be least used!!!!
 #after 1500 {
 #  vwait t3

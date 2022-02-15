@@ -153,7 +153,8 @@ proc setAdrList {} {
 }
 
 proc fillAdrWin {adrId} {
-global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
+  global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
+
   #set variables
 	set name1 [pg_result [pg_exec $db "SELECT name1 FROM address WHERE objectid=$adrId"] -list]
 	set name2 [pg_result [pg_exec $db "SELECT name2 FROM address WHERE objectid=$adrId"] -list]
@@ -164,7 +165,7 @@ global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
   #Export if not empty
   set tel1 [pg_result [pg_exec $db "SELECT telephone FROM address WHERE objectid=$adrId"] -list]
   set tel2 [pg_result [pg_exec $db "SELECT mobile FROM address WHERE objectid=$adrId"] -list]
-  set fax  [pg_result [pg_exec $db "SELECT telefax FROM address WHERE objectid=$adrId"] -list]
+  #set fax  [pg_result [pg_exec $db "SELECT telefax FROM address WHERE objectid=$adrId"] -list]
   set mail [pg_result [pg_exec $db "SELECT email FROM address WHERE objectid=$adrId"] -list]
   set www  [pg_result [pg_exec $db "SELECT www FROM address WHERE objectid=$adrId"] -list]
 
@@ -179,9 +180,9 @@ global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
   if {[string is punct $tel2] || $tel2==""} {set ::tel2 "Telefon2" ; .tel2E conf -fg silver} {set ::tel2 $tel2}
   if {[string is punct $mail] || $mail==""} {set ::mail "Mail" ; .mailE conf -fg silver} {set ::mail $mail}
   if {[string is punct $www] || $www==""} {set ::www "Internet" ; .wwwE conf -fg silver} {set ::www $www}
-  if {[string is punct $fax] || $fax==""} {set ::fax "Telefax" ; .faxE conf -fg silver} {set ::fax $fax}
-
+ 
   return 0
+
 } ;#END fillAdrWin
 
 proc searchAddress {} {
@@ -231,22 +232,6 @@ proc searchAddress {} {
   return 0
 } ;# END searchAddress
 
-# clearAdrWin
-##called by "Neue Anschrift" & "Anschrift ändern" buttons
-proc clearAdrWin {} {
-  global adrSpin adrSearch
-  foreach e "[pack slaves .adrF2] [pack slaves .adrF4]" {
-    $e conf -bg beige -fg silver -state normal -validate focusin -vcmd {
-    %W delete 0 end
-  catch {  %W conf -fg black}
-    return 0
-    }
-  }
-  catch {pack forget .adrClearSelB}
-  $adrSearch conf -state disabled
-  .adrF2 conf -bg #d9d9d9
-  return 0
-}
 
 # resetAdrSearch
 ##called by GUI + searchAddress
@@ -265,20 +250,22 @@ proc resetAdrSearch {} {
 }
 
 # resetAdrWin
+##what does it do?
 ##called by GUI (first fill) + Abbruch btn + aveAddress
 proc resetAdrWin {} {
   global adrSpin adrNo adrSearch
 
   pack .name1E .name2E .streetE -in .adrF2 -anchor nw
   pack .zipE .cityE -anchor nw -in .adrF2 -side left
-  pack .tel1E .tel2E .faxE .mailE .wwwE -in .adrF4
+  pack .tel1E .tel2E .mailE .wwwE -in .adrF4
 
   foreach e "[pack slaves .adrF2] [pack slaves .adrF4]" {
     $e conf -bg lightblue -validate none -fg black -state readonly -readonlybackground lightblue -relief flat -bd 0
   }
 
-  .b1 config -text "Anschrift ändern" -command {changeAddress $adrNo}
-  .b2 config -text "Anschrift löschen" -command {deleteAddress $adrNo}
+  .b0 config -activebackground silver
+  .b1 config -text "Anschrift ändern" -command {changeAddress $adrNo} -activebackground silver
+  .b2 config -text "Anschrift löschen" -command {deleteAddress $adrNo} -activebackground red
   pack .b1 .b2 .b0 -in .adrF3 -anchor se
 
   $adrSpin conf -bg lightblue
@@ -286,36 +273,118 @@ proc resetAdrWin {} {
   .adrF2 conf -bg lightblue
   catch {pack forget .adrClearSelB}
 
+  #Set address to spinbox
   setAdrList
   fillAdrInvWin [$adrSpin get]
 }
 
 proc newAddress {} {
   global adrSpin
+  global name1 name2
+  upvar name1 name1
+  upvar name2 name2
+  
+  #reset address vars
+  set name2 [mc name2]
+  set name1 [mc name1]
+  
+  set ::street [mc street]
+  set ::zip [mc zip]
+  set ::city [mc city]
+  set ::tel1 [mc tel1]
+  set ::tel2 [mc tel2]
+  set ::www [mc www]
+  set ::mail [mc mail]
 
-  set ::name1 "Anrede/Firma"
-  set ::name2 "Name"
-  set ::street "Strasse"
-  set ::zip "PLZ"
-  set ::city "Ortschaft"
-  set ::tel1 "Telefon"
-  set ::tel2 "Telefon"
-  set ::www "Internet"
-  set ::mail "E-Mail"
+#TODO etwas beisst sich!!!!!!!!!!!!!!!!!!!!
+  #configure entry widgets
+  foreach e "[pack slaves .adrF2] [pack slaves .adrF4]" {
+    $e conf -bg beige -fg silver -state normal -validate focusin -vcmd {
+      %W delete 0 end
+      %W conf -fg blue -bg orange	
+      return 0	
+    }
+#     -validate focusout -vcmd {
+#      %W conf -fg black -bg lightblue
+#      return 0	
+#    }
+  }
 
-  clearAdrWin
+#  #configure adrSpin & buttons
+#  $adrSpin delete 0 end
+#  $adrSpin conf -bg #d9d9d9
+  .b1 configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
+  .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
+  
+  pack forget .b0
+}
+
+# clearAddressWin
+##called by [newAddress] & [changeAddress] buttons
+proc clearAddressWin args {
+  global adrSpin adrSearch
+  
+
+  if {$args == "new"} {
+
+ #TODO why does this work only when hand typed? 
+  
+    resetAddressVars
+    
+  } else {
+  
+    foreach e "[pack slaves .adrF2] [pack slaves .adrF4]" {
+
+      $e conf -bg orange -fg blue -state normal -validate focusin -vcmd {
+        %W delete 0 end
+        %W conf -bg lightblue
+        return 0
+      }
+    }
+  }
+    
+  catch {pack forget .adrClearSelB}
+  $adrSearch conf -state disabled
+  .adrF2 conf -bg #d9d9d9
+
+#  return 0
+}
+
+# newAddress
+##clears address win & button names
+##called by .b1
+proc newAddress-OLD {} {
+  global adrSpin
+
+  clearAddressWin new
+
+#  set ::name1 "Anrede/Firma"
+#  set ::name2 "Name"
+#  set ::street "Strasse"
+#  set ::zip "PLZ"
+#  set ::city "Ortschaft"
+#  set ::tel1 "Telefon"
+#  set ::tel2 "Telefon"
+#  set ::www "Internet"
+#  set ::mail "E-Mail"
+  
   $adrSpin delete 0 end
   $adrSpin conf -bg #d9d9d9
 
-  .b1 configure -text "Anschrift speichern" -command {saveAddress}
+  .b1 configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
   pack forget .b0
+
   return 0
 }
 
+# changeAddress
+##clears address win & button names
+##called by .b2
 proc changeAddress {adrNo} {
-  clearAdrWin
-  .b1 configure -text "Anschrift speichern" -command {saveAddress}
+  clearAddressWin change
+  
+  .b1 configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
   pack forget .b0
   return 0
