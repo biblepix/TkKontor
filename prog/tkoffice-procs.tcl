@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Restored: 4dec21
+# Updated: 15feb22
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S
@@ -90,12 +90,12 @@ proc createTkOfficeLogo {} {
   canvas .logoC -width 500 -height 45 -bg $dunkelblau -highlightthickness 0
   pack .logoC -in .topF -side left -anchor w
 
-  set kreis [.logoC create oval 1 1 40 40]
+  set kreis [.logoC create oval 3 3 40 40]
   .logoC itemconf $kreis -fill orange -outline gold -width 1
 
-  set schrift0 [.logoC create text 15 20]	
+  set schrift0 [.logoC create text 17 18]	
   .logoC itemconf $schrift0 -font "TkHeadingFont 18 bold" -fill $dunkelblau -text "T"
-  set schrift1 [.logoC create text 27 26]
+  set schrift1 [.logoC create text 28 26]
   .logoC itemconf $schrift1 -font "TkCaptionFont 18 bold" -fill $dunkelblau -text "k"
 
   set schrift2 [.logoC create text 120 25]
@@ -154,7 +154,7 @@ proc setAdrList {} {
 
 proc fillAdrWin {adrId} {
   global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
-
+	
   #set variables
 	set name1 [pg_result [pg_exec $db "SELECT name1 FROM address WHERE objectid=$adrId"] -list]
 	set name2 [pg_result [pg_exec $db "SELECT name2 FROM address WHERE objectid=$adrId"] -list]
@@ -181,7 +181,7 @@ proc fillAdrWin {adrId} {
   if {[string is punct $mail] || $mail==""} {set ::mail "Mail" ; .mailE conf -fg silver} {set ::mail $mail}
   if {[string is punct $www] || $www==""} {set ::www "Internet" ; .wwwE conf -fg silver} {set ::www $www}
  
-  return 0
+#  return 0
 
 } ;#END fillAdrWin
 
@@ -268,7 +268,7 @@ proc resetAdrWin {} {
   .b2 config -text "Anschrift löschen" -command {deleteAddress $adrNo} -activebackground red
   pack .b1 .b2 .b0 -in .adrF3 -anchor se
 
-  $adrSpin conf -bg lightblue
+  $adrSpin conf -state normal -bg lightblue
   $adrSearch conf -state normal
   .adrF2 conf -bg lightblue
   catch {pack forget .adrClearSelB}
@@ -280,23 +280,22 @@ proc resetAdrWin {} {
 
 proc newAddress {} {
   global adrSpin
-  global name1 name2
-  upvar name1 name1
-  upvar name2 name2
+  
+  #disable adrSpin & upvar adress vars
+  $adrSpin conf -state disabled
+  upvar name1 name1 name2 name2 street street zip zip city city tel1 tel1 tel2 tel2 www www mail mail
   
   #reset address vars
   set name2 [mc name2]
   set name1 [mc name1]
-  
-  set ::street [mc street]
-  set ::zip [mc zip]
-  set ::city [mc city]
-  set ::tel1 [mc tel1]
-  set ::tel2 [mc tel2]
-  set ::www [mc www]
-  set ::mail [mc mail]
+  set street [mc street]
+  set zip [mc zip]
+  set city [mc city]
+  set tel1 [mc tel1]
+  set tel2 [mc tel2]
+  set www [mc www]
+  set mail [mc mail]
 
-#TODO etwas beisst sich!!!!!!!!!!!!!!!!!!!!
   #configure entry widgets
   foreach e "[pack slaves .adrF2] [pack slaves .adrF4]" {
     $e conf -bg beige -fg silver -state normal -validate focusin -vcmd {
@@ -310,12 +309,9 @@ proc newAddress {} {
 #    }
   }
 
-#  #configure adrSpin & buttons
-#  $adrSpin delete 0 end
-#  $adrSpin conf -bg #d9d9d9
+  #reconfigure buttons
   .b1 configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
   .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
-  
   pack forget .b0
 }
 

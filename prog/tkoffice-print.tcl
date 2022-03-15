@@ -162,6 +162,12 @@ proc printDocument {num type} {
     set docPath [setReportPsPath $jahr]
     set docType ps
 
+    #Postscript canvas for printout in landscape format
+    ##TODO this only works for 1 page, multiple pages should be handled by canvas2ps (which doesn't work properly yet)
+    .reportT conf -bg white
+    update
+    .reportC postscript -rotate 1 -file $docPath
+    
   # B. I n v o i c e
   } elseif {$type == "inv"} {
 
@@ -182,14 +188,14 @@ proc printDocument {num type} {
     }
   } ;#END main clause
   
-  #View pdf / PS_
+  #View pdf / PS TODO: consider ps2pdf for all cases!_
   if [catch {exec xdg-open $docPath}] {
+    
     set viewer [detectViewer $docType]
-  }
-
-  if {$viewer == ""} {
-    NewsHandler::QueryNews "Kein Anzeigeprogramm gefunden! 
-    Das Dokumen befindet sich in $docPath zur Weiterbearbeitung." red
+    if {$viewer == ""} {
+      NewsHandler::QueryNews "Kein Anzeigeprogramm gefunden! 
+      Das Dokumen befindet sich in $docPath zur Weiterbearbeitung." red
+    }
   }
 
 } ;# END printDocument

@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17 
-# Restored: 14feb22
+# Updated: 22feb22
 		
 set version 1.1
 set px 5
@@ -126,7 +126,6 @@ entry .wwwE -width 25 -textvar www -justify right
 button .b0 -text [mc adrNew] -width 20 -command {
   #clearAddressWin
   newAddress
-#  .b0 conf -bg #d9d9d9
   }
   
 button .b1 -text [mc adrChange] -width 20 -command {changeAddress $adrNo}
@@ -148,13 +147,13 @@ pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor ne
 #main prog is fillAdrInvWin, but it may not have to be changed...
 
 #Create "Rechnungen" Titel
-label .adrInvTitel -justify center -text "Verbuchte Rechnungen" -font TIT -pady 5 -padx 5 -anchor w -fg steelblue -bg silver -padx 5
+label .adrInvTitel -justify center -text "Verbuchte Rechnungen" -font TIT -pady 5 -padx 5 -anchor w -fg steelblue -bg silver
 label .creditL -text "Kundenguthaben: $currency " -font "TkCaptionFont"
 label .credit2L -text "\u2196 wird bei Zahlungseingang aktualisiert" -font "TkIconFont" -fg grey
 message .creditM -textvar credit -relief sunken -width 50
 label .umsatzL -text "Kundenumsatz: $currency " -font "TkCaptionFont"
 message .umsatzM -textvar umsatz -relief sunken -bg lightblue -width 50
-pack .adrInvTitel -in .n.t1.mainF.f3 -anchor w -fill x
+pack .adrInvTitel -in .n.t1.mainF.f3 -anchor w -fill x -padx 10 -pady 5
 
 #Umsatz unten
 pack .creditL .creditM .credit2L -in .umsatzF -side left -anchor w
@@ -169,8 +168,8 @@ label .invPayedH -text "Bezahlt $currency" -font TkCaptionFont -justify right -a
 label .invcommH -text "Anmerkung" -font TkCaptionFont -justify right -anchor w -width 20
 label .invShowH -text "Rechnung anzeigen" -font TkCaptionFont -fg steelblue3 -justify right -anchor e -justify right -width 20
 
-pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x
-pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x
+pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x -padx 10
+pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x -padx 10
 set invF .n.t1.mainF.invF
 set headF .n.t1.mainF.headF
 pack .invNoH .invDatH .invartH .invSumH .invPayedH .invcommH -in $headF -side left
@@ -263,10 +262,10 @@ pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
 label .titel4 -text "Jahresabschlüsse" -font TIT -anchor nw -pady 5 -padx 5 -fg steelblue -bg silver
 pack .titel4 -in .n.t3 -fill x -anchor nw
 
-message .abschlussM -justify left -width 1000 -text "Text..."
+message .abschlussM -justify left -width 1000 -text [mc reportTxt]
 message .spesenM -justify left -width 1000 -text "Text..."
-button .abschlussCreateB -text "Abschluss erstellen" -command {createReport	}
-button .abschlussPrintB -text "Abschluss drucken" ;#configured in above proc
+button .abschlussCreateB -text [mc reportCreate] -command {createReport}
+button .abschlussPrintB -text [mc reportPrint] ;#wird später von obigem Prog. gepackt
 
 #button .spesenB -text "Jahresspesen verwalten" -command {manageExpenses}
 button .spesenDeleteB -text "Eintrag löschen" -command {deleteExpenses}
@@ -414,7 +413,7 @@ if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcur
 
 
 #######################################################################
-## F i n a l   a c t i o n s :    detect Fehlermeldung bzw. socket no.
+## F i n a l   a 	c t i o n s :    detect Fehlermeldung bzw. socket no.
 #######################################################################
 if {[string length $res] >20} {
   NewsHandler::QueryNews $res red 
@@ -453,7 +452,6 @@ bind .n <<NotebookTabChanged>> {
 
 
 resetNewInvDialog
-#updateArticleList
 resetArticleWin
 setArticleLine TAB2
 

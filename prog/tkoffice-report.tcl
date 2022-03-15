@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-report.tcl
 # called by tkoffice-gui.tcl
-# Updated: 5feb22
+# Updated: 15mch22
 
 #sSrced by .abschlussPrintB button & ?
 
@@ -121,6 +121,7 @@ proc createReport {} {
   catch {text .reportT}
   set t .reportT
   $t delete 1.0 end
+#  $t conf -width -height
   
   set jahr [.abschlussJahrSB get]
   set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
@@ -149,7 +150,9 @@ proc createReport {} {
 	set maxTuples [pg_result $res -numTuples]
 
 	#Textwin dimensions Tk scaling factor:
-	##requires LETTER height + LINE width!
+	##requires no of LETTERS as height + no. of LETTER as width!
+	#TODO conflicts with [winfo height/width ...] for proper A4-dimensions
+	#TODO A4 = 210 x 297 mm
 	set scaling [tk scaling]
 	set winLetH 35
   set winLetW [expr round(3.5 * $winLetH)]
@@ -159,10 +162,12 @@ proc createReport {} {
   #Configure widgets & scroll bar
   $t conf -bg lightblue -bd 0 
   
+  
+  
   #TODO testing
     catch {scrollbar .reportSB -orient vertical}
   $t conf -width $winLetX -height $winLetY -padx 10 -pady 10 -yscrollcommand {.reportSB set}
-  #$t conf -width 500 -height 500
+  #$t conf -padx 10 -pady 10 -yscrollcommand {.reportSB set}
   
   #Pack all
   pack $t -in .n.t3.mainF -side left  
@@ -177,10 +182,9 @@ proc createReport {} {
 	$t configure -tabs {
 	1.5c
 	4.0c
-	16c numeric
-	19c numeric
-	22c numeric
-	25c numeric
+	11c numeric
+	14c numeric
+	17c numeric
   }
 
   #Configure font tags
@@ -194,8 +198,7 @@ proc createReport {} {
   $t insert end "Einnahmen\n" T2
 
   # E I N N A H M E N
-
-  $t insert end "Rch.Nr.\tDatum\tAnschrift\tNetto ${currency}\tMwst. ${vat}%\tSpesen\tBezahlt ${currency}\tTotal ${currency}\n" T3
+  $t insert end "Rch.Nr.\tDatum\tAnschrift\tNetto ${currency}\tMwst. ${vat}%\tSpesen\tEingänge ${currency}\n" T3
 
 
 #TODO  'finalsum' is exclusive vat & Auslagen - list Auslagen anyway because payedsum may differ
@@ -245,8 +248,10 @@ proc createReport {} {
   foreach tuple [pg_result $token -llist] {
     set name [lindex $tuple 1]
     set value [lindex $tuple 2]
+    
     ##1.prepare for text window
-    append spesenList "$name\t\t\t\t-${value}\n"
+    
+    append spesenList "$name\t\t\t\t\t\t-${value}\n"
     lappend spesenAmounts $value
     ##2.prepare for LateX
     append auslagenTex {\multicolumn{3}{l}} \{ $name \} &&& \{ \$ \- $value \$ \} {\\} \n
@@ -306,14 +311,15 @@ proc createReport {} {
 
 proc canvasReport {t} {
   update
-set jahr [.abschlussJahrSB get]  
-  set w [winfo width $t]
+  set jahr [.abschlussJahrSB get]  
+  
+  #Set height & width to A4
   set h [winfo height $t]
-
-  #Create canvas & put report into window  
+  set w [expr int(1.5 * $h)]
+  
+  #Create canvas & put report into window, trying to get A4 dimensions
   catch {canvas .reportC -width $w -height $h}
   
-#  pack $t -in .n.t3.mainF
   .reportC create window 0 0 -tags repwin -window $t -anchor nw -width $w -height $h
   .reportC itemconf repwin -height $h -width $w
     
@@ -324,8 +330,13 @@ set jahr [.abschlussJahrSB get]
   
   #Create print button
   catch {button .reportPrintB}
-  .reportPrintB conf -text "Bericht drucken" -command "canvas2ps .reportC $jahr"
-  
+
+#TODO testing 1 page optoin
+#  .reportPrintB conf -text "Bericht drucken" -command "canvas2ps .reportC $jahr"
+   #TODO add -pageheight & -pagewidth for A4 !
+   set docPath [setReportPsPath $jahr]
+   .reportPrintB conf -text [mc reportPrint] -command "printDocument $jahr rep"
+   
   #Final packing of canvas & scrollbar
   pack .reportC -in .n.t3.mainF -side left -fill none
   pack .reportSB -in .n.t3.mainF -fill y -side left
@@ -406,11 +417,10 @@ set lastVisible $endVisible
   
   append reportName report . $jahr _ $pageNo . ps
   set reportPath [file join $reportDir $reportName]
-  $canv postscript -colormode gray -file $reportPath
   
-
+  #Postscript in landscape format for easy printing
+  $canv postscript -colormode gray -rotate 1 -file $reportPath
   printDocument $jahr rep
-  
   
   #5. Restore original dimensions
   $canv itemconf textwin -height $origCanvHeight
