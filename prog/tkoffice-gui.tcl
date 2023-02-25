@@ -1,18 +1,22 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
-# Salvaged: 1nov17 
-# Updated: 22feb22
+# Salvaged: 1nov17
+# Updated for use with SQlite: Sep22
 		
-set version 1.1
+set version 2.0
 set px 5
 set py 5
 
 package require Tk
 package require Img
+
+#Initiate Sqlite DB
+package require sqlite3
+sqlite3 db $dbname
+
 source [file join $progDir tkoffice-procs.tcl]
 source [file join $progDir tkoffice-invoice.tcl]
 source [file join $progDir tkoffice-report.tcl]
 source [file join $progDir tkoffice-print.tcl]
-source [file join $progDir pgin.tcl]
 source $confFile
 
 #Create title font
@@ -38,25 +42,16 @@ ttk::notebook .n
 .n add [frame .n.t2] -text "[mc newInv]"
 .n add [frame .n.t3] -text "[mc reports]"
 .n add [frame .n.t4] -text "[mc settings]"
+.n add [frame .n.t5] -text "[mc storni]"
+.n insert end .n.t4
 
-#TODO integrate CONFIGUARATION in these submenus!
-ttk::notebook .n2
-.n2 add [frame .n2.dbF] -text "Datenbank einrichten"
-.n2 add [frame .n2.artF] -text "Artikel verwalten"
-.n2 add [frame .n2.expF] -text "Jahresspesen verwalten"
-.n2 add [frame .n2.bilF] -text "Rechnungsstellung"
-
-.n add [frame .n.t5] -text "[mc info]"
-
-#TODO nogo
-#pack [frame .midF -bg steelblue3] -fill x
-#pack .n -in .midF -anchor center -padx 10 -pady 10 -fill x
 pack .n -anchor center -padx 15 -pady 15 -fill x
 
 set winW [winfo width .n]
 
 button .abbruchB -text "Programm beenden" -activebackground red -command {
-	catch {pg_disconnect $dbname}
+	#catch {pg_disconnect $dbname}
+	db close 
 	exit
 	}
 pack .abbruchB -in .botF -side right -pady 3 -padx 10
@@ -102,7 +97,7 @@ pack [frame .adrF4 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor
 pack [frame .adrF1] -anchor nw -in .n.t1.mainF.f2 -side left
 pack [frame .adrF3] -anchor se -in .n.t1.mainF.f2 -expand 1 -side left
 
-##create Address number Spinbox
+##create Address number 
 set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -bg lightblue -justify right -textvar adrNo]
 focus $adrSpin
 
@@ -267,7 +262,7 @@ message .spesenM -justify left -width 1000 -text "Text..."
 button .abschlussCreateB -text [mc reportCreate] -command {createReport}
 button .abschlussPrintB -text [mc reportPrint] ;#wird später von obigem Prog. gepackt
 
-#button .spesenB -text "Jahresspesen verwalten" -command {manageExpenses}
+button .spesenB -text "Jahresspesen verwalten" -command {manageExpenses}
 button .spesenDeleteB -text "Eintrag löschen" -command {deleteExpenses}
 button .spesenAbbruchB -text [mc cancel] -command {manageExpenses}
 button .spesenAddB -text "Eintrag hinzufügen" -command {addExpenses}
@@ -287,10 +282,12 @@ pack .abschlussM -in .n.t3.topF -side left
 
 #TODO Spesenverwaltung buggy, needs exit button & must be cleared at the end!
 ##moved to EINSTELLUNGEN tab!
-#pack .spesenB -in .n.t3.topF -side right -padx 50 
+pack .spesenB -in .n.t3.topF -side right -padx 50 
+
 
 #Execute initial commands if connected to DB
-catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res
+#catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res
+
 pack .news -in .botF -side left -anchor center -expand 1
 
 ######################################################################################
@@ -320,11 +317,12 @@ entry .confartunitE -bg beige -textvar artikel::rabatt
 entry .confartpriceE -bg beige
 ttk::checkbutton .confarttypeACB -text "Auslage"
 ttk::checkbutton .confarttypeRCB -text "Rabatt"
+
 #TODO
 #pack .confartcreateB -in .n.t4
 
-#DATENBANK SICHERN
-label .dumpdbT -text "Datenbank sichern" -font "TkHeadingFont"
+#DATENBANK ERSTELLEN & SICHERN
+label .dumpdbT -text "Datenbank verwalten" -font "TkHeadingFont"
 message .dumpdbM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner $dumpDir abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando \n\tsu postgres -c 'psql $dbname < $dbname-\[DATUM\].sql' \n wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
 button .dumpdbB -text "Datenbank sichern" -command {dumpdb}
 pack .dumpdbT -in .n.t4.f2 -anchor nw
@@ -341,9 +339,10 @@ entry .confdbUserE -textvar dbuser -validate focusin -validatecommand {%W conf -
 button .initdbB -text "Datenbank erstellen" -command {initdb}
 
 #TODO testing
-pack .confdbT -in .n2.dbF -anchor nw 
-pack .confdbM -in .n2.dbF -anchor ne -side left
-pack .initdbB  .confdbnameE .confdbUserE -in .n2.dbF -anchor se -side right
+#pack .confdbT -in .n2.dbF -anchor nw 
+#pack .confdbM -in .n2.dbF -anchor ne -side left
+pack .initdbB -in .n.t4.f2 -anchor se -side right
+
 
 #RECHNUNGSSTELLUNG
 pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
@@ -371,9 +370,9 @@ button .billcomplogoB -text "Firmenlogo hinzufügen" -command {
   return 0
 }
 
-#pack .billingT .billingM -in .n.t4.f5 -anchor nw
-#pack .billformatlinksRB .billformatrechtsRB -in .n.t4.f5 -anchor se -side bottom
-#pack .billcomplogoB .billcurrencySB .billvatE .billownerE .billcompE .billstreetE .billcityE .billphoneE .billbankE .billcond1E .billcond2E .billcond3E -in .billing2F
+pack .billingT .billingM -in .n.t4.f5 -anchor nw
+pack .billformatlinksRB .billformatrechtsRB -in .n.t4.f5 -anchor se -side bottom
+pack .billcomplogoB .billcurrencySB .billvatE .billownerE .billcompE .billstreetE .billcityE .billphoneE .billbankE .billcond1E .billcond2E .billcond3E -in .billing2F
 
 #Configure all entries to change colour & be emptied when focused
 foreach e [pack slaves .billing2F] {
@@ -406,6 +405,18 @@ if {[info exists cond3] && $cond3!=""} {.billcond3E insert 0 $cond3; .billcond3E
 if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcurrencySB set $currency}
 
 
+####################################################
+# T A B  5 - STORNI
+####################################################################################
+label .titel5 -text "[mc storni]" -font TIT -anchor nw -fg steelblue -bg silver 
+message .storniM -width 400 -anchor nw -justify left -text "[mc storniTxt]" 
+
+entry .stornoE -bg beige -justify left -validate focusout -vcmd {storno %s;return 0}
+
+pack .titel5 -in .n.t5 -anchor nw -pady 25 -padx 25 -fill x
+pack .storniM .stornoE -in .n.t5 -pady 25 -padx 25 -side left -anchor nw
+
+
 ####################################################################################
 # P a c k   b o t t o m 
 ###################################################################################
@@ -415,8 +426,9 @@ if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcur
 #######################################################################
 ## F i n a l   a 	c t i o n s :    detect Fehlermeldung bzw. socket no.
 #######################################################################
+proc gerekmi {} {
 if {[string length $res] >20} {
-  NewsHandler::QueryNews $res red 
+  NewsHandler::News $res red 
   .confdbnameE conf -text "Datenbankname eingeben" -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
   .confdbUserE conf -text "Datenbanknutzer eingeben" -validate focusin -validatecommand {%W conf -text "Name eingeben" -bg beige -fg grey ; return 0}
   return 1
@@ -429,9 +441,13 @@ set db $res
 .confdbUserE conf -state disabled
 .initdbB conf -state disabled
 
+}
 
 #TODO try below - separating "New invoice" procs from "Show old invoice" procs in tkoffice-invoice.tcl
-source [file join $progDir tkoffice-invoice.tcl]
+#source [file join $progDir tkoffice-invoice.tcl]
+
+
+# E x e c u t e   p r o g s
 setAdrList
 resetAdrWin
 resetNewInvDialog
@@ -444,7 +460,7 @@ setArticleLine TAB4
 #Execute once when specific TAB opened
 bind .n <<NotebookTabChanged>> {
   set selected [.n select]
-  puts "Changed to $selected"
+#  puts "Changed to $selected"
   if {$selected == ".n.t3"} {
     set t3 1
   }
@@ -453,13 +469,18 @@ bind .n <<NotebookTabChanged>> {
 
 resetNewInvDialog
 resetArticleWin
-setArticleLine TAB2
+
+#setArticleLine TAB2
 
 ##Load progs for tab 3 -TODO try this for TAB4 which should be least used!!!!
 #after 1500 {
 #  vwait t3
 #  source [file join $progDir tkoffice-report.tcl]
-  setAbschlussjahrSB
+
+#TODO : Syntaxproblem mit SQLite 
+
+#  setAbschlussjahrSB
+
 #}
 #Recompute real widths
 #set topwinX [winfo width .]

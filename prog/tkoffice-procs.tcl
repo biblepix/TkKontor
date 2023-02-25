@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Updated: 15feb22
+# Updated: 5sep22
 
 ##################################################################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S
@@ -98,7 +98,7 @@ proc createTkOfficeLogo {} {
   set schrift1 [.logoC create text 28 26]
   .logoC itemconf $schrift1 -font "TkCaptionFont 18 bold" -fill $dunkelblau -text "k"
 
-  set schrift2 [.logoC create text 120 25]
+  set schrift2 [.logoC create text 105 25]
   .logoC itemconf $schrift2 -font "TkHeadingFont 20 bold" -fill orange -text {f  f  i  c  e}
 
 #  set schrift3 [.logoC create text [expr $bildschirmbreite - 100] 30 -anchor e]
@@ -135,8 +135,8 @@ proc createPrintBitmap {} {
 proc setAdrList {} {
   global db adrSpin
   $adrSpin config -bg lightblue
-	set IDlist [pg_exec $db "SELECT objectid FROM address ORDER BY objectid DESC"]
-	$adrSpin conf -values [pg_result $IDlist -list]
+	set IDlist [db eval "SELECT objectid FROM address ORDER BY objectid DESC"]
+	$adrSpin conf -values $IDlist
 
 	$adrSpin conf -command {
 		fillAdrWin %s
@@ -156,18 +156,18 @@ proc fillAdrWin {adrId} {
   global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
 	
   #set variables
-	set name1 [pg_result [pg_exec $db "SELECT name1 FROM address WHERE objectid=$adrId"] -list]
-	set name2 [pg_result [pg_exec $db "SELECT name2 FROM address WHERE objectid=$adrId"] -list]
-	set street [pg_result [pg_exec $db "SELECT street FROM address WHERE objectid=$adrId"] -list]
-	set city [pg_result [pg_exec $db "SELECT city FROM address WHERE objectid=$adrId"] -list]
-	set ::zip  [pg_result [pg_exec $db "SELECT zip FROM address WHERE objectid=$adrId"] -list]
+	set name1 [db eval "SELECT name1 FROM address WHERE objectid=$adrId"]
+	set name2 [db eval "SELECT name2 FROM address WHERE objectid=$adrId"]
+	set street [db eval "SELECT street FROM address WHERE objectid=$adrId"]
+	set city [db eval "SELECT city FROM address WHERE objectid=$adrId"]
+	set ::zip  [db eval "SELECT zip FROM address WHERE objectid=$adrId"]
 
   #Export if not empty
-  set tel1 [pg_result [pg_exec $db "SELECT telephone FROM address WHERE objectid=$adrId"] -list]
-  set tel2 [pg_result [pg_exec $db "SELECT mobile FROM address WHERE objectid=$adrId"] -list]
-  #set fax  [pg_result [pg_exec $db "SELECT telefax FROM address WHERE objectid=$adrId"] -list]
-  set mail [pg_result [pg_exec $db "SELECT email FROM address WHERE objectid=$adrId"] -list]
-  set www  [pg_result [pg_exec $db "SELECT www FROM address WHERE objectid=$adrId"] -list]
+  set tel1 [db eval "SELECT telephone FROM address WHERE objectid=$adrId"]
+  set tel2 [db eval "SELECT mobile FROM address WHERE objectid=$adrId"]
+  #set fax  [db eval "SELECT telefax FROM address WHERE objectid=$adrId"]
+  set mail [db eval "SELECT email FROM address WHERE objectid=$adrId"]
+  set www  [db eval "SELECT www FROM address WHERE objectid=$adrId"]
 
   regsub {({)(.*)(})} $name1 {\2} ::name1
   regsub {({)(.*)(})} $name2 {\2} ::name2
@@ -191,17 +191,15 @@ proc searchAddress {} {
 
   if {$s == ""} {return 0}
 
-  #Search names/city/zip
-  set token [pg_exec $db "SELECT objectid FROM address WHERE
-	  name1 ~ '$s' OR
-	  name2 ~ '$s' OR
-    zip ~ '$s' OR
-	  city ~ '$s'
+  #Search names/city/zip (with %...% for fuzzy matches)
+  set adrNumL [db eval "SELECT objectid FROM address WHERE
+	  name1 LIKE '%$s%' OR
+	  name2 LIKE '%$s%' OR
+    zip LIKE '%$s%' OR
+	  city LIKE '%$s%'
   "]
 
-  #Get list of number(s)
-	set adrNumList [pg_result $token -list]
-  set numTuples [pg_result $token -numTuples]
+  set numTuples [llength $adrNumL]
 #puts $adrNumList
 #puts $numTuples
 
@@ -213,14 +211,14 @@ proc searchAddress {} {
 
   #A: open address if only 1 found
   if {$numTuples == 1} {
-    $adrSpin set $adrNumList
-	  fillAdrWin $adrNumList
-	  fillAdrInvWin $adrNumList
+    $adrSpin set $adrNumL
+	  fillAdrWin $adrNumL
+	  fillAdrInvWin $adrNumL
 
   #B: fill adrSB spinbox to choose from selection
   } elseif {$numTuples > 1} {
 
-    $adrSpin config -bg beige -values "$adrNumList"
+    $adrSpin config -bg beige -values "$adrNumL"
     fillAdrWin [$adrSpin get]
     fillAdrInvWin [$adrSpin get]
     catch {button .adrClearSelB -width 13 -text "^ Auswahl löschen" -command setAdrList}
@@ -282,7 +280,13 @@ proc newAddress {} {
   global adrSpin
   
   #disable adrSpin & upvar adress vars
-  $adrSpin conf -state disabled
+  $adrSpin delete 0 end
+  $adrSpin conf -bg #d9d9d9
+	$adrSpin conf -state disabled
+	
+	#clear Invoices
+	clearAdrInvWin
+	  
   upvar name1 name1 name2 name2 street street zip zip city city tel1 tel1 tel2 tel2 www www mail mail
   
   #reset address vars
@@ -311,21 +315,26 @@ proc newAddress {} {
 
   #reconfigure buttons
   .b1 configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
-  .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
+  .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin new}
   pack forget .b0
+
+	#clear adrInvWin
+	
+	
+	
 }
 
 # clearAddressWin
 ##called by [newAddress] & [changeAddress] buttons
 proc clearAddressWin args {
   global adrSpin adrSearch
-  
-
+ 
   if {$args == "new"} {
 
  #TODO why does this work only when hand typed? 
-  
-    resetAddressVars
+ 
+ ##TODO what is this supposed to do? where is it? 
+#    resetAddressVars
     
   } else {
   
@@ -343,10 +352,11 @@ proc clearAddressWin args {
   $adrSearch conf -state disabled
   .adrF2 conf -bg #d9d9d9
 
+
 #  return 0
 }
 
-# newAddress
+# newAddress - OLD???????????
 ##clears address win & button names
 ##called by .b1
 proc newAddress-OLD {} {
@@ -409,7 +419,7 @@ set tel2 $::tel2
 	#A: save new
 	if {$adrno == ""} {
 		set newNo [createNewNumber address]
-		set token [pg_exec $db "INSERT INTO address (
+		set token [db eval "INSERT INTO address (
       objectid,
       ts,
       name1,
@@ -441,7 +451,7 @@ set tel2 $::tel2
 	#B: change old
 	} else {
 
-	set token [pg_exec $db "UPDATE address SET
+	set token [db eval "UPDATE address SET
 		name1='$name1',
 		name2='$name2',
 		street='$street',
@@ -455,8 +465,8 @@ set tel2 $::tel2
     ]
 	}
 
-  if {[pg_result $token -error] != ""} {
-  	NewsHandler::QueryNews "[pg_result $token -error ]" red
+  if [db errorcode] {
+  	NewsHandler::QueryNews "$token" red
   } else {
    	NewsHandler::QueryNews "Anschrift Nr. $adrno gespeichert" lightgreen
 	  #Update Address list
@@ -469,20 +479,21 @@ set tel2 $::tel2
 proc deleteAddress {adrNo} {
   global db
   #Check if any invoice is attached
-  set token [pg_exec $db "SELECT f_number from invoice where customeroid=$adrNo"]
+  set token [db eval "SELECT f_number from invoice where customeroid=$adrNo"]
 
-  if {[pg_result $token -list] == ""} {
+  if {$token == ""} {
 
     set res [tk_messageBox -message "Wollen Sie die Adresse $adrNo wirklich löschen?" -type yesno]
     if {!$res} {return 1}
 
-    set token [pg_exec $db "DELETE FROM address WHERE objectid=$adrNo"]
+    set token [db eval "DELETE FROM address WHERE objectid=$adrNo"]
     reportResult $token "Adresse $adrNo gelöscht."
     resetAdrWin
 
   } else {
-    reportResult $token "Adresse $adrNo nicht gelöscht, da mit Rechnung(en) [pg_result $token -list] verknüpft."
+    reportResult $token "Adresse $adrNo nicht gelöscht, da mit Rechnung(en) $token verknüpft."
   }
+
 } ;#END deleteAddress
 
 
@@ -505,8 +516,8 @@ proc resetArticleWin {} {
 
 proc createArtMenu {} {
 	global db
-	set token [pg_exec $db "SELECT artnum,artname FROM artikel"]
-	array set artArr [pg_result $token -list]
+	set token [db eval "SELECT artnum,artname FROM artikel"]
+	array set artArr $token
 
 
 	#TODO extract artNum from string
@@ -560,11 +571,12 @@ proc setArticleLine {tab args} {
 
   #Get DB data per line
   namespace eval artikel {
-    set token [pg_exec $db "SELECT artname,artprice,artunit,arttype FROM artikel WHERE artnum=$artNum"]
-    set artName [lindex [pg_result $token -list] 0]
-    set artPrice [lindex [pg_result $token -list] 1]
-    set artUnit [lindex [pg_result $token -list] 2]
-    set artType [lindex [pg_result $token -list] 3]
+  
+    set token [db eval "SELECT artname,artprice,artunit,arttype FROM artikel WHERE artnum=$artNum"]
+    set artName  [lindex $token 0]
+    set artPrice [lindex $token 1]
+    set artUnit  [lindex $token 2]
+    set artType  [lindex $token 3]
 
     if {$artType == "R"} {
       .mengeE delete 0 end
@@ -654,7 +666,7 @@ proc saveArticle {} {
   set artPrice [.confartpriceE get]
   if {$artPrice == ""} {set artPrice 0}
 
-  set token [pg_exec $db "INSERT INTO artikel (
+  set token [db eval "INSERT INTO artikel (
     artname,
     artunit,
     artprice,
@@ -688,7 +700,7 @@ proc deleteArticle {} {
   set artNo [.confartnumSB get]
   set res [tk_messageBox -message "Wollen Sie Artikel $artNo wirklich löschen?" -type yesno]
   if {$res == "yes"} {
-    set token [pg_exec $db "DELETE FROM artikel WHERE artnum=$artNo"]
+    set token [db eval "DELETE FROM artikel WHERE artnum=$artNo"]
     reportResult $token "Artikel $artNo gelöscht."
     updateArticleList
     setArticleLine TAB4
@@ -700,13 +712,13 @@ proc deleteArticle {} {
 ##called by saveArticle / ...
 proc updateArticleList {} {
   global db
-  set token [pg_exec $db "SELECT artnum FROM artikel"]
+  set token [db eval "SELECT artnum FROM artikel"]
   
   
   #TODO replace?
-  #.invartnumSB conf -values [pg_result $token -list]
-  #.invartOM artNo [pg_result $token -list]
-  .confartnumSB conf -values [pg_result $token -list]
+  #.invartnumSB conf -values $token
+  #.invartOM artNo $token
+  .confartnumSB conf -values $token
 }
 
 
@@ -775,37 +787,42 @@ namespace eval NewsHandler {
 	}
 } ;#END NewsHandler
 
-#2.Create new f_number
-#TODO: let Postgres take care of it !!!!!!!!!!!!!!!!!!!!!!
+#2.Create new f_number -
+#NOTE this MAY BE unnecessary now, since SQLite automatically creates a new 'rowid' for new entries
+#INSTEAD OF 'f_number' & 'objectid' USE this in future!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#But how do I identify 2 rowid's, and how does 'ts' come in?
 
 proc createNewNumber {objectKind} {
-#one for all!
-global db
+
 #use new no. for all "integer not null" DB fields! (ref. saveAdress + saveInvoice)
 	if {$objectKind=="address"} {
 		set object "objectid"
 	} elseif {$objectKind=="invoice"} {
 		set object "f_number"
 	}
-	set lastNo [pg_exec $db "SELECT $object FROM $objectKind ORDER BY $object DESC LIMIT 1"]
-	set objectNo [pg_result $lastNo -list]
+	set lastNo [db eval "SELECT $object FROM $objectKind ORDER BY $object DESC LIMIT 1"]
+	set objectNo $lastNo
 	incr objectNo
 	return $objectNo
 }
 
+
+#TODO where is this used? -adapt to SQLight!
 proc reportResult {token text} {
   #if error
-  if {[pg_result $token -error] != ""} {
-  	NewsHandler::QueryNews "[pg_result $token -error]" red
+  
+  if [db errorcode] {
+  	NewsHandler::QueryNews "$token" red
 
   #if empty - TODO: falsches ERgebnis bei Zahlungseingang!
 #FOR deletions? insertions?
-  } elseif {[pg_result $token -oid] != ""} {
+  } else {
 
-    NewsHandler::QueryNews "$text [pg_result $token -oid]" lightgreen
+    NewsHandler::QueryNews "$text $token]" lightgreen
   }
 }
 
+#TODO - adapt for SQLIGHT!
 proc initialiseDB {dbname} {
   global ?db?
   #1. Create DB
@@ -813,7 +830,7 @@ proc initialiseDB {dbname} {
   #2. Create tables
 
     ##1. Article table
-    set token [pg_exec $db "CREATE TABLE artikel (
+    set token [db eval "CREATE TABLE artikel (
       artnum SERIAL,
       artname text NOT NULL,
       artunit text NOT NULL,
@@ -821,15 +838,15 @@ proc initialiseDB {dbname} {
     )"
     ]
   ##2. Spesen
-  set token [pg_exec $db "CREATE TABLE spesen (
+  set token [db eval "CREATE TABLE spesen (
     num SERIAL,
     name text NOT NULL,
     value NUMERIC NOT NULL
   )"
   ]
   ##3. Invoice
-  #Invoice with yearly changing no.
-  set token [pg_exec $db "CREATE TABLE invoice (
+  #Invoice with yearly changing numbers!
+  set token [db eval "CREATE TABLE invoice (
     ?f_number? SERIAL,
     ...
     ...
@@ -841,20 +858,28 @@ proc initialiseDB {dbname} {
 
   } ;#END initialiseDB
 
+
 # dumpDB
 ##called by 'Datenbank sichern' button
 proc dumpDB {} {
-  global dbname dbuser dumpDir
+
+  global dbname
+  
   file mkdir $dumpDir
 
   set date [clock format [clock seconds] -format %d-%m-%Y]
-  set dumpfile $dbname-${date}.sql
+  set dumpfile $dbname_backup-${date}.sql
   set dumppath [file join $dumpDir $dumpfile]
-  catch {exec pg_dump -U $dbuser $dbname > $dumppath} err
-
-  if {$err != ""} {
+  
+	set err [db backup $dumppath]
+ 
+  if [db errorcode] {
     NewsHandler::QueryNews "Datenbank konnte nicht gesichert werden;\n$err" red
   } else {
     NewsHandler::QueryNews "Datenbank erfolgreich gesichert in $dumppath" lightgreen
   }
+  
+#TODO: Add "Datenbank wiederherstellen" Btn in TAB4! & write proc
+#Achtung: vor "Wiederherstellen" unbedingt automatische Tagessicherung machen!
+ 
 }

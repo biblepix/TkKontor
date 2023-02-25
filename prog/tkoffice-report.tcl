@@ -15,8 +15,7 @@
 proc setAbschlussjahrSB {} {
   global db
   set heuer [clock format [clock seconds] -format %Y]
-  set token [pg_exec $db "SELECT DISTINCT EXTRACT(year FROM f_date) FROM invoice"]
-  set jahresliste [pg_result $token -list]
+  set jahresliste [db eval "SELECT DISTINCT EXTRACT(year FROM f_date) FROM invoice"]
   lappend jahresliste $heuer
 
   .abschlussJahrSB conf -values [lsort -decreasing $jahresliste]
@@ -59,9 +58,9 @@ proc manageExpenses {} {
 
   .spesenLB delete 0 end
   #get listbox values from DB
-  set token [pg_exec $db "SELECT * FROM spesen"]
+  set token [db eval "SELECT * FROM spesen"]
 
-  foreach tuple [pg_result $token -llist] {
+  foreach tuple $token {
     #set tuple [pg_result $token -getTuple $tupleNo]
     set name [lindex $tuple 1]
     set value [lindex $tuple 2]
@@ -83,10 +82,13 @@ proc saveExpenses {} {
 
   set name [.expnameE get]
   set value [.expvalueE get]
-  set token [pg_exec $db "INSERT INTO spesen (name,value) VALUES ('$name',$value)"]
+  set token [db eval "INSERT INTO spesen (name,value) VALUES ('$name',$value)"]
 
-  NewsHandler::QueryNews [pg_result $token -error] red
-  #reportResult $token "Eintrag gespeichert."
+	if [db errorcode] {
+	  NewsHandler::QueryNews $token red
+	} else {
+  	reportResult $token "Eintrag gespeichert."
+  }
   manageExpenses
 }
 proc deleteExpenses {} {
@@ -94,7 +96,9 @@ proc deleteExpenses {} {
 
   #1 delete from DB
   set value [lindex [.spesenLB get active] end]
-  set token [pg_exec $db "DELETE FROM spesen WHERE value=$value"]
+  set token [db eval "DELETE FROM spesen WHERE value=$value"]
+ 
+ #TODO check errorcode, s.o. 
   reportResult $token "Eintrag gelöscht"
 
   #2 update LB
@@ -128,7 +132,7 @@ proc createReport {} {
   set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
 
 	#get data from $jahr's invoices + 'payeddate = $jahr' from any previous invoices
-	set res [pg_exec $db "SELECT
+	set res [db eval "SELECT
 	f_number,
 	f_date,
 	addressheader,
@@ -141,6 +145,7 @@ proc createReport {} {
 	ORDER BY f_number ASC"]
 
 	#save result to var
+	#TODO s.o.
 	if {[pg_result $res -error] != ""} {
 	  NewsHandler::QueryNews "[pg_result $res -error]" red
 	  return 1

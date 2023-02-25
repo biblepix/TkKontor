@@ -1,3 +1,9 @@
+# ~/TkOffice/prog/tkoffice-print.tcl
+# called by 
+# Salvaged: 1nov17
+# Updated to use SQLite: 6sep22
+
+
 # fetchInvData
 ##1.retrieves invoice data from DB
 ##2.gets some vars from Config
@@ -15,7 +21,7 @@ proc fetchInvData {invNo} {
   if {$currency=="CHF"} {set currency {Fr.}}
 
   #2.Get invoice data from DB
-  set invToken [pg_exec $db "SELECT 
+  set invToken [db eval "SELECT 
     ref,
     cond,
     f_date,
@@ -24,8 +30,8 @@ proc fetchInvData {invNo} {
   FROM invoice WHERE f_number = $invNo"
   ]
 
-  if { [pg_result $invToken -error] != ""} {
-    NewsHandler::QueryNews "[mc invRecovErr $invNo]\n[pg_result $invToken -error]" red
+  if [db errorcode] {
+    NewsHandler::QueryNews "[mc invRecovErr $invNo]\n$invToken" red
     return 1
   }
   
@@ -38,7 +44,7 @@ proc fetchInvData {invNo} {
   set adrNo     [lindex [pg_result $invToken -list] 4]
 
   #3.Get address data from DB & format for Latex
-  set adrToken [pg_exec $db "SELECT 
+  set adrToken [db eval "SELECT 
     name1,
     name2,
     street,
@@ -89,38 +95,14 @@ proc fetchInvData {invNo} {
   close $chan
 
   #Cleanup
-  pg_result $invToken -clear
-  pg_result $adrToken -clear
-
+  #pg_result $invToken -clear
+  #pg_result $adrToken -clear
+unset invToken adrToken
+	
   return 0
   
 } ;#END recoverInvData
 
-
-# viewDocument
-##runs detectViewer & opens file with appropriate app
-##works with PDF
-##called by ? for vixewing Abschluss.pdf ?
-#proc viewDocument {file type} {
-#  
-#  set viewer [detectViewer $type]
-
-#  #TODO warum kommt diese MSg erst am Schluss??????????????'''
-#  NewsHandler::QueryNews "Wir versuchen nun, das Dokument $file anzuzeigen." orange
-
-#  #open in $viewer if found, else use xdg-open
-#  if {$viewer==1} {
-#    set viewer "xdg-open"
-#  }
-
-#  #hier ein after?
-#  if [catch {exec $viewer $file}] {
-#    NewsHandler::QueryNews "Kann $file nicht anzeigen. Öffnen Sie die Datei eigenhändig." red
-#    return 1
-#  }
-
-#  return 0
-#}
 
 # detectViewer
 ##looks for PDF or PS viewers (args=type: ps OR pdf)
@@ -200,67 +182,6 @@ proc printDocument {num type} {
 
 } ;# END printDocument
 
-# printPdf
-##sends PDF to printer / viewer
-##called by printDocument
-#proc printPdf {pdfPath} {
-
-#  #catch {namespace delete Latex}
-#  namespace eval Latex {}
-#  set Latex::pdfPath $pdfPath
-#  set Latex::pdfFile [file tail $pdfPath]
-
-##  NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wird zum Drucker geschickt..." orange
-
-#  # A) View if no lpr found
-#  if {[auto_execok lpr] == ""} {
-#    NewsHandler::QueryNews "Kein Drucker gefunden!\nDas Dokument $Latex::pdfFile wird zur Weiterbearbeitung angezeigt..." orange
-#    after 7000 viewDocument $pdfPath pdf
-#    return 1
-#  }
-
-#  # B) Try printing
-#  proc tryPrint {pdfPath} {
-#    return [catch {exec lpr $pdfPath}]
-##    NewsHandler::QueryNews "Kein Drucker?" blue
-#  }
-
-#  ##1. Versuch
-#  if [tryPrint $pdfPath] {
-#    set run 1
-#    #NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wurde möglicherweise nicht gedruckt.\nIst der Drucker eingeschaltet?" red
-#  #after 5000
-#  }
-
-#  ##2.-4. Versuch
-#  set V 0
-
-#  while { [tryPrint $pdfPath] && $run < 4} {
-
-#    incr run
-#NewsHandler::QueryNews $run green
-#    after 3000
-#    if {$run == 4} {
-#      after idle set V 1
-#    }
-#  }
-
-#puts $V
-
-##  if {! $V} {
-##  puts gösteremiyorum
-##    return 0
-##  }
-
-## C) Try viewing
-#  vwait V
-#  #NewsHandler::QueryNews "Das Dokument $Latex::pdfFile wurde möglicherweise nicht gedruckt. \nWir versuchen es jetzt zwecks Weiterbearbeitung anzuzeigen." orange
-#  after idle viewDocument $Latex::pdfPath pdf
-#  return 1
-
-
-
-#} ;#END printPdf
 
 # doPrintReport
 ##called by .abschlussPrintB

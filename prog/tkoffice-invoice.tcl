@@ -1,7 +1,8 @@
 # ~/TkOffice/prog/tkoffice-invoice.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
-# Updated: 29jan22
+# Updated for use with SQLite: 9sep22
+# Updated 23feb23
 
 source $confFile
 ################################################################################################################
@@ -106,7 +107,7 @@ proc addInvRow {} {
     variable rabatt
     set rowNo [incr lastrow 1]
 
-    #Create new row namespace
+    # new row namespace
     namespace eval $rowNo  {
 
       set artName [.invartnameL cget -text]
@@ -224,24 +225,23 @@ proc addInvRow {} {
 ##called by .saveinvB button
 proc doSaveInv {} {
 #TODO: remove catches, getting DVIPS and LATEX errors which are NOT errors!
+  
   #1.Save to DB
   if [catch saveInv2DB res] {
     NewsHandler::QueryNews $res red
     return 1
   } 
   
-  #TODO wie kommt/kam invNo nach ::Latex?
+	#NOTE: invNo put into ::Latex by saveInv2DB
   #2. LatexInvoice
   if [catch {latexInvoice $::Latex::invNo} res] {
     NewsHandler::QueryNews $res red
     return 1
   }
   
-  #3. ? NO! doPrintInv ?
-  # ? doViewInvoice ?
-
   return 0
-}
+
+} ;#END doSaveInv
 
 # saveInv2DB
 ##saves new invoice to DB
@@ -252,7 +252,6 @@ proc saveInv2DB {} {
   set adrNo [.adrSB get]
 
   #1. Get invNo & export to ::Latex 
-  #TODO: incorporate in DB as 'SERIAL', starting with %YY
 	set invNo [createNewNumber invoice]
 	namespace eval Latex {}
 	set ::Latex::invNo $invNo
@@ -308,7 +307,7 @@ proc saveInv2DB {} {
   }
 
   #3. Save new invoice to DB
-  set token [pg_exec $db "INSERT INTO invoice 
+  set token [db eval "INSERT INTO invoice 
     (
     objectid,
     ts,
@@ -338,7 +337,7 @@ proc saveInv2DB {} {
     $vatlesssum,
     $auslage,
     $invNo,
-    to_date('$auftrDat','DD MM YYYY'),
+date('$auftrDat','DD MM YYYY'),
     '$comm',
     '$ref',
     '$cond',
@@ -346,16 +345,20 @@ proc saveInv2DB {} {
     )"]
   
 #TODO does this belong here? should we use reportResult instead?
-  if {[pg_result $token -error] != ""} {
-    NewsHandler::QueryNews "[mc invNotsaved $invNo]:\n[pg_result $token -error ]" red
+  if [db errorcode] {
+  
+  #TODO how to get error message from SQLite?????????????????
+    #NewsHandler::QueryNews "[mc invNotsaved $invNo]:\n[pg_result $token -error ]" red
+     NewsHandler::QueryNews "[mc invNotsaved $invNo]:\n $token ]" red
+     
     return 1
   } else {
    	NewsHandler::QueryNews "[mc invSaved $invNo]" green
     fillAdrInvWin $adrNo
     
-    #TODO how can we incorporate printDocument here instead? - needs number + type!
-    #Do we still need "doPrintNewInv" ?
-    .saveinvB conf -text [mc printInv] -command "printDocument $invNo inv" -bg orange
+#TODO! wrong inv number printed !!!!!!!!!!!!!!!!!!!
+.saveinvB conf -text [mc printInv] -command "printDocument $invNo inv" -bg orange
+
     return 0
   } 
 
@@ -397,9 +400,21 @@ proc latexInvoice {invNo} {
  #moved to printDocument   
 #    NewsHandler::QueryNews "Das PDF-Dokument '[file tail $invPdfPath]' befindet sich in $spoolDir zur weiteren Bearbeitung." maroon
     
+    namespace delete Latex
     
 } ;#END latexInvoice
 
+# clearAdrInvWin
+##called by fillAdrInvWin & newAddress
+proc clearAdrInvWin {} {
+	global invF
+  set slaveList [pack slaves $invF]
+  foreach  w $slaveList {
+    foreach w [pack slaves $w] {
+      pack forget $w
+    }
+  }
+}
 
 # fillAdrInvWin
 ##called by .adrSB 
@@ -408,12 +423,8 @@ proc fillAdrInvWin {adrId} {
   global invF db
 
   #Delete previous frames
-  set slaveList [pack slaves $invF]
-  foreach  w $slaveList {
-    foreach w [pack slaves $w] {
-      pack forget $w
-    }
-  }
+  clearAdrInvWin
+  
   #Clear old window+namespace
   if [namespace exists verbucht] {
     namespace delete verbucht
@@ -428,31 +439,30 @@ proc fillAdrInvWin {adrId} {
     set anzeige 0
 
     set adrId [.adrSB get]
-    set idToken [pg_exec $db "SELECT ts FROM address WHERE objectid = $adrId"]
-    set custId [pg_result $idToken -list]
-    set invNoT [pg_exec $db "SELECT f_number FROM invoice WHERE customeroid = $custId"]
-    set nTuples [pg_result $invNoT -numTuples]
+    set custId [db eval "SELECT ts FROM address WHERE objectid = $adrId"]
 
+    set invNoT [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
+    set nTuples [llength $invNoT]
   	if {$nTuples == -1} {return 1}
 
-    set invDatT   [pg_exec $db "SELECT f_date FROM invoice WHERE customeroid = $custId"]
-	  set beschrT   [pg_exec $db "SELECT shortdescription FROM invoice WHERE customeroid = $custId"]
-	  set sumtotalT [pg_exec $db "SELECT finalsum FROM invoice WHERE customeroid = $custId"]
-	  set payedsumT [pg_exec $db "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
-	  set statusT   [pg_exec $db "SELECT ts FROM invoice WHERE customeroid = $custId"]	
-    set itemsT    [pg_exec $db "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
-    set commT     [pg_exec $db "SELECT f_comment FROM invoice WHERE customeroid = $custId"]
-    set auslageT  [pg_exec $db "SELECT auslage FROM invoice WHERE customeroid = $custId"]
+		#NOTE: these are no more tokens, but single items or lists! 
+    set invDatT   [db eval "SELECT f_date FROM invoice WHERE customeroid = $custId"]
+	  set beschrT   [db eval "SELECT shortdescription FROM invoice WHERE customeroid = $custId"]
+	  set sumtotalT [db eval "SELECT finalsum FROM invoice WHERE customeroid = $custId"]
+	  set payedsumT [db eval "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
+	  set statusT   [db eval "SELECT ts FROM invoice WHERE customeroid = $custId"]	
+    set itemsT    [db eval "SELECT items FROM invoice WHERE items IS NOT NULL AND customeroid = $custId"]
+    set commT     [db eval "SELECT f_comment FROM invoice WHERE customeroid = $custId"]
+    set auslageT  [db eval "SELECT auslage FROM invoice WHERE customeroid = $custId"]
 
     #Show client turnover, including 'auslagen'
-    set umsatzT [pg_exec $db "SELECT sum(finalsum),sum(auslage) AS total from invoice WHERE customeroid = $custId"]
-    set verbucht [lindex [pg_result $umsatzT -list] 0]
-    set auslagen [lindex [pg_result $umsatzT -list] 1]
-    
-    if {![string is double $auslagen] || $auslagen == ""} {
-      set auslagen 0.00
+    set umsatzL [db eval "SELECT sum(finalsum),sum(auslage) AS total from invoice WHERE customeroid = $custId"]
+    set verbucht [lindex $umsatzL 0]
+    set auslage [lindex $umsatzL 1]
+    if {![string is double $auslage] || $auslage == ""} {
+      set auslage 0.00
     }
-    set ::umsatz [roundDecimal [expr $verbucht + $auslagen]]
+    set ::umsatz [roundDecimal [expr $verbucht + $auslage]]
         
     #Create row per invoice
     for {set n 0} {$n<$nTuples} {incr n} {
@@ -463,8 +473,8 @@ proc fillAdrInvWin {adrId} {
         set invF $::invF
         
         #compute Rechnungsbetrag from sumtotal+auslage
-			  set sumtotal [pg_result $::verbucht::sumtotalT -getTuple $n]
-			  set auslage [pg_result $::verbucht::auslageT -getTuple $n]
+			  set sumtotal [lindex $::verbucht::sumtotalT $n]
+			  set auslage [lindex $::verbucht::auslageT $n]
 
 			  if {[string is double $auslage] && $auslage >0} {
   			  set invTotal [expr $sumtotal + $auslage]
@@ -472,11 +482,11 @@ proc fillAdrInvWin {adrId} {
 			    set invTotal $sumtotal
 			  } 
 			  
-			  set ts [pg_result $::verbucht::statusT -getTuple $n]
-			  set invNo [pg_result $::verbucht::invNoT -getTuple $n]
-        set invdat [pg_result $::verbucht::invDatT -getTuple $n]
-			  set beschr [pg_result $::verbucht::beschrT -getTuple $n]
-        set comment [pg_result $::verbucht::commT -getTuple $n]
+			  set ts [lindex $::verbucht::statusT $n]
+			  set invNo [lindex $::verbucht::invNoT $n]
+        set invdat [lindex $::verbucht::invDatT $n]
+			  set beschr [lindex $::verbucht::beschrT $n]
+        set comment [lindex $::verbucht::commT $n]
 
 			  #increase but don't overwrite frames per line	
 			  catch {frame $invF.$n}
@@ -493,7 +503,7 @@ proc fillAdrInvWin {adrId} {
 			  $invF.$n.sumL conf -text $invTotal
 
         #create label/entry for Bezahlt, packed later
-        set bezahlt [pg_result $::verbucht::payedsumT -getTuple $n]
+        set bezahlt [lindex $::verbucht::payedsumT $n]
         catch {label $invF.$n.payedL -width 13 -justify right -anchor e}
         $invF.$n.payedL conf -text $bezahlt
 
@@ -507,11 +517,16 @@ proc fillAdrInvWin {adrId} {
 				  $invF.$n.commM conf -fg grey -text $comment -textvar {}
           pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumL $invF.$n.payedL $invF.$n.commM -side left
 			  
-        #If 1 or 2 make entry
+        #If 1 or 2 make entry widget
 			  } else {
+			  
+			  
+ 
 			  
           $invF.$n.payedL conf -fg red    
           catch {entry $invF.$n.zahlenE -bg beige -fg black -width 7 -justify left}
+  
+  #TODO was stimmt hier nicht?        
           $invF.$n.zahlenE conf -validate focusout -vcmd "savePaymentEntry %P %W $n"
 
 			    set ::verbucht::eingabe 1
@@ -531,12 +546,14 @@ proc fillAdrInvWin {adrId} {
 
         #Create Show button if items not empty
         set itemsT $::verbucht::itemsT
-        catch {set itemlist [pg_result $itemsT -getTuple $n] }
-        if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
+        catch {set itemlist [lindex $itemsT $n] }
+        
+  #TODO change for SQLite!
+   #     if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
           set ::verbucht::anzeige 1
           $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "printDocument $invNo inv"
           pack $invF.$n.invshowB -anchor e -side right
-        }
+   #     }
 
   		} ;#end for loop
     } ;#END namspace $rowNo
@@ -548,150 +565,6 @@ proc fillAdrInvWin {adrId} {
   set ::credit [updateCredit $adrId]
   
 } ;#END fillAdrInvWin
-
-
-###############################################################################################
-#### O L D   I N V O I C E   P R O C S  ####################################################?????
-###############################################################################################
-
-## fetchInvData
-###1.retrieves invoice data from DB
-###2.gets some vars from Config
-###3.saves dataFile & itemFile for Latex processing
-###called by latexInvoice
-#proc fetchInvData {invNo} {
-#  global db texDir confFile itemFile dataFile
-
-#  #1.get some vars from config
-#  source $confFile
-#  if {![string is digit $vat]} {set vat 0.0}
-#  if {$currency=="$"} {set currency \\textdollar}
-#  if {$currency=="£"} {set currency \\textsterling}
-#  if {$currency=="€"} {set currency \\texteuro}
-#  if {$currency=="CHF"} {set currency {Fr.}}
-
-#  #2.Get invoice data from DB
-#  set invToken [pg_exec $db "SELECT 
-#    ref,
-#    cond,
-#    f_date,
-#    items,
-#    customeroid
-#  FROM invoice WHERE f_number = $invNo"
-#  ]
-
-#  if { [pg_result $invToken -error] != ""} {
-#    NewsHandler::QueryNews "[mc invRecovErr $invNo]\n[pg_result $invToken -error]" red
-#    return 1
-#  }
-#  
-#  set ref       [lindex [pg_result $invToken -list] 0]
-#  set cond      [lindex [pg_result $invToken -list] 1]
-#  set auftrDat  [lindex [pg_result $invToken -list] 2]
-#  
-#  #make sure below signs are escaped since they interfere with LaTex commands
-#  set itemsHex  [lindex [pg_result $invToken -list] 3]
-#  set adrNo     [lindex [pg_result $invToken -list] 4]
-
-#  #3.Get address data from DB & format for Latex
-#  set adrToken [pg_exec $db "SELECT 
-#    name1,
-#    name2,
-#    street,
-#    zip,
-#    city 
-#  FROM address WHERE ts=$adrNo"
-#  ]
-
-#  lappend custAdr [lindex [pg_result $adrToken -list] 0] {\\}
-#  lappend custAdr [lindex [pg_result $adrToken -list] 1] {\\}
-#  lappend custAdr [lindex [pg_result $adrToken -list] 2] {\\}
-#  lappend custAdr [lindex [pg_result $adrToken -list] 3] { }
-#  lappend custAdr [lindex [pg_result $adrToken -list] 4]
-#    
-#  #4.set dataList for usepackage letter
-#  append dataList \\newcommand\{\\referenz\} \{ $ref \} \n
-#  append dataList \\newcommand\{\\cond\} \{ $cond \} \n
-#  append dataList \\newcommand\{\\dat\} \{ $auftrDat \} \n
-#  append dataList \\newcommand\{\\invNo\} \{ $invNo \} \n
-#  append dataList \\newcommand\{\\custAdr\} \{ $custAdr \} \n
-#  append dataList \\newcommand\{\\myBank\} \{ $myBank \} \n
-#  append dataList \\newcommand\{\\myName\} \{ $myComp \} \n
-#  append dataList \\newcommand\{\\myAddress\} \{ $myAdr \} \n
-#  append dataList \\newcommand\{\\myPhone\} \{ $myPhone \} \n
-#  append dataList \\newcommand\{\\vat\} \{ $vat \} \n
-#  append dataList \\newcommand\{\\currency\} \{ $currency \} \n
-
-#  ##save dataList to dataFile
-#  set chan [open $dataFile w] 
-#  puts $chan $dataList
-#  close $chan
-
-#  #save itemList to itemFile  
-#  set itemList [binary decode hex $itemsHex]
-#  if {$itemList == ""} {
-#    reportResult "Keine Posten für Rechnung $invNo gefunden. Kann Rechnung nicht anzeigen oder ausdrucken." red 
-#    return 1
-#  }
-#  #get rid of Latex code signs
-#  regsub -all {%} $itemList {\%} itemList
-#  regsub -all {&} $itemList {\&} itemList
-#  regsub -all {$} $itemList {\$} itemList
-#  regsub -all {#} $itemList {\#} itemList
-#  regsub -all {_} $itemList {\_} itemList
-#  
-#  set chan [open $itemFile w]
-#  puts $chan $itemList
-#  close $chan
-
-#  #Cleanup
-#  pg_result $invToken -clear
-#  pg_result $adrToken -clear
-
-#  return 0
-#  
-#} ;#END recoverInvData
-
-#TODO obsoLETE! > printDocument
-#Invoice view/print wrappers
-#proc doPrintOldInv {invNo} {
-
-#  #1. Get invoice data from DB
-#  if [catch "recoverInvData $invNo"] {
-#    NewsHandler::QueryNews "Rechnungsdaten $invNo konnten nicht wiederhergestellt werden. Ansicht/Ausdruck nicht möglich." red
-#    return 1
-#  }
-#  NewsHandler::QueryNews "Rechnung Nr. $invNo wird nun angezeigt.\nEine weitere Bearbeitung (Ausdruck/Versand) ist  aus dem Anzeigeprogramm möglich." orange
-
-#  #after 5000 "latexInvoice $invNo"
-#  #after 9000 "viewInvoice $invNo"
-#  
-#  return 0
-#}
-
-
-##TODO this is replaced by printDocument !
-#proc doPrintNewInv {invNo} {
-#  
-#  #1.convert DVI to PostScript
-#  latexInvoice $invNo ps
-#  
-#  #2. try printing to lpr
-#  NewsHandler::QueryNews "Sende Rechnung $invNo zum Drucker..." orange
-#printInvoice $invNo
-#return
-
-
-# #TODO test this thoroughly, there may be no output at all!!!
-#  if [catch {printInvoice $invNo} res] {
-#    NewsHandler::QueryNews "$res\nDruck fehlgeschlagen!" red 
-#  }
-#  
-#  #3. viewInvoice anyway
-#  set invPsPath [setInvPath ps]
-#  after 5000 "NewsHandler::QueryNews 'Die Rechnung wird nun angezeigt. Sie können sie aus dem Anzeigeprogramm erneut ausdrucken bzw. nach PDF umwandeln.' orange"
-#  after 8000 "viewInvoice $invPsPath"
-#}
 
 
 # setInvPath
@@ -766,66 +639,6 @@ proc viewInvoice {invNo} {
 
 
 
-# O B S O L E T E
-# printInvoice - OBSOLETE!!!! > printDocument
-##prints to printer or shows in view prog
-##called after latex - TODO: what inv.name to print?
-##called by "Rechnung drucken" button (neue Rechnung)
-#proc printInvoice {invNo} {
-
-#  #1. try direct printing to lpr  
-#  set invPsPath [setInvPath $invNo ps]
-#  NewsHandler::QueryNews "Die Rechnung $invNo wird zum Drucker geschickt." orange
-
-##TODO Hängt wenn lpr auf Drucker wartet!
-#  if {[auto_execok lpr] != ""} {
-#    
-#    set textChan [open $invPsPath]
-#    set t [read $textChan]
-#    close $textChan
-
-#    set printChan [open |/usr/bin/lpr w]    
-#    puts $printChan $t
-#    close $rintChan
-##    catch {close $printChan}
-#  NewsHandler::QueryNews "Die Rechnung $invNo wurde zum Drucker geschickt." orange
-##    return 0
-#    #after 5000 {return 1}
-# #   catch {exec lpr $invPsPath}
-#      return 0  
-#  } 
-
-
-#  #2. try direct printing vie GhostScript
-##TODO: zis not working yet!
-#  if {[auto_execok gs] != ""} {
-#    
-#    set invPsPath [setInvPath $invNo ps]
-#    set device "ps2write"
-#    set printer "/dev/usb/lp0" 
-#    catch {
-#      eval exec gs -dSAFER -dNOPAUSE -sDEVICE=$device -sOutputFile=\|$printer $invPsPath 
-#    }
-#  return 0
-#  }
-
-#  #3. Print to PS or PDF 
-#  NewsHandler::QueryNews "Die Rechnung $invNo kann nicht gedruckt werden." red
-#  NewsHandler::QueryNews "Installieren Sie ein Betrachtungsprogramm wie 'evince' oder 'okular' für besseres Druck-Handling." orange
-#  
-#  set invPdfPath [setInvPath $invNo pdf]
-#  if ![catch {exec ps2pdf $invPsPath $invPdfPath}] {
-#    set path $invPdfPath
-#  } else {
-#    set path $invPsPath
-#  }
-#  NewsHandler::QueryNews "Sie finden Rechnung $invNo unter $path zur weiteren Bearbeitung." orange
-#  return 1
-
-#} ;#END printInvoice
-
-
-
 # missing operand at _@_
 #in expression "0.00 + _@_"
 #missing operand at _@_
@@ -845,7 +658,7 @@ proc savePaymentEntry {newPayedsum curEName ns} {
 
 	#1)get invoice details
   set invNo [$invF.$rowNo.invNoL cget -text]
-  #set newPayedsum [$curEName get]
+  set newPayedsum [$curEName get]
 
   #avoid non-digit amounts
   if ![string is double $newPayedsum] {
@@ -855,11 +668,11 @@ proc savePaymentEntry {newPayedsum curEName ns} {
     return 1
   }
   
-  set invT [pg_exec $db "SELECT payedsum,finalsum,auslage,customeroid FROM invoice WHERE f_number=$invNo"]
-  set oldPayedsum [lindex [pg_result $invT -list] 0]
-  set buchungssumme [lindex [pg_result $invT -list] 1]
-  set auslage [lindex [pg_result $invT -list] 2]
-  set adrNo [lindex [pg_result $invT -list] 3]
+  set invT [db eval "SELECT payedsum,finalsum,auslage,customeroid FROM invoice WHERE f_number=$invNo"]
+  set oldPayedsum [lindex $invT 0]
+  set buchungssumme [lindex $invT 1]
+  set auslage [lindex $invT 2]
+  set adrNo [lindex $invT 3]
   
   if {[string is double $auslage] && $auslage >0} {
     set finalsum [expr $buchungssumme + $auslage]
@@ -889,10 +702,10 @@ puts "status $status"
 #puts "diff $diff"
 
 	# S a v e  totalPayedsum  to 'invoice' 
-  set token1 [pg_exec $db "UPDATE invoice 
+  set token1 [db eval "UPDATE invoice 
     SET payedsum = $totalPayedsum, 
     ts = $status,
-    payeddate = (SELECT current_timestamp::timestamp::date)
+    payeddate = (SELECT date())
     WHERE f_number=$invNo
     "]
 
@@ -923,15 +736,15 @@ puts "status $status"
 proc updateCredit {adrNo} {
   global db
   
-  set invoicesT [pg_exec $db "SELECT 
+  set invoicesT [db eval "SELECT 
     sum(finalsum),
     sum(payedsum),
     sum(auslage) AS total from invoice WHERE customeroid = $adrNo"
     ]
   
-  set verbuchtTotal [lindex [pg_result $invoicesT -list] 0]
-  set gezahltTotal  [lindex [pg_result $invoicesT -list] 1]
-  set auslagenTotal [lindex [pg_result $invoicesT -list] 2]
+  set verbuchtTotal [lindex $invoicesT 0]
+  set gezahltTotal  [lindex $invoicesT 1]
+  set auslagenTotal [lindex $invoicesT 2]
   
   if {![string is double $verbuchtTotal]  || $auslagenTotal == ""} {
     set verbuchtTotal 0.00
@@ -957,79 +770,33 @@ proc updateCredit {adrNo} {
   
   return [roundDecimal $totalCredit]
 }
-    
-### A R C H I V ################################################################################
+   
+# storno
+##removes given item from database if confirmed in messageBox
+##called by .stornoE   
+proc storno {id} {
+	global db
 
-# doInvoicePdf  - obsolete!!! 
-##creates invoice PDF if so desired by user
-##called by viewInvoice
-#proc doInvoicPdf {invNo} {
-#  global invDviName invDviPath invPdfName invPdfPath 
-#  global psViewer invPsPath
+	#Switch back to main page & create pop-up window to verify deletion
+	.n select 0
+	set res [tk_messageBox -title "Buchung stornieren" -message "Wollen Sie Buchung $id wirklich dauerhaft entfernen?" -icon warning -type yesno]	
 
-#  set reply [tk_messageBox -type yesno -message "Möchten Sie von der Rechnung Nr. $invNo ein PDF zum Versand/Ausdruck erstellen?"]
-#  if {$reply == "yes"} {
-
-#    if [catch {exec dvipdf $invDviPath} res] {
-#      NewsHandler::QueryNews "Es konnte kein PDF der Rechnung Nr. $invNo erstellt werden: \n$res" red
-#      exec dvips $invDviPath
-#      exec psViewer $invPsPath
-#      NewsHandler::QueryNews "Die Rechnung Nr. $invNo liegt im PostScript-Format vor. Druck/Versand über $psViewer" orange
-
-#    } else {
-#      NewsHandler::QueryNews "Das PDF der Rechnung finden Sie in $invPdfPath" green
-#    }
-
-#  }
-#}
-
-# viewInvOnCanvas
-##shows invoice in toplevel window
-##called by viewInvoice if no viewer found
-#  global adrSpin
-#proc viewInvOnCanvas {invNo} {
-# 
-#  NewsHandler::QueryNews "Kein externes Betrachtungsprogramm gefunden." orange
-#  NewsHandler::QueryNews "Installieren Sie zur bequemen Anzeige/Bearbeitung von Rechnungen eines der Programme 'evince' oder 'okular'." orange  
-
-#  set invPsPath [setInvPath $invNo ps]
-#  catch {latexInvoice $invNo ps}
-#  
-#  #Create toplevel window with canvas & buttons
-#  destroy .topW
-#  toplevel .topW -borderwidth 7 -relief sunken
-#  button .topW.showinvexitB -text "Schliessen"
-#  button .topW.showinvpdfB -text "PDF erzeugen"
-#  button .topW.showinvprintB -text "Drucken"
-#  canvas .topW.invC -yscrollc ".topW.yScroll set"
-#  scrollbar .topW.yScroll -ori vert -command ".topW.invC yview"
-
-#  #Create PostScript image (height/width nicht beeinflussbar!)
-#  image create photo psIm -file $invPsPath
-#  .topW.invC create image 0 0 -image psIm -anchor nw
-#  .topW.invC configure -scrollregion [.topW.invC bbox all]
-#  .topW.invC conf -width [image width psIm] -height [image height psIm]
-#    
-#  pack .topW.invC
-#  pack .topW.yScroll -side left
-#  pack .topW.showinvexitB .topW.showinvpdfB .topW.showinvprintB -side right
-
-#  .topW.showinvexitB conf -command "wm forget .topW"
-#  
-##TODO export to function - what about ps2pdf in latexPdf???
-#  .topW.showinvpdfB conf -command "doPdf $invNo"
-#  
-#  proc doPdf {invNo} {
-#    set invPsPath [setInvPath $invNo ps]
-#    set invPdfPath [setInvPath $invNo pdf]  
-#    exec ps2pdf $invPsPath $invPdfPath
-#    NewsHandler::QueryNews "Das PDF finden Sie unter $invPdfPath." green
-#    return 0
-#  }
-#  
-#  .topW.showinvprintB conf -command "printDocument $invNo inv"  
-
-#  return 0
-
-#} ;#END viewInvOnCanvas
-
+	#Exit if "No"
+	if {$res == "no"} {
+		NewsHandler::QueryNews "Buchung Nr. $id wurde nicht storniert." red
+		return 1
+	}
+	
+	#Avoid error of empty item (wrong number - sqlite has no proper error handling!!!)
+	set code "FROM invoice WHERE objectid=$id"
+	set res [db eval "SELECT * $code"]
+	if {$res == ""} {
+		NewsHandler::QueryNews "Kein Auftrag mit Nr. $id vorhanden. Abbruch." red
+		return 1
+	}
+	
+	#Proecess deletion & update GUI
+	db eval "DELETE $code"
+	NewsHandler::QueryNews "Buchung Nr. $id erfolgreich storniert." green
+	fillAdrInvWin $id
+}
