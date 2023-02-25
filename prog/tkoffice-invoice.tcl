@@ -2,7 +2,7 @@
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
 # Updated for use with SQLite: 9sep22
-# Updated 23feb23
+# Updated 25feb23
 
 source $confFile
 ################################################################################################################
@@ -306,7 +306,11 @@ proc saveInv2DB {} {
     set vatlesssum [expr ($vat * $finalsum)/100]
   }
 
-  #3. Save new invoice to DB
+	#3. reformat auftrDat for DB date function
+	set rawdate [clock scan "$auftrDat" -format "%d.%m.%Y"]
+	set dbdate  [clock format $rawdate  -format "%Y-%m-%d"]
+	
+  #4. Save new invoice to DB
   set token [db eval "INSERT INTO invoice 
     (
     objectid,
@@ -337,7 +341,7 @@ proc saveInv2DB {} {
     $vatlesssum,
     $auslage,
     $invNo,
-date('$auftrDat','DD MM YYYY'),
+    date('$dbdate'),
     '$comm',
     '$ref',
     '$cond',
