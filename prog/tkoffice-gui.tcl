@@ -1,6 +1,7 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17
 # Updated for use with SQlite: Sep22
+# Updated 28feb23
 		
 set version 2.0
 set px 5
@@ -42,7 +43,8 @@ ttk::notebook .n
 .n add [frame .n.t2] -text "[mc newInv]"
 .n add [frame .n.t3] -text "[mc reports]"
 .n add [frame .n.t4] -text "[mc settings]"
-.n add [frame .n.t5] -text "[mc storni]"
+.n add [frame .n.t5] -text "[mc spesen]"
+.n add [frame .n.t6] -text "[mc storni]"
 .n insert end .n.t4
 
 pack .n -anchor center -padx 15 -pady 15 -fill x
@@ -257,34 +259,46 @@ pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
 label .titel4 -text "Jahresabschlüsse" -font TIT -anchor nw -pady 5 -padx 5 -fg steelblue -bg silver
 pack .titel4 -in .n.t3 -fill x -anchor nw
 
-message .abschlussM -justify left -width 1000 -text [mc reportTxt]
-message .spesenM -justify left -width 1000 -text "Text..."
+message .abschlussM -justify left -width 300 -text [mc reportTxt]
+#message .spesenM -justify left -width 300 -text "Text..."
 button .abschlussCreateB -text [mc reportCreate] -command {createReport}
 button .abschlussPrintB -text [mc reportPrint] ;#wird später von obigem Prog. gepackt
 
-button .spesenB -text "Jahresspesen verwalten" -command {manageExpenses}
-button .spesenDeleteB -text "Eintrag löschen" -command {deleteExpenses}
-button .spesenAbbruchB -text [mc cancel] -command {manageExpenses}
-button .spesenAddB -text "Eintrag hinzufügen" -command {addExpenses}
-listbox .spesenLB -width 100 -height 40 -bg lightblue
-entry .expnameE
-entry .expvalueE
-
 spinbox .abschlussJahrSB -width 4
-message .news -textvar news -pady 5 -padx 10 -justify center -anchor n -width 700 -bg steelblue3 -fg white
+message .news -textvar news -pady 5 -padx 10 -justify center -anchor n -bg steelblue3 -fg white
 
 pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
-pack [frame .n.t3.mainF -padx 15 -pady 15] -fill both -expand 1
+pack [frame .n.t3.mainF -padx 15 -pady 15] -fill both -anchor nw
 pack [frame .n.t3.botF] -fill x
 
-pack .abschlussJahrSB .abschlussCreateB -in .n.t3.topF -side right
-pack .abschlussM -in .n.t3.topF -side left
+pack [frame .n.t3.leftF] -in .n.t3.mainF -side right -expand 1 -fill both -anchor nw
+pack [frame .n.t3.rightF] -in .n.t3.mainF -side left -fill y 
 
-#TODO Spesenverwaltung buggy, needs exit button & must be cleared at the end!
-##moved to EINSTELLUNGEN tab!
-pack .spesenB -in .n.t3.topF -side right -padx 50 
+pack [frame .n.t3.rightF.saichF] -fill x
+pack .abschlussCreateB -in .n.t3.rightF.saichF -side left
+pack .abschlussJahrSB -in .n.t3.rightF.saichF -side left -padx 20
+pack .abschlussM -in .n.t3.rightF -anchor nw -pady 20
+  
+  #Create canvas, text window & scrollbar - height & width will be set by createReport
+  canvas .reportC -bg beige -height 500 -width 750
+  text .reportT
+
+  scrollbar .reportSB -orient vertical
+  .reportT conf -yscrollcommand {.reportSB set}
+  .reportSB conf -command {.reportT yview}
+  
 
 
+  #Print button - packed later by canvasReport
+  button .reportPrintBtn -text "[mc reportPrint]" -bg lightgreen
+  pack .reportSB -in .n.t3.leftF -side right -fill y
+
+  pack .reportC -in .n.t3.leftF -side right -fill both
+  
+ 
+#.reportC conf -width $w -height $h -bg blue
+#  .reportC create window 0 0 -tags repwin -window .reportT -anchor nw -width $w -height $h
+#  .reportC itemconf repwin -width $w -height $h
 #Execute initial commands if connected to DB
 #catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res
 
@@ -404,9 +418,25 @@ if {[info exists cond2] && $cond2!=""} {.billcond2E insert 0 $cond2; .billcond2E
 if {[info exists cond3] && $cond3!=""} {.billcond3E insert 0 $cond3; .billcond3E conf -bg "#d9d9d9"} {.billcond3E insert 0 "Zahlungskondition 3"}
 if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcurrencySB set $currency}
 
+########################################################
+# T A B  5  - SPESENVERWALTUNG
+########################################################
+
+button .spesenB -text "Jahresspesen verwalten" -command {manageExpenses}
+button .spesenDeleteB -text "Eintrag löschen" -command {deleteExpenses}
+button .spesenAbbruchB -text [mc cancel] -command {manageExpenses}
+button .spesenAddB -text "Eintrag hinzufügen" -command {addExpenses}
+listbox .spesenLB -width 100 -height 40 -bg lightblue
+entry .expnameE
+entry .expvalueE
+
+#TODO Spesenverwaltung buggy, needs exit button & must be cleared at the end!
+##moved to EINSTELLUNGEN tab!
+pack .spesenB -in .n.t5 -side right -padx 50 
+
 
 ####################################################
-# T A B  5 - STORNI
+# T A B  6 - STORNI
 ####################################################################################
 label .titel5 -text "[mc storni]" -font TIT -anchor nw -fg steelblue -bg silver 
 message .storniM -width 400 -anchor nw -justify left -text "[mc storniTxt]" 
@@ -460,34 +490,12 @@ setArticleLine TAB4
 #Execute once when specific TAB opened
 bind .n <<NotebookTabChanged>> {
   set selected [.n select]
-#  puts "Changed to $selected"
   if {$selected == ".n.t3"} {
     set t3 1
   }
 }
 
-
 resetNewInvDialog
 resetArticleWin
-
-#setArticleLine TAB2
-
-##Load progs for tab 3 -TODO try this for TAB4 which should be least used!!!!
-#after 1500 {
-#  vwait t3
-#  source [file join $progDir tkoffice-report.tcl]
-
-#TODO : Syntaxproblem mit SQLite 
-
-#  setAbschlussjahrSB
-
-#}
-#Recompute real widths
-#set topwinX [winfo width .]
-#puts $topwinX
-#set nbWidth [expr round($topwinX / 10) * 9]
-#.n conf -width $nbWidth
-#.n.t2.f2 conf -width [expr round($nbWidth / 10) * 9] 
-#set f2Width [winfo width .n.t2.f2]
-
+setAbschlussjahrSB
 createArtMenu

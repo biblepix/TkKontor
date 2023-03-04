@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-report.tcl
 # called by tkoffice-gui.tcl
-# Updated: 15mch22
+# Updated: 4mch23
 
 #sSrced by .abschlussPrintB button & ?
 
@@ -15,7 +15,7 @@
 proc setAbschlussjahrSB {} {
   global db
   set heuer [clock format [clock seconds] -format %Y]
-  set jahresliste [db eval "SELECT DISTINCT EXTRACT(year FROM f_date) FROM invoice"]
+ 	set jahresliste [lsort -unique [db eval "select strftime('%Y', f_date) from invoice"]]
   lappend jahresliste $heuer
 
   .abschlussJahrSB conf -values [lsort -decreasing $jahresliste]
@@ -51,7 +51,7 @@ proc manageExpenses {} {
   #pack Listbox & buttons
   pack forget .abschlussM .spesenAbbruchB .reportT .abschlussScr .reportPrintB .expnameE .expvalueE
   pack .spesenM -side left
-  pack .spesenAddB .spesenDeleteB -in .n.t3.mainF -side right -anchor se
+  pack .spesenAddB .spesenDeleteB -in .n.t4 -side right -anchor se
   pack .spesenLB -in .n.t3.mainF
 
   .spesenAddB conf -text "Eintrag hinzufügen" -command {addExpenses}
@@ -116,21 +116,20 @@ proc deleteExpenses {} {
 ##called by .abschlussCreateB button
 proc createReport {} {
   global db myComp currency vat texDir reportDir
-  pack forget .spesenM .spesenLB .spesenAbbruchB .spesenAddB .spesenDeleteB
-  pack .abschlussM -side top
-
-  # C r e a t e      t e x t w i n
-  #catch {destroy $t $sb}
-#packed later by canvasReport
-  catch {text .reportT}
-  set t .reportT
-  $t delete 1.0 end
-#  $t conf -width -height
   
   set jahr [.abschlussJahrSB get]
   set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
   set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
-
+  set h [expr [winfo height .n.t3] - 100]
+  set w [expr int(1.5 * $h)]
+  
+  # Prepare canvas & textwin dimensions
+  set t .reportT
+  $t delete 1.0 end
+  .reportC conf -width $w -height $h -bg blue
+  .reportC create window 0 0 -tags repwin -window .reportT -anchor nw -width $w -height $h
+  .reportC itemconf repwin -width $w -height $h
+  
 	#get data from $jahr's invoices + 'payeddate = $jahr' from any previous invoices
 	set res [db eval "SELECT
 	f_number,
@@ -139,20 +138,52 @@ proc createReport {} {
 	finalsum,
 	vatlesssum,
 	payedsum,
-	auslage FROM invoice
-	WHERE EXTRACT(YEAR from payeddate) = $jahr
-	OR EXTRACT(YEAR from f_date) = $jahr
+	auslage 
+	FROM invoice 
+	WHERE strftime('%Y', payeddate) = '$jahr'
+	OR strftime('%Y', f_date) = '$jahr'
 	ORDER BY f_number ASC"]
 
-	#save result to var
-	#TODO s.o.
-	if {[pg_result $res -error] != ""} {
-	  NewsHandler::QueryNews "[pg_result $res -error]" red
-	  return 1
-  }
 
-	pg_result $res -assign j
-	set maxTuples [pg_result $res -numTuples]
+
+
+	#set num. of entries for textwin & put values into arrays per No.
+	set invL [db eval	"SELECT f_number FROM invoice WHERE strftime('%Y', f_date) = '$jahr'"]
+#	set maxTuples [llength $invL]
+
+	foreach invNo $invL {
+	
+		# f_date currency vatlesssum finalsum payedsum auslage
+		set date [db eval "SELECT f_date FROM invoice WHERE f_number = $invNo"] 
+		array set $invNo "invDat $date" 
+	
+		set adr [db eval "SELECT addressheader FROM invoice WHERE f_number = $invNo"] 
+		array set $invNo "invAdr $adr" 
+	
+		set netto [db eval "SELECT vatlesssum FROM invoice WHERE f_number = $invNo"] 
+		array set $invNo "netto $netto"
+	 	
+		set currency [db eval "SELECT currency FROM invoice WHERE f_number = $invNo"] 
+		array set $invNo "currency $currency"
+			 	
+		set finalsum [db eval "SELECT finalsum FROM invoice WHERE f_number = $invNo"] 
+		array set $invNo "finalsum $finalsum"
+		
+		set payedsum [db eval "SELECT payedsum FROM invoice WHERE f_number = $invNo"] 
+		array set $invNo "payedsum $payedsum"
+	 	
+		set auslage [db eval "SELECT auslage FROM invoice WHERE f_number = $invNo"] 
+		array set $invNo "auslage $auslage" 
+	
+		##compute finalsum on basis of $vat from config
+		if {! $vat > 0} {
+  		array set $invNo {VAT 0}
+  		array set $invNo "netto $finalsum"
+		} else {
+			array	set $invNo "VAT [expr $finalsum - $netto]"
+  	}
+  	
+	}	
 
 	#Textwin dimensions Tk scaling factor:
 	##requires no of LETTERS as height + no. of LETTER as width!
@@ -166,22 +197,20 @@ proc createReport {} {
 
   #Configure widgets & scroll bar
   $t conf -bg lightblue -bd 0 
-  
-  
+    
   
   #TODO testing
-    catch {scrollbar .reportSB -orient vertical}
-  $t conf -width $winLetX -height $winLetY -padx 10 -pady 10 -yscrollcommand {.reportSB set}
+    
+ #   catch {scrollbar .reportSB -orient vertical}
+ #   .reportC conf -yscrollcommand {.reportSB set}
+  #$t conf -width $winLetX -height $winLetY -padx 10 -pady 10 -yscrollcommand {.reportSB set}
   #$t conf -padx 10 -pady 10 -yscrollcommand {.reportSB set}
   
   #Pack all
-  pack $t -in .n.t3.mainF -side left  
+  #pack $t -in .n.t3.mainF -side left  
 	#pack .abschlussPrintB -in .n.t3.botF -anchor se
 
 	# F i l l   t e x t w i n
-#	raise $t
-#	update
-#	$t delete 1.0 end
 
   #Compute tabs for landscape layout (c=cm m=mm)
 	$t configure -tabs {
@@ -209,55 +238,47 @@ proc createReport {} {
 #TODO  'finalsum' is exclusive vat & Auslagen - list Auslagen anyway because payedsum may differ
 
 	#compute sum total & insert text lines
-	#TODO use sum(...) from DB instaead!
-	for {set no 0;set sumtotal 0} {$no <$maxTuples} {incr no} {
-		set total $j($no,payedsum)
-		catch {set sumtotal [expr $sumtotal + $total]}
-		set sumtotal [roundDecimal $sumtotal]
 
-		##compute Mwst
-		set VAT $j($no,vatlesssum)
-		set finalsum $j($no,finalsum)
+	
+  set sumtotal 0
 
-		if {! $vat > 0} {
-  		set VAT ""
-  		set vatlesssum $finalsum
-		} else {
-  		set VAT [expr $finalsum - $vatlesssum]
-  	}
+  foreach n $invL {
+ 
+    #set vars from array
+    set payedsum [lindex [array get $n payedsum] 1]
+    set invDat [lindex [array get $n invDat] 1]
+    set invAdr [lindex [array get $n invAdr] 1]
+    set netto [lindex [array get $n netto] 1]
+    set VAT [lindex [array get $n VAT] 1]
+    set auslage [lindex [array get $n auslage] 1]
+    
+    #Update sum total
+    catch {set sumtotal [expr $sumtotal + ${n}payedsum]}
+    set sumtotal [roundDecimal $sumtotal]
+	  
+    if ![ string is double $auslage ] {
+      set auslage ""
+    }
 
-		##set spesen tab
-		set spesen $j($no,auslage)
-    if ![string is double $spesen] {
-	    set spesen ""
-	  } else {
-   		set spesen $j($no,auslage)
-	  }
-		set invNo $j($no,f_number)
-		set invDat $j($no,f_date)
-		set invAdr $j($no,addressheader)
-		set payedsum $j($no,payedsum)
+    #Insert row in text window
+	  $t insert end "\n${n}\t${invDat}\t${invAdr}\t${netto}\t${vat}\t ${auslage}\t${payedsum}"
 
-		#1. list in text window
-		$t insert end "\n${invNo}\t${invDat}\t${invAdr}\t${vatlesssum}\t${VAT}\t${spesen}\t${payedsum}"
+	  #Export to Latex
+#    append einnahmenTex $n(invNo) & $n(invDat) & $n(invAdr) & $n(netto) & $n(auslage) & $n(VAT) & $n(payedsum) {\\} \n
 
-		#2.export to Latex
-    append einnahmenTex $invNo & $invDat & $invAdr & $vatlesssum & $spesen & $VAT & $payedsum {\\} \n
-	}
+  }
 
-### A U S L A G E N
+### A U S G A B E N
 
 	#Get 'spesen' from DB
-	set token [pg_exec $db "SELECT * FROM spesen"]
-
-  foreach tuple [pg_result $token -llist] {
-    set name [lindex $tuple 1]
-    set value [lindex $tuple 2]
+  foreach n [db eval "SELECT num FROM spesen"] {
+    set name [db eval "SELECT name FROM spesen WHERE num = $n"]
+    set value [db eval "SELECT value FROM spesen WHERE num = $n"]
     
     ##1.prepare for text window
-    
     append spesenList "$name\t\t\t\t\t\t-${value}\n"
     lappend spesenAmounts $value
+    
     ##2.prepare for LateX
     append auslagenTex {\multicolumn{3}{l}} \{ $name \} &&& \{ \$ \- $value \$ \} {\\} \n
   }
@@ -286,11 +307,9 @@ proc createReport {} {
   $t insert end "\nAuslagen total\t\t\t\t\t\t\t-${spesenTotal}\n\n" T3
   $t insert end "Reingewinn\t\t\t\t\t\t\t$netProfit" T2
   
-  #TODO for testing
-#  $t conf -state disabled
 
 #Canvas report & PS
-  canvasReport $t
+#  canvasReport $t
  # canv2ps .reportC  
 
 
@@ -303,136 +322,254 @@ proc createReport {} {
 #  puts $chan $auslagenTex
 #  close $chan
 
-  #Configure print button
-  #TODO zis aynt workin!
-  #TODO prepack from beginning
-  #moved to canvasReport
-  #catch {button .reportPrintB}
-  #.reportPrintB conf -text "Bericht als PDf zum Druck darstellen" -command "doPrintReport $jahr"
-  
-  #pack .reportPrintB -in .n.t3.mainF -side right
-
+  #Pack & configure print button
+  pack .reportPrintBtn -in .n.t3.rightF -side bottom -anchor sw
+#  .reportPrintBtn conf -command "printDocument $jahr rep"
+   .reportPrintBtn conf -command "canvas2ps .reportC $jahr"
+   .reportT conf -borderwidth 3 -padx 7 -pady 7
+   
 } ;#END createReport
 
-proc canvasReport {t} {
-  update
-  set jahr [.abschlussJahrSB get]  
+
+
+
+
+
+proc canvas2ps {c w year} {
+
+  global tmpDir reportDir
+
+#  set tmpDir /tmp
+#  set c .reportC
+#  set w .reportT
+
+  $w conf -bg white
+  $w yview moveto 1.0
+  set numLines [$w count -lines 1.0 end]  
+  set pageNo 1
   
-  #Set height & width to A4
-  set h [winfo height $t]
-  set w [expr int(1.5 * $h)]
+  set tmpfile $tmpDir/report_${year}_${pageNo}.ps
+  set reportPath $reportDir/Report_${year}.pdf
+  set cmd "$c postscript -rotate 1 -file $tmpfile"  
   
-  #Create canvas & put report into window, trying to get A4 dimensions
-  catch {canvas .reportC -width $w -height $h}
+  set reportPs $tmpDir/Report_${year}.ps
+  set reportPdf [string trimright $reportPs .ps].pdf
   
-  .reportC create window 0 0 -tags repwin -window $t -anchor nw -width $w -height $h
-  .reportC itemconf repwin -height $h -width $w
+  puts $reportPs
+  puts $reportPdf
+  
+  ###############################
+  # Handle single page report
+  ###############################
+  
+  # check if report is in full view
+  if { [$w yview] == "0.0 1.0"} {
+  
+    puts "Printing single page..."
     
-  #Create scrollbar
- # catch {scrollbar .reportSB -orient vertical}
-  .reportC conf -yscrollcommand {.reportSB set}
-  .reportSB conf -command {.reportC yview}
-  
-  #Create print button
-  catch {button .reportPrintB}
-
-#TODO testing 1 page optoin
-#  .reportPrintB conf -text "Bericht drucken" -command "canvas2ps .reportC $jahr"
-   #TODO add -pageheight & -pagewidth for A4 !
-   set docPath [setReportPsPath $jahr]
-   .reportPrintB conf -text [mc reportPrint] -command "printDocument $jahr rep"
-   
-  #Final packing of canvas & scrollbar
-  pack .reportC -in .n.t3.mainF -side left -fill none
-  pack .reportSB -in .n.t3.mainF -fill y -side left
-  pack .reportPrintB -in .n.t3.mainF -side right
-
-  raise $t
-
-} ;#END canvasReport
-
-# canv2ps
- # Capture a window into an image
- # Author: David Easton
-##called by .reportPrintBtn
-#TODO get PS into viewer!
-proc canvas2ps {canv jahr} {
-  global reportDir tmpDir
-  set win .reportT
-
-#TODO testing
-#set win .reportC
-
-  set origCanvHeight [winfo height $canv]
+    $w conf -bg white
+    $c postscript -rotate 1 -file $reportPs
+    NewsHandler::QueryNews "Wir versuchen nun, den Bericht anzuzeigen. Im Anzeigeprogramm können Sie ihn ausdrucken." orange
     
-  #1. move win to top position + make first PS page
-    raise $win
-    update
-    $win yview moveto 0.0 
-    raise $win
-    update
-
-  #A) Für 1 page 
-  #$canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
-  $canv postscript -file [file join $tmpDir abschluss_$jahr.ps]
-  
-  #move 1 page for multiple pages
-  set visFraction [$win yview]
-  set begVisible [lindex $visFraction 0] 
-  set endVisible [lindex $visFraction 1]
-  $win yview moveto $endVisible
-
-set pageNo 1
-set lastVisible $endVisible
-
-  while {$endVisible < 1.0} {
-
-    incr pageNo
-        
-    set lastVisible $endVisible
-    raise $win
-    update
-    $canv postscript -colormode gray -file [file join $tmpDir abschluss_$pageNo.ps]
-
-    #move 1 page
-    set visFraction [$win yview]
-    set begVisible $endVisible
-    set endVisible [lindex $visFraction 1]
-    $win yview moveto $endVisible      
+    exec xdg-open $reportPs
+    set res [tk_messageBox -type yesno -message "Wollen Sie die Datei $reportPs abschliessend in $reportDir speichern?"]
     
-	}
-
-#puts $endVisible
-#puts $lastVisible	
-
-	#3. Compute remaining page height & adapt window dimension
-    if {$begVisible < $lastVisible} {
-        set cutoutPercent [expr $begVisible - $lastVisible]
-        set hiddenHeight [expr round($cutoutPercent * $origCanvHeight)]
-        set visHeight [expr $origCanvHeight - $hiddenHeight]
-        $canv itemconf textwin -height $visHeight
-        $canv conf -height $visHeight 
+    if {$res == "yes"} {
+      
+#      exec ps2pdf $reportPs $reportPdf
+      file copy $reportPs $reportDir
+    
+      NewsHandler::QueryNews "Falls der Bericht noch nicht gedruckt ist, können Sie die Datei $reportDir/$reportPs drucken oder im blauen Fenster nochmals bearbeiten." orange
+      
     }
 
-  incr pageNo
+  } else {
   
-  #4. Make last page
-  raise $win
+  ###############################
+  # Handle multiple pages
+  ###############################
+  $w tag conf hide -elide 1
+  $w tag conf show -elide 0
+
+  #divide text by fix page height
+  set wholeBlocks [expr $::numLines / 40]
+  
+  ## 1. Handle whole 40 blocks
+  
+  #Prepare page 1
+  set top 1
+  set bot 40
+  set pageNo 1
+  $w yview moveto 0.0
+  $w tag add hide [expr $bot + 1].0 end
+  
+  ## 2. Handle following pages
+  for {set tot $wholeBlocks} {$pageNo <= $tot} {incr pageNo} {
+    
+   # $w yview moveto $top.0
+    update
+    $c postscript -rotate 1 -file $tmpDir/report_${year}_${pageNo}.ps
+    
+    #hide section just done
+    
+    $w tag remove hide 1.0 end
+    $w tag add hide $top.0 $bot.end
+    
+    set top [expr $bot + 1]
+    set bot [expr $top + 40]
+    
+    #hide section below current
+    $w tag add hide [expr $bot + 1].0 end
+       
+  }
+
+  ## 3. Handle last page
+  $w tag remove hide 1.0 end
+  $w tag add hide 1.0 $top.end
+
   update
+  $c postscript -rotate 1 -file $tmpDir/report_${year}_${pageNo}.ps
   
-  append reportName report . $jahr _ $pageNo . ps
-  set reportPath [file join $reportDir $reportName]
   
-  #Postscript in landscape format for easy printing
-  $canv postscript -colormode gray -rotate 1 -file $reportPath
-  printDocument $jahr rep
+  ## 4. View full document in PDF 
+  ##Postscript all *ps in landscape format to *.ps in one batch:  
+## -c "<</Orientation 3>> setpagedevice" - seems unnecessary
+  exec gs -dNOPAUSE -dAutoRotatePages=/None -sDEVICE=pdfwrite -sOUTPUTFILE=$tmpDir/Report_${year}.ps -dBATCH $tmpDir/report_${year}*.ps
   
-  #5. Restore original dimensions
-  $canv itemconf textwin -height $origCanvHeight
-  $canv conf -height $origCanvHeight 
+  NewsHandler::QueryNews "Wir versuchen nun, den Bericht anzuzeigen. Im Anzeigeprogramm können Sie ihn dann ausdrucken." orange
+    
+  exec xdg-open $tmpDir/Report_${year}.ps
+  set res [tk_messageBox -type yesno -message "Wollen Sie die Datei Report_${year}.ps abschliessend in $reportDir speichern?"]
+  if {$res == "yes"} {
+    file copy $report_${year}.ps $reportDir
+  }
+ }
+ 
+  ## 5. Final cleanup
+  $w conf -bg lightblue
+  $w tag delete hide
+  $w yview moveto 0.0
 
-} ;#END canv2ps
+} ;#END canvas2ps
 
+
+
+
+
+# O B S O L E T E ###########################################################
+
+## canvas2ps
+# # Capture a window into an image
+# # Author: David Easton
+###called by .reportPrintBtn
+#proc canvas2ps {canv jahr} {
+#  global reportDir tmpDir
+#  set win .reportT
+#  set origCanvHeight [winfo height $canv]
+#    
+#  #1. move win to top position + make first PS page
+#    raise $win
+#    update
+#    $win yview moveto 0.0 
+#    raise $win
+#    update
+
+#  set pageNo 1
+
+#  #A) Für 1st page 
+#  set file [file join $tmpDir abschluss_$pageNo.ps]
+#  $canv postscript -colormode mono -file $file 
+#  #exec ps2pdf $file
+#   
+#  #move 1 page for multiple pages
+#  set visFraction [$win yview]
+#  set begVisible [lindex $visFraction 0] 
+#  set endVisible [lindex $visFraction 1]
+#  $win yview moveto $endVisible
+
+
+#set lastVisible $endVisible
+
+#  while {$endVisible < 1.0} {
+
+#    incr pageNo
+#        
+#    set lastVisible $endVisible
+#    raise $win
+#    update
+#    
+#    set file [file join $tmpDir abschluss_$pageNo.ps]
+#    $canv postscript -colormode gray -file $file
+#    #exec ps2pdf $file
+
+#    #move 1 page
+#    set visFraction [$win yview]
+#    set begVisible $endVisible
+#    set endVisible [lindex $visFraction 1]
+#    $win yview moveto $endVisible      
+#    
+#	}
+
+##puts $endVisible
+##puts $lastVisible	
+
+#	#3. Compute remaining page height & adapt window dimension
+#    if {$begVisible < $lastVisible} {
+#        set cutoutPercent [expr $begVisible - $lastVisible]
+#        set hiddenHeight [expr round($cutoutPercent * $origCanvHeight)]
+#        set visHeight [expr $origCanvHeight - $hiddenHeight]
+#        $canv itemconf repwin -height $visHeight
+#        $canv conf -height $visHeight 
+#    }
+
+#  incr pageNo
+#  
+#  #4. Make last page  ????
+#  raise $win
+#  update
+#    $canv postscript -colormode gray -rotate 1 -file $reportPath
+#    
+#    #5. Make full report ????
+#  append reportName report . $jahr _ $pageNo . ps
+#  set reportPath [file join $tmpDir $reportName]
+#  
+##Postscript all *ps in landscape format to *.ps in one batch:  
+#exec gs -dNOPAUSE -dAutoRotatePages=/None -sDEVICE=pdfwrite -sOUTPUTFILE=ABSCHLUSS.pdf -dBATCH $tmpDir/abschluss*.ps
+## -c "<</Orientation 3>> setpagedevice" - seems unnecessary
+
+#  #Join postscript files
+##  lappend fileL [glob $tmpDir/abschluss_*]
+##  exec psjoin $tmpDir/abschluss_1.ps $tmpDir/abschluss_2.ps > $tmpDir/ABSCHLUSS.ps
+#  
+#  
+#  exec xdg-open $tmpDir/ABSCHLUSS.pdf
+# 
+#  
+#  #5. Restore original dimensions
+#  $canv itemconf textwin -height $origCanvHeight
+#  $canv conf -height $origCanvHeight 
+
+#} ;#END canvas2ps
+proc canvasReport {jahr} {
+  update
+  set h [expr [winfo height .n.t3] - 100]
+  set w [expr int(1.5 * $h)]
+  
+  canvas .reportC -width $w -height $h
+  .reportC create window 0 0 -tags repwin -window .reportT -anchor nw
+  .reportC itemconf repwin -height $h -width $w
+   
+   set docPath [setReportPsPath $jahr]
+   
+   
+  #Final packing of canvas & scrollbar
+  #pack forget .reportT
+  pack .reportC -in .n.t3.leftF
+  pack .reportPrintBtn -in .n.t3.rightF -anchor se -side right
+
+  #raise $t
+
+} ;#END canvasReport
 
 # latexReport
 ##recreates (abschlussEinnahmen.tex) + (abschlussAuslagen.tex) > Abschluss.tex
