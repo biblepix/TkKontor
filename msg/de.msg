@@ -18,6 +18,9 @@ mcset de artSave "Artikel speichern"
 mcset de artSelect "Artikel wählen"
 mcset de saveConf "Einstellungen speichern"
 mcset de invEnter "Rechnung verbuchen"
+mcset de save "Speichern"
+mcset de description "Bezeichnung"
+mcset de betrag "Betrag"
 mcset de cancel "Abbruch"
 mcset de invRecovErr "Kann Rechnungsdaten Nr. %s nicht wiederherstellen"
 
@@ -36,5 +39,7 @@ mcset de mail "E-Mail"
 mcset de www "Internet"
 
 mcset de spesen "Spesenverwaltung"
+mcset de spesenTxt "Hier können Sie jährlich anfallende Geschäftskosten auflisten, die jeweils im Jahresabschluss automatisch abgezogen werden."
+
 mcset de storni "Storni"
 mcset de storniTxt "Hier können Sie fehlerhafte Buchungen stornieren (rückbuchen). \nGeben Sie eine Rechnungsnummer ein und bestätigen Sie mit Tabulatortaste."

@@ -1,6 +1,6 @@
 # ~/TkOffice/prog/tkoffice-report.tcl
 # called by tkoffice-gui.tcl
-# Updated: 4mch23
+# Updated: 7mch23
 
 #sSrced by .abschlussPrintB button & ?
 
@@ -49,48 +49,61 @@ proc manageExpenses {} {
   .expvalueE conf -bg beige -fg grey -width 7 -textvar ::expval
 
   #pack Listbox & buttons
-  pack forget .abschlussM .spesenAbbruchB .reportT .abschlussScr .reportPrintB .expnameE .expvalueE
+  pack forget .abschlussM .spesenAbbruchB .reportT .abschlussScr .expnameE .expvalueE .spesenB
   pack .spesenM -side left
-  pack .spesenAddB .spesenDeleteB -in .n.t4 -side right -anchor se
-  pack .spesenLB -in .n.t3.mainF
-
+  pack .spesenAddB .spesenDeleteB -in .n.t6 -side right -anchor se
+  pack .spesenLB -in .n.t6 -fill y -pady 50
+  
   .spesenAddB conf -text "Eintrag hinzufügen" -command {addExpenses}
-
   .spesenLB delete 0 end
+  
   #get listbox values from DB
-  set token [db eval "SELECT * FROM spesen"]
+  set numL  [db eval "Select ROW_NUMBER() OVER() from spesen"]
+  #db eval "SELECT count() from spesen" - for num of entries
+  
+  foreach num $numL {
+    set row [db eval "select * FROM (                            
+      select ROW_NUMBER() OVER() as row_num,name,value from spesen ) t 
+      where row_num=$num" ]
 
-  foreach tuple $token {
-    #set tuple [pg_result $token -getTuple $tupleNo]
-    set name [lindex $tuple 1]
-    set value [lindex $tuple 2]
-    .spesenLB insert end "$name       $value"
+#puts $t
+#puts $name
+#puts $value
+  
+ #   set name [db eval "SELECT name FROM spesen WHERE num=$num"]
+ #   set value [db eval "SELECT value FROM spesen WHERE num=$num"]
+    .spesenLB insert end $row
   }
 }
 
 proc addExpenses {} {
-  pack .spesenAbbruchB .spesenAddB .expvalueE .expnameE -in .n.t3.mainF -side right -anchor se
+  pack .spesenAbbruchB .spesenAddB .expvalueE .expnameE -in .n.t6 -side right -anchor se
   pack forget .spesenDeleteB
-  .spesenAddB conf -text "Speichern" -command {saveExpenses}
-  set ::expname "Bezeichnung"
-  set ::expval "Betrag"
+  .spesenAddB conf -text "[mc save]" -command {saveExpenses}
+  set ::expname "[mc description]"
+  set ::expval "[mc betrag]"
   .expnameE conf -fg grey -validate focusin -vcmd {%W delete 0 end;%W conf -fg black;return 0}
   .expvalueE conf -fg grey -validate focusin -vcmd {%W delete 0 end; %W conf -fg black; return 0}
+
+#  manageExpenses
 }
+
 proc saveExpenses {} {
   global db
 
   set name [.expnameE get]
   set value [.expvalueE get]
-  set token [db eval "INSERT INTO spesen (name,value) VALUES ('$name',$value)"]
+ 
+  db eval "INSERT INTO spesen (name,value) VALUES ('$name',$value)"
 
 	if [db errorcode] {
-	  NewsHandler::QueryNews $token red
+	  NewsHandler::QueryNews "Ging nicht..." red
 	} else {
-  	reportResult $token "Eintrag gespeichert."
+  	reportResult "Ging doch" "Eintrag gespeichert."
   }
   manageExpenses
 }
+
 proc deleteExpenses {} {
   global db
 
@@ -199,18 +212,7 @@ proc createReport {} {
   $t conf -bg lightblue -bd 0 
     
   
-  #TODO testing
-    
- #   catch {scrollbar .reportSB -orient vertical}
- #   .reportC conf -yscrollcommand {.reportSB set}
-  #$t conf -width $winLetX -height $winLetY -padx 10 -pady 10 -yscrollcommand {.reportSB set}
-  #$t conf -padx 10 -pady 10 -yscrollcommand {.reportSB set}
-  
-  #Pack all
-  #pack $t -in .n.t3.mainF -side left  
-	#pack .abschlussPrintB -in .n.t3.botF -anchor se
-
-	# F i l l   t e x t w i n
+ 	# F i l l   t e x t w i n
 
   #Compute tabs for landscape layout (c=cm m=mm)
 	$t configure -tabs {
@@ -325,7 +327,7 @@ proc createReport {} {
   #Pack & configure print button
   pack .reportPrintBtn -in .n.t3.rightF -side bottom -anchor sw
 #  .reportPrintBtn conf -command "printDocument $jahr rep"
-   .reportPrintBtn conf -command "canvas2ps .reportC $jahr"
+   .reportPrintBtn conf -command "canvas2ps .reportC .reportT $jahr"
    .reportT conf -borderwidth 3 -padx 7 -pady 7
    
 } ;#END createReport
@@ -562,7 +564,7 @@ proc canvasReport {jahr} {
    set docPath [setReportPsPath $jahr]
    
    
-  #Final packing of canvas & scrollbar
+  #Final packing of canvas
   #pack forget .reportT
   pack .reportC -in .n.t3.leftF
   pack .reportPrintBtn -in .n.t3.rightF -anchor se -side right

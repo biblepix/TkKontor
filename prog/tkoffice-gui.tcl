@@ -36,16 +36,17 @@ pack .firmaL -in .topF -side right -padx 10 -pady 3 -anchor e
 set screenX [winfo screenwidth .]
 set screenY [winfo screenheight .]
 . conf -bg steelblue3
-
 ttk::notebook .n 
+
 .n conf -width [expr round($screenX / 10) * 9] -height [expr round($screenY / 10) * 8]
 .n add [frame .n.t1] -text "[mc adr+orders]"
 .n add [frame .n.t2] -text "[mc newInv]"
 .n add [frame .n.t3] -text "[mc reports]"
+#.n add [frame .n.t4] -text "[mc settings]"
+.n add [frame .n.t6] -text "[mc spesen]"
+.n add [frame .n.t5] -text "[mc storni]"
+#.n insert end .n.t4
 .n add [frame .n.t4] -text "[mc settings]"
-.n add [frame .n.t5] -text "[mc spesen]"
-.n add [frame .n.t6] -text "[mc storni]"
-.n insert end .n.t4
 
 pack .n -anchor center -padx 15 -pady 15 -fill x
 
@@ -265,7 +266,7 @@ button .abschlussCreateB -text [mc reportCreate] -command {createReport}
 button .abschlussPrintB -text [mc reportPrint] ;#wird später von obigem Prog. gepackt
 
 spinbox .abschlussJahrSB -width 4
-message .news -textvar news -pady 5 -padx 10 -justify center -anchor n -bg steelblue3 -fg white
+message .news -textvar news -pady 10 -padx 10 -bd 3 -relief sunken -justify center -width 1000 -anchor n -bg steelblue3
 
 pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
 pack [frame .n.t3.mainF -padx 15 -pady 15] -fill both -anchor nw
@@ -419,25 +420,34 @@ if {[info exists cond3] && $cond3!=""} {.billcond3E insert 0 $cond3; .billcond3E
 if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcurrencySB set $currency}
 
 ########################################################
-# T A B  5  - SPESENVERWALTUNG
+# T A B  5  - S P E S E N
 ########################################################
+
+label .titel6 -text "[mc spesen]" -font TIT -anchor nw -fg steelblue -bg silver 
+message .spesenM -width 400 -anchor nw -justify left -text "[mc spesenTxt]" 
+listbox .spesenLB -width 100 -height 40 -bg lightblue
+
+#TODO? listboxes have no yview concept, but are still scrollable!
+#scrollbar .spesenSB -orient vertical
+#.spesenLB conf -yscrollcommand {.spesenSB set}
+#.spesenSB conf -command {.spesenSB yview}
 
 button .spesenB -text "Jahresspesen verwalten" -command {manageExpenses}
 button .spesenDeleteB -text "Eintrag löschen" -command {deleteExpenses}
 button .spesenAbbruchB -text [mc cancel] -command {manageExpenses}
 button .spesenAddB -text "Eintrag hinzufügen" -command {addExpenses}
-listbox .spesenLB -width 100 -height 40 -bg lightblue
+
 entry .expnameE
 entry .expvalueE
 
 #TODO Spesenverwaltung buggy, needs exit button & must be cleared at the end!
 ##moved to EINSTELLUNGEN tab!
-pack .spesenB -in .n.t5 -side right -padx 50 
-
+pack .titel6 -in .n.t6 -fill x -padx 20 -pady 20
+pack .spesenM .spesenB -in .n.t6 -anchor nw -padx 20 -pady 20 
 
 ####################################################
-# T A B  6 - STORNI
-####################################################################################
+# T A B  6 - S T O R N I
+#####################################################
 label .titel5 -text "[mc storni]" -font TIT -anchor nw -fg steelblue -bg silver 
 message .storniM -width 400 -anchor nw -justify left -text "[mc storniTxt]" 
 
