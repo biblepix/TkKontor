@@ -42,10 +42,9 @@ ttk::notebook .n
 .n add [frame .n.t1] -text "[mc adr+orders]"
 .n add [frame .n.t2] -text "[mc newInv]"
 .n add [frame .n.t3] -text "[mc reports]"
-#.n add [frame .n.t4] -text "[mc settings]"
 .n add [frame .n.t6] -text "[mc spesen]"
+.n add [frame .n.t7] -text "[mc artikel]"
 .n add [frame .n.t5] -text "[mc storni]"
-#.n insert end .n.t4
 .n add [frame .n.t4] -text "[mc settings]"
 
 pack .n -anchor center -padx 15 -pady 15 -fill x
@@ -309,32 +308,6 @@ pack .news -in .botF -side left -anchor center -expand 1
 # T A B 4 :  C O N F I G U R A T I O N
 ######################################################################################
 
-#1. A R T I K E L   V E R W A L T E N
-label .confartT -text [mc artManage] -font "TkHeadingFont"
-message .confartM -width 800 -text "Die Felder 'Bezeichnung' und 'Einheit' (z.B. Std.) dürfen nicht leer sein.\nDie Kontrollkästchen 'Auslage' und 'Rabatt' für den Artikeltyp können leer sein. Wenn 'Rabatt' ein Häkchen bekommt, gilt der Artikel als Abzugswert in Prozent (im Feld 'Preis' Prozentzahl ohne %-Zeichen eingeben, z.B. 5.5). Der Rabatt wird in der Rechnung vom Gesamtbetrag abgezogen.\nFalls das Feld 'Auslage' angehakt wird (z.B. für Artikel 'Zugfahrt'), wird der Artikel in der Rechnung separat als Auslage aufgeführt, unterliegt nicht der Mehrwertsteuerpflicht und wird nicht als Einnahme verbucht."
-
-
-#These are packed/unpacked later by article procs
-label .confartL -text "Artikel Nr."
-
-namespace eval artikel {
-  label .confartnameL -padx 7 -width 25 -textvar artName -anchor w
-  label .confartpriceL -padx 10 -width 7 -textvar artPrice -anchor w
-  label .confartunitL -padx 10 -width 7 -textvar artUnit -anchor w
-  label .confarttypeL -padx 10 -width 1 -textvar artType -anchor w
-}
-spinbox .confartnumSB -width 5 -command {setArticleLine TAB4}
-button .confartsaveB -text [mc artSave] -command {saveArticle}
-button .confartdeleteB -text [mc artDelete] -command {deleteArticle} -activebackground red
-button .confartcreateB -text [mc artCreate] -command {createArticle}
-entry .confartnameE -bg beige
-entry .confartunitE -bg beige -textvar artikel::rabatt
-entry .confartpriceE -bg beige
-ttk::checkbutton .confarttypeACB -text "Auslage"
-ttk::checkbutton .confarttypeRCB -text "Rabatt"
-
-#TODO
-#pack .confartcreateB -in .n.t4
 
 #DATENBANK ERSTELLEN & SICHERN
 label .dumpdbT -text "Datenbank verwalten" -font "TkHeadingFont"
@@ -419,6 +392,7 @@ if {[info exists cond2] && $cond2!=""} {.billcond2E insert 0 $cond2; .billcond2E
 if {[info exists cond3] && $cond3!=""} {.billcond3E insert 0 $cond3; .billcond3E conf -bg "#d9d9d9"} {.billcond3E insert 0 "Zahlungskondition 3"}
 if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcurrencySB set $currency}
 
+
 ########################################################
 # T A B  5  - S P E S E N
 ########################################################
@@ -457,9 +431,43 @@ pack .titel5 -in .n.t5 -anchor nw -pady 25 -padx 25 -fill x
 pack .storniM .stornoE -in .n.t5 -pady 25 -padx 25 -side left -anchor nw
 
 
-####################################################################################
-# P a c k   b o t t o m 
-###################################################################################
+#####################################################
+# T A B  7  -  A R T I K E L 
+#####################################################
+label .titel7 -text "[mc artManage]" -font TIT -anchor nw -fg steelblue -bg silver 
+pack .titel7 -in .n.t7 -fill x
+#label .confartT -text "[mc artManage]" -font "TkHeadingFont"
+
+message .confartM -width 800 -text "[mc artTxt]"
+label .artL -text "Artikelliste" -font "TkHeadingFont"
+
+#pack .titel7 .confartM .artL -in .n.t7 -anchor nw -pady 20 -padx 20
+
+
+#These are packed/unpacked later by article procs
+label .confartL -text "Artikel Nr."
+
+namespace eval artikel {
+  label .confartnameL -padx 7 -width 25 -textvar artName -anchor w
+  label .confartpriceL -padx 10 -width 7 -textvar artPrice -anchor w
+  label .confartunitL -padx 10 -width 7 -textvar artUnit -anchor w
+  label .confarttypeL -padx 10 -width 1 -textvar artType -anchor w
+}
+spinbox .confartnumSB -width 5 -command {setArticleLine TAB4}
+button .confartsaveB -text [mc artSave] -command {saveArticle}
+button .confartdeleteB -text [mc artDelete] -command {deleteArticle} -activebackground red
+button .confartcreateB -text [mc artCreate] -command {createArticle}
+entry .confartnameE -bg beige
+entry .confartunitE -bg beige -textvar artikel::rabatt
+entry .confartpriceE -bg beige
+ttk::checkbutton .confarttypeACB -text "Auslage"
+ttk::checkbutton .confarttypeRCB -text "Rabatt"
+
+#TODO
+#pack .confartcreateB -in .n.t7
+
+
+
 
 
 
@@ -506,6 +514,6 @@ bind .n <<NotebookTabChanged>> {
 }
 
 resetNewInvDialog
-resetArticleWin
+#resetArticleWin
 setAbschlussjahrSB
 createArtMenu

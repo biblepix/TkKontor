@@ -1,11 +1,11 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Updated: 5sep22
+# Updated: 11mch23
 
-##################################################################################################
+###############################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S
-##################################################################################################
+###############################################################
 
 # roundDecimal
 ##rounds any sum to $sum.$dp
@@ -15,66 +15,6 @@ proc roundDecimal {sum} {
   set rounded [format "%.${dp}f" $sum]
   return $rounded
 }
-
-# latex2pdf - TODO obsolete?
-##produces PDF of any TeX file
-## args = invNo OR jahr
-##called by printDocument
-proc latex2pdf {num type} {
-  global tmpDir spoolDir reportDir texDir
-
-  #A. Abschluss
-  if {$type == "rep"} {
-
-    set jahr $num
-    set texName "Abschluss.tex"
-    set texPath [file join $texDir $texName]
-    append pdfName [file root $texName] . pdf
-    set pdfPath [file join $tmpDir $pdfName]
-    set targetDir $reportDir
-
-  #B. Invoice
-  } elseif {$type == "inv"} {
-
-    set invNo $num
-    set texPath [setInvPath $invNo tex]
-    set pdfPath [setInvPath $invNo pdf]
-    set pdfName [file tail $pdfPath]
-    set targetDir $spoolDir
-  }
-
-  #Latex > PDF
-#  catch {namespace delete Latex}
-  namespace eval Latex {}
-  set Latex::texPath $texPath
-  set Latex::tmpDir $tmpDir
-  #set Latex::targetDir $targetDir
-
-  namespace eval Latex {
-    eval exec -- pdflatex -interaction nonstopmode -output-directory $tmpDir $texPath
-  }
-
-  #Rename 'Abschluss.pdf' to include year
-  if {$type == "rep"} {
-    while ![file exists $pdfPath] {
-      after 2000
-    }
-
-    append pdfNewName [file root $pdfName] $jahr . pdf
-    cd $tmpDir
-    file rename -force $pdfName $pdfNewName
-    set pdfName $pdfNewName
-  }
-
-  #Copy any type PDF from $tmpDir to $targetDir
-  cd $tmpDir
-  file copy -force $pdfName $targetDir
-
-  #TODO include here tkoffice-reports.tcl p. 378 to catch any failure !!!
-  ###NewsHandler::QueryNews "Die Datei $pdfName befindet sich in $targetDir zur weiteren Bearbeitung." lightgreen
-  return 0
-
-} ;#END latex2pdf
 
 # createTkOfficeLogo
 ##called by tkoffice-gui.tcl
@@ -153,7 +93,7 @@ proc setAdrList {} {
 }
 
 proc fillAdrWin {adrId} {
-  global db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
+  global adrSpin db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
 	
   #set variables
 	set name1 [db eval "SELECT name1 FROM address WHERE objectid=$adrId"]
@@ -181,7 +121,7 @@ proc fillAdrWin {adrId} {
   if {[string is punct $mail] || $mail==""} {set ::mail "Mail" ; .mailE conf -fg silver} {set ::mail $mail}
   if {[string is punct $www] || $www==""} {set ::www "Internet" ; .wwwE conf -fg silver} {set ::www $www}
  
-#  return 0
+  $adrSpin set $adrId
 
 } ;#END fillAdrWin
 
@@ -271,8 +211,9 @@ proc resetAdrWin {} {
   .adrF2 conf -bg lightblue
   catch {pack forget .adrClearSelB}
 
-  #Set address to spinbox
-  setAdrList
+  #Set address to spinbox or, if just changed, to changed address
+  setAdrList  
+  fillAdrWin [$adrSpin get]
   fillAdrInvWin [$adrSpin get]
 }
 
@@ -352,8 +293,6 @@ proc clearAddressWin args {
   $adrSearch conf -state disabled
   .adrF2 conf -bg #d9d9d9
 
-
-#  return 0
 }
 
 # newAddress - OLD???????????
@@ -473,7 +412,13 @@ set tel2 $::tel2
 	  catch setAdrList
   }
 
+  #reset address win & go back
   resetAdrWin
+  $adrSpin set $adrno
+  fillAdrWin $adrno
+  fillAdrInvWin $adrno 
+  
+  
 } ;#END saveAddress
 
 proc deleteAddress {adrNo} {
@@ -505,9 +450,10 @@ proc deleteAddress {adrNo} {
 # resetArticleWin
 ##called by ... in Artikel verwalten
 proc resetArticleWin {} {
-  pack .confartT .confartM -in .n.t4.f1 -anchor w
-  pack .confartL .confartnumSB .confartunitL .confartpriceL .confartnameL .confarttypeL -in .n.t4.f1 -side left
-  pack .confartdeleteB .confartcreateB -in .n.t4.f1 -side right
+  pack .confartM -in .n.t7 -anchor nw
+  pack .artL -in .n.t7 -anchor nw
+  pack .confartL .confartnumSB .confartunitL .confartpriceL .confartnameL .confarttypeL -in .n.t7 -side left -anchor nw
+  pack .confartdeleteB .confartcreateB -in .n.t7 -side right -anchor ne
   pack forget .confartsaveB .confarttypeACB .confarttypeRCB
   pack forget .confartnameE .confartunitE .confartpriceE
   .confartdeleteB conf -text "Artikel löschen" -command {deleteArticle}
@@ -614,7 +560,7 @@ proc createArticle {} {
  #clear previous entries & add .confArtSaveB
   .confartnumSB set ""
   .confartnumSB conf -bg lightgrey
-  pack .confartsaveB -in .n.t4.f1 -side right
+  pack .confartsaveB -in .n.t7 -side right
 
 #TODO:move to GUI?
   .confarttypeRCB conf -variable rabattselected -command {
@@ -637,7 +583,7 @@ proc createArticle {} {
   set ::artName "Bezeichnung"
   set ::artPrice "Preis"
   set ::artUnit "Einheit"
-  pack .confartnameL .confartnameE .confartunitL .confartunitE .confartpriceL .confartpriceE .confarttypeACB .confarttypeRCB -in .n.t4.f1 -side left
+  pack .confartnameL .confartnameE .confartunitL .confartunitE .confartpriceL .confartpriceE .confarttypeACB .confarttypeRCB -in .n.t7 -side left
   pack forget .confartdeleteB
 
   #Rename Button
@@ -680,11 +626,11 @@ proc saveArticle {} {
     )"]
 
   #Reset original mask
-  foreach w [pack slaves .n.t4.f1] {
+  foreach w [pack slaves .n.t7] {
     pack forget $w
   }
 
-pack .confartL .confartnumSB .confartunitL .confartpriceL .confartnameL .confarttypeL -in .n.t4.f1 -side left
+pack .confartL .confartnumSB .confartunitL .confartpriceL .confartnameL .confarttypeL -in .n.t7 -side left
 
   #Recreate article list
   updateArticleList

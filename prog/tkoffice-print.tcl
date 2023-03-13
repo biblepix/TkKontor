@@ -2,7 +2,7 @@
 # called by 
 # Salvaged: 1nov17
 # Updated to use SQLite: 6sep22
-
+# Updated 11mch23
 
 # fetchInvData
 ##1.retrieves invoice data from DB
@@ -171,7 +171,23 @@ proc printDocument {num type} {
   } ;#END main clause
   
   #View pdf / PS TODO: consider ps2pdf for all cases!_
-  if [catch {exec xdg-open $docPath}] {
+
+  #TODO consider embedding viewer window:
+#  https://wiki.tcl-lang.org/page/Combining+GUI+applications+developed+with+Tk+and+'native'+Windows+toolkits
+
+   # package require BLT
+
+     # Create a unique name for the new process
+    # set name "EmbedTk[pid][clock seconds]"
+    # eval blt::bgexec wait [list Eterm -n $name -e vi] $argv
+    # pack [blt::container .c -name $name] -fill both
+    # wm title . "Vim running in Tk"
+    # # Wait for app to exit (could use trace + callback here)
+    # vwait wait
+    # destroy .
+ 
+  if [catch {exec xdg-open $docPath}] {}
+  if [catch {exec gv $docPath} {
     
     set viewer [detectViewer $docType]
     if {$viewer == ""} {
@@ -193,3 +209,63 @@ proc doPrintReport {jahr} {
   return 0
 }
 	
+	
+	# latex2pdf - TODO obsolete?
+##produces PDF of any TeX file
+## args = invNo OR jahr
+##called by printDocument
+proc latex2pdf {num type} {
+  global tmpDir spoolDir reportDir texDir
+
+  #A. Abschluss
+  if {$type == "rep"} {
+
+    set jahr $num
+    set texName "Abschluss.tex"
+    set texPath [file join $texDir $texName]
+    append pdfName [file root $texName] . pdf
+    set pdfPath [file join $tmpDir $pdfName]
+    set targetDir $reportDir
+
+  #B. Invoice
+  } elseif {$type == "inv"} {
+
+    set invNo $num
+    set texPath [setInvPath $invNo tex]
+    set pdfPath [setInvPath $invNo pdf]
+    set pdfName [file tail $pdfPath]
+    set targetDir $spoolDir
+  }
+
+  #Latex > PDF
+#  catch {namespace delete Latex}
+  namespace eval Latex {}
+  set Latex::texPath $texPath
+  set Latex::tmpDir $tmpDir
+  #set Latex::targetDir $targetDir
+
+  namespace eval Latex {
+    eval exec -- pdflatex -interaction nonstopmode -output-directory $tmpDir $texPath
+  }
+
+  #Rename 'Abschluss.pdf' to include year
+  if {$type == "rep"} {
+    while ![file exists $pdfPath] {
+      after 2000
+    }
+
+    append pdfNewName [file root $pdfName] $jahr . pdf
+    cd $tmpDir
+    file rename -force $pdfName $pdfNewName
+    set pdfName $pdfNewName
+  }
+
+  #Copy any type PDF from $tmpDir to $targetDir
+  cd $tmpDir
+  file copy -force $pdfName $targetDir
+
+  #TODO include here tkoffice-reports.tcl p. 378 to catch any failure !!!
+  ###NewsHandler::QueryNews "Die Datei $pdfName befindet sich in $targetDir zur weiteren Bearbeitung." lightgreen
+  return 0
+
+} ;#END latex2pdf

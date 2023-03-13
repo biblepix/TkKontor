@@ -15,7 +15,7 @@
 proc setAbschlussjahrSB {} {
   global db
   set heuer [clock format [clock seconds] -format %Y]
- 	set jahresliste [lsort -unique [db eval "select strftime('%Y', f_date) from invoice"]]
+ 	set jahresliste [lsort -unique [db eval "SELECT strftime('%Y', f_date) FROM invoice"]]
   lappend jahresliste $heuer
 
   .abschlussJahrSB conf -values [lsort -decreasing $jahresliste]
@@ -36,7 +36,7 @@ proc setReportPsPath {jahr} {
 }
 
 #################################
-# A U S L A G E N
+#  J A H R E S S P E S E N
 #################################
 
 # manageExpenses
@@ -142,62 +142,12 @@ proc createReport {} {
   .reportC conf -width $w -height $h -bg blue
   .reportC create window 0 0 -tags repwin -window .reportT -anchor nw -width $w -height $h
   .reportC itemconf repwin -width $w -height $h
+
+  #Get annual invoice & expenditure data from DB
+  ## invoice data stored in report${jahr} namespace
+  listInvoices $jahr
+  listExpenses
   
-	#get data from $jahr's invoices + 'payeddate = $jahr' from any previous invoices
-	set res [db eval "SELECT
-	f_number,
-	f_date,
-	addressheader,
-	finalsum,
-	vatlesssum,
-	payedsum,
-	auslage 
-	FROM invoice 
-	WHERE strftime('%Y', payeddate) = '$jahr'
-	OR strftime('%Y', f_date) = '$jahr'
-	ORDER BY f_number ASC"]
-
-
-
-
-	#set num. of entries for textwin & put values into arrays per No.
-	set invL [db eval	"SELECT f_number FROM invoice WHERE strftime('%Y', f_date) = '$jahr'"]
-#	set maxTuples [llength $invL]
-
-	foreach invNo $invL {
-	
-		# f_date currency vatlesssum finalsum payedsum auslage
-		set date [db eval "SELECT f_date FROM invoice WHERE f_number = $invNo"] 
-		array set $invNo "invDat $date" 
-	
-		set adr [db eval "SELECT addressheader FROM invoice WHERE f_number = $invNo"] 
-		array set $invNo "invAdr $adr" 
-	
-		set netto [db eval "SELECT vatlesssum FROM invoice WHERE f_number = $invNo"] 
-		array set $invNo "netto $netto"
-	 	
-		set currency [db eval "SELECT currency FROM invoice WHERE f_number = $invNo"] 
-		array set $invNo "currency $currency"
-			 	
-		set finalsum [db eval "SELECT finalsum FROM invoice WHERE f_number = $invNo"] 
-		array set $invNo "finalsum $finalsum"
-		
-		set payedsum [db eval "SELECT payedsum FROM invoice WHERE f_number = $invNo"] 
-		array set $invNo "payedsum $payedsum"
-	 	
-		set auslage [db eval "SELECT auslage FROM invoice WHERE f_number = $invNo"] 
-		array set $invNo "auslage $auslage" 
-	
-		##compute finalsum on basis of $vat from config
-		if {! $vat > 0} {
-  		array set $invNo {VAT 0}
-  		array set $invNo "netto $finalsum"
-		} else {
-			array	set $invNo "VAT [expr $finalsum - $netto]"
-  	}
-  	
-	}	
-
 	#Textwin dimensions Tk scaling factor:
 	##requires no of LETTERS as height + no. of LETTER as width!
 	#TODO conflicts with [winfo height/width ...] for proper A4-dimensions
@@ -234,107 +184,163 @@ proc createReport {} {
   $t insert end "Einnahmen\n" T2
 
   # E I N N A H M E N
+  
+  ##Titel
   $t insert end "Rch.Nr.\tDatum\tAnschrift\tNetto ${currency}\tMwst. ${vat}%\tSpesen\tEingänge ${currency}\n" T3
+puts $currency
 
 
 #TODO  'finalsum' is exclusive vat & Auslagen - list Auslagen anyway because payedsum may differ
 
-	#compute sum total & insert text lines
 
-	
-  set sumtotal 0
-
-  foreach n $invL {
+  #compute sum total & insert text lines
  
-    #set vars from array
-    set payedsum [lindex [array get $n payedsum] 1]
-    set invDat [lindex [array get $n invDat] 1]
-    set invAdr [lindex [array get $n invAdr] 1]
-    set netto [lindex [array get $n netto] 1]
-    set VAT [lindex [array get $n VAT] 1]
-    set auslage [lindex [array get $n auslage] 1]
+
+  namespace eval report {
+
+    variable sumtotal 0
     
-    #Update sum total
-    catch {set sumtotal [expr $sumtotal + ${n}payedsum]}
-    set sumtotal [roundDecimal $sumtotal]
-	  
-    if ![ string is double $auslage ] {
-      set auslage ""
-    }
-
-    #Insert row in text window
-	  $t insert end "\n${n}\t${invDat}\t${invAdr}\t${netto}\t${vat}\t ${auslage}\t${payedsum}"
-
-	  #Export to Latex
-#    append einnahmenTex $n(invNo) & $n(invDat) & $n(invAdr) & $n(netto) & $n(auslage) & $n(VAT) & $n(payedsum) {\\} \n
-
-  }
-
-### A U S G A B E N
-
-	#Get 'spesen' from DB
-  foreach n [db eval "SELECT num FROM spesen"] {
-    set name [db eval "SELECT name FROM spesen WHERE num = $n"]
-    set value [db eval "SELECT value FROM spesen WHERE num = $n"]
-    
-    ##1.prepare for text window
-    append spesenList "$name\t\t\t\t\t\t-${value}\n"
-    lappend spesenAmounts $value
-    
-    ##2.prepare for LateX
-    append auslagenTex {\multicolumn{3}{l}} \{ $name \} &&& \{ \$ \- $value \$ \} {\\} \n
-  }
-
-  if {$spesenAmounts == ""} {
-    set spesenAmounts 0.00
-  } else {
-    set spesenTotal 0.00
-      foreach i $spesenAmounts {
-        set spesenTotal [expr $spesenTotal + $i]
+    foreach n $invL {
+   
+      #set vars from array
+      set payedsum [lindex [array get $n payedsum] 1]
+      set invDat [lindex [array get $n invDat] 1]
+      set invAdr [lindex [array get $n invAdr] 1]
+      set netto [lindex [array get $n netto] 1]
+      set vat [lindex [array get $n VAT] 1]
+      set auslage [lindex [array get $n auslage] 1]
+      
+      #Update sum total
+      set sumtotal [roundDecimal [expr $sumtotal + $payedsum]]
+	    
+      if ![ string is double $auslage ] {
+        set auslage ""
       }
-  }
-  set spesenTotal [roundDecimal $spesenTotal]
 
-	#TODO insert further  ...
-	$t insert end "\n\Einnahmen total\t\t\t\t\t\t\t $sumtotal" T3
+      #Insert row in text window
+	    .reportT insert end "\n${n}\t${invDat}\t${invAdr}\t${netto}\t${vat}\t ${auslage}\t${payedsum}"
+
+    }
+	  
+	  .reportT insert end "\n\nEinnahmen total\t\t\t\t\t\t\t $sumtotal" T3
+
+  } ;# END report ns
+	
 	$t insert end "\n\nAuslagen\n" T2
-	$t insert end $spesenList
+	$t insert end $report::spesenList
 
   ##compute Reingewinn
+  set sumtotal $report::sumtotal
+  set spesenTotal $report::spesenTotal
   set netProfit [roundDecimal [expr $sumtotal - $spesenTotal]]
   if {$netProfit < 0} {
     set netProfit 0.00
   }
 
-  $t insert end "\nAuslagen total\t\t\t\t\t\t\t-${spesenTotal}\n\n" T3
+  $t insert end "\nAuslagen total\t\t\t\t\t\t\t-${spesenTotal} \n\n" T3
   $t insert end "Reingewinn\t\t\t\t\t\t\t$netProfit" T2
-  
-
-#Canvas report & PS
-#  canvasReport $t
- # canv2ps .reportC  
-
-
-
-  #Save Einnahmen & Auslagen to LateX for printAbschluss
-#  set chan [open $einnahmenTexFile w]
-#  puts $chan $einnahmenTex
-#  close $chan
-#  set chan [open $auslagenTexFile w]
-#  puts $chan $auslagenTex
-#  close $chan
 
   #Pack & configure print button
   pack .reportPrintBtn -in .n.t3.rightF -side bottom -anchor sw
-#  .reportPrintBtn conf -command "printDocument $jahr rep"
-   .reportPrintBtn conf -command "canvas2ps .reportC .reportT $jahr"
-   .reportT conf -borderwidth 3 -padx 7 -pady 7
+ .reportPrintBtn conf -command "canvas2ps .reportC .reportT $jahr"
+ .reportT conf -borderwidth 3 -padx 7 -pady 7
    
+  namespace delete report
+  
 } ;#END createReport
 
 
+proc listInvoices {jahr} { 
+
+ 
+  namespace eval report {
+
+    upvar #0 ::jahr jahr
+  
+    
+#TODO: WHAT ABOUT payeddate vs. f_date ?????????????????????
+##is this still functional?
+    
+	  #get data from $jahr's invoices + 'payeddate = $jahr' from any previous invoices
+	  
+	  set res [db eval "SELECT
+	  f_number,
+	  f_date,
+	  addressheader,
+	  finalsum,
+	  vatlesssum,
+	  payedsum,
+	  auslage 
+	  FROM invoice 
+	  WHERE strftime('%Y', payeddate) = '$jahr'
+	  OR strftime('%Y', f_date) = '$jahr'
+	  ORDER BY f_number ASC"]
+
+	  #set num. of entries for textwin & put values into arrays per No.
+	  set invL [db eval	"SELECT f_number FROM invoice WHERE strftime('%Y', f_date) = '$jahr'"]
+	  
+	  
+	  foreach invNo $invL {
+	  
+		  # f_date currency vatlesssum finalsum payedsum auslage
+		  set date [db eval "SELECT f_date FROM invoice WHERE f_number = $invNo"] 
+		  array set $invNo "invDat $date" 
+	  
+		  set adr [db eval "SELECT addressheader FROM invoice WHERE f_number = $invNo"] 
+		  array set $invNo "invAdr $adr" 
+	  
+		  set netto [db eval "SELECT vatlesssum FROM invoice WHERE f_number = $invNo"] 
+		  array set $invNo "netto $netto"
+	   	
+		  set currency [db eval "SELECT currency FROM invoice WHERE f_number = $invNo"] 
+		  array set $invNo "currency $currency"
+			   	
+		  set finalsum [db eval "SELECT finalsum FROM invoice WHERE f_number = $invNo"] 
+		  array set $invNo "finalsum $finalsum"
+		  
+		  set payedsum [db eval "SELECT payedsum FROM invoice WHERE f_number = $invNo"] 
+		  array set $invNo "payedsum $payedsum"
+	   	
+		  set auslage [db eval "SELECT auslage FROM invoice WHERE f_number = $invNo"] 
+		  array set $invNo "auslage $auslage" 
+	  
+		  ##compute finalsum on basis of $vat from config
+		  if {! $vat > 0} {
+    		array set $invNo {VAT 0}
+    		array set $invNo "netto $finalsum"
+		  } else {
+			  array	set $invNo "VAT [expr $finalsum - $netto]"
+    	}
+    	
+	  }
+	  
+  } ;#END ns report
+  	
+} ;#END listInvoices
 
 
+### A U S G A B E N
+##Note: code copied from manageExpenses
+
+  proc listExpenses {} {
+
+    set numL [db eval "Select ROW_NUMBER() OVER() from spesen"] 
+   
+    foreach num $numL {
+   
+      set row [db eval "select * FROM (                            
+        select ROW_NUMBER() OVER() as row_num,name,value from spesen ) t 
+        where row_num=$num" ]
+      
+      ##1.prepare for text window
+      set row [linsert $row 2 "          "]
+      append report::spesenList $row \n
+
+    }
+    
+    set report::spesenTotal [db eval "SELECT SUM(value) FROM spesen"]
+
+} ;#END listExpenses
 
 
 proc canvas2ps {c w year} {

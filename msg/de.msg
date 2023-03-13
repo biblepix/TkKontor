@@ -26,7 +26,7 @@ mcset de invRecovErr "Kann Rechnungsdaten Nr. %s nicht wiederherstellen"
 
 mcset de reportTxt "Hier können Sie jährliche Geschäftsberichte betrachten und drucken. \n\nDer Druck erfolgt nur korrekt, wenn der  Bericht in Gesamtbreite sichtbar ist. Im Zweifelsfall das Programmfenster im Vollbildmodus anzeigen und Bericht nochmals erstellen lassen. \n\nSollte die Seiteneinteilung im Vordruckfenster unbefriedigend sein, können Sie den Bericht nochmals erstellen und vor dem Ausdruck im blauen Fenster Abstände von Hand anpassen."
 mcset de reportCreate "Abschlussbericht erstellen"
-mcset de reportPrint "Bericht ausdrucken"
+mcset de reportPrint "Bericht zum Druck anzeigen"
 
 mcset de tel1 "Phone"
 mcset de tel2 "Mobile"
@@ -43,3 +43,6 @@ mcset de spesenTxt "Hier können Sie jährlich anfallende Geschäftskosten aufli
 
 mcset de storni "Storni"
 mcset de storniTxt "Hier können Sie fehlerhafte Buchungen stornieren (rückbuchen). \nGeben Sie eine Rechnungsnummer ein und bestätigen Sie mit Tabulatortaste."
+
+mcset de artikel "Artikelverwaltung"
+mcset de artTxt "Hier können Sie Artikel für die Rechnungsstellung verwalten.\n\nDie Felder 'Bezeichnung' und 'Einheit' (z.B. Std.) dürfen nicht leer sein.\n\nDie Kontrollkästchen 'Auslage' und 'Rabatt' für den Artikeltyp können leer sein. Wenn 'Rabatt' ein Häkchen bekommt, gilt der Artikel als Abzugswert in Prozent (im Feld 'Preis' Prozentzahl ohne %-Zeichen eingeben, z.B. 5.5). Der Rabatt wird in der Rechnung vom Gesamtbetrag abgezogen.\n\nFalls das Feld 'Auslage' angehakt wird (z.B. für Artikel 'Zugfahrt'), wird der Artikel in der Rechnung separat als Auslage aufgeführt, unterliegt nicht der Mehrwertsteuerpflicht und wird nicht als Einnahme verbucht."

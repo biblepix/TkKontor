@@ -49,7 +49,7 @@ proc chooseTkoLang {}  {
 }
 
 #TODO test again! 
-if [catch {source $confFile}] {
+if [catch {source $confFile} res] {
 
 	chooseTkoLang
   
