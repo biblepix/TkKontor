@@ -1,8 +1,8 @@
 # ~/TkOffice/prog/tkoffice-report.tcl
 # called by tkoffice-gui.tcl
-# Updated: 7mch23
+# Updated: 13mch23
 
-#sSrced by .abschlussPrintB button & ?
+#sSrced by .repPrintB button & ?
 
 ################################################################################
 ### A B S C H L Ü S S E  &  E X P E N S E S
@@ -18,8 +18,8 @@ proc setAbschlussjahrSB {} {
  	set jahresliste [lsort -unique [db eval "SELECT strftime('%Y', f_date) FROM invoice"]]
   lappend jahresliste $heuer
 
-  .abschlussJahrSB conf -values [lsort -decreasing $jahresliste]
-  .abschlussJahrSB set [expr $heuer - 1]
+  .repJahrSB conf -values [lsort -decreasing $jahresliste]
+  .repJahrSB set [expr $heuer - 1]
 }
 
 # setReportPsPath
@@ -49,7 +49,7 @@ proc manageExpenses {} {
   .expvalueE conf -bg beige -fg grey -width 7 -textvar ::expval
 
   #pack Listbox & buttons
-  pack forget .abschlussM .spesenAbbruchB .reportT .abschlussScr .expnameE .expvalueE .spesenB
+  pack forget .repM .spesenAbbruchB .reportT .repScr .expnameE .expvalueE .spesenB
   pack .spesenM -side left
   pack .spesenAddB .spesenDeleteB -in .n.t6 -side right -anchor se
   pack .spesenLB -in .n.t6 -fill y -pady 50
@@ -66,12 +66,6 @@ proc manageExpenses {} {
       select ROW_NUMBER() OVER() as row_num,name,value from spesen ) t 
       where row_num=$num" ]
 
-#puts $t
-#puts $name
-#puts $value
-  
- #   set name [db eval "SELECT name FROM spesen WHERE num=$num"]
- #   set value [db eval "SELECT value FROM spesen WHERE num=$num"]
     .spesenLB insert end $row
   }
 }
@@ -99,7 +93,7 @@ proc saveExpenses {} {
 	if [db errorcode] {
 	  NewsHandler::QueryNews "Ging nicht..." red
 	} else {
-  	reportResult "Ging doch" "Eintrag gespeichert."
+  	NewsHandler::QueryNews "Eintrag gespeichert." green
   }
   manageExpenses
 }
@@ -112,7 +106,7 @@ proc deleteExpenses {} {
   set token [db eval "DELETE FROM spesen WHERE value=$value"]
  
  #TODO check errorcode, s.o. 
-  reportResult $token "Eintrag gelöscht"
+ #NewsHandler::QueryNews $token "Eintrag gelöscht" green
 
   #2 update LB
   manageExpenses
@@ -126,22 +120,22 @@ proc deleteExpenses {} {
 
 # createReport
 ##Creates yearly report for display in text window
-##called by .abschlussCreateB button
+##called by .repCreateBtn
 proc createReport {} {
   global db myComp currency vat texDir reportDir
   
-  set jahr [.abschlussJahrSB get]
+  set jahr [.repJahrSB get]
   set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
   set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
   set h [expr [winfo height .n.t3] - 100]
   set w [expr int(1.5 * $h)]
   
   # Prepare canvas & textwin dimensions
-  set t .reportT
+  set t .repT
   $t delete 1.0 end
-  .reportC conf -width $w -height $h -bg blue
-  .reportC create window 0 0 -tags repwin -window .reportT -anchor nw -width $w -height $h
-  .reportC itemconf repwin -width $w -height $h
+  .repC conf -width $w -height $h -bg blue
+  .repC create window 0 0 -tags repwin -window .repT -anchor nw -width $w -height $h
+  .repC itemconf repwin -width $w -height $h
 
   #Get annual invoice & expenditure data from DB
   ## invoice data stored in report${jahr} namespace
@@ -218,11 +212,11 @@ puts $currency
       }
 
       #Insert row in text window
-	    .reportT insert end "\n${n}\t${invDat}\t${invAdr}\t${netto}\t${vat}\t ${auslage}\t${payedsum}"
+	    .repT insert end "\n${n}\t${invDat}\t${invAdr}\t${netto}\t${vat}\t ${auslage}\t${payedsum}"
 
     }
 	  
-	  .reportT insert end "\n\nEinnahmen total\t\t\t\t\t\t\t $sumtotal" T3
+	  .repT insert end "\n\nEinnahmen total\t\t\t\t\t\t\t $sumtotal" T3
 
   } ;# END report ns
 	
@@ -241,22 +235,26 @@ puts $currency
   $t insert end "Reingewinn\t\t\t\t\t\t\t$netProfit" T2
 
   #Pack & configure print button
-  pack .reportPrintBtn -in .n.t3.rightF -side bottom -anchor sw
- .reportPrintBtn conf -command "canvas2ps .reportC .reportT $jahr"
- .reportT conf -borderwidth 3 -padx 7 -pady 7
+  pack .repPrintBtn -in .n.t3.rightF -side bottom -anchor sw
+  
+#TODO implement in printReport!
+.repPrintBtn conf -command "printReport $jahr"
+.repT conf -borderwidth 3 -padx 7 -pady 7
    
   namespace delete report
   
 } ;#END createReport
 
-
+# listInvoices
+##extracts all data from invoice for $jahr into ::report ns
+##called by createReport
 proc listInvoices {jahr} { 
-
  
+  namespace eval report {}
+  set report::jahr $jahr
+  
   namespace eval report {
 
-    upvar #0 ::jahr jahr
-  
     
 #TODO: WHAT ABOUT payeddate vs. f_date ?????????????????????
 ##is this still functional?
@@ -278,7 +276,6 @@ proc listInvoices {jahr} {
 
 	  #set num. of entries for textwin & put values into arrays per No.
 	  set invL [db eval	"SELECT f_number FROM invoice WHERE strftime('%Y', f_date) = '$jahr'"]
-	  
 	  
 	  foreach invNo $invL {
 	  
@@ -322,143 +319,27 @@ proc listInvoices {jahr} {
 ### A U S G A B E N
 ##Note: code copied from manageExpenses
 
-  proc listExpenses {} {
+# listExpenses
+##called by createReport
+##extracts expenses as text block into ::report ns 
+proc listExpenses {} {
 
-    set numL [db eval "Select ROW_NUMBER() OVER() from spesen"] 
-   
-    foreach num $numL {
-   
-      set row [db eval "select * FROM (                            
-        select ROW_NUMBER() OVER() as row_num,name,value from spesen ) t 
-        where row_num=$num" ]
-      
-      ##1.prepare for text window
-      set row [linsert $row 2 "          "]
-      append report::spesenList $row \n
-
-    }
+  set numL [db eval "Select ROW_NUMBER() OVER() from spesen"] 
+ 
+  foreach num $numL {
+ 
+    set row [db eval "select * FROM (                            
+      select ROW_NUMBER() OVER() as row_num,name,value from spesen ) t 
+      where row_num=$num" ]
     
-    set report::spesenTotal [db eval "SELECT SUM(value) FROM spesen"]
+    ##1.prepare for text window
+    set row [linsert $row 2 "          "]
+    append report::spesenList $row \n
+  }
+  
+  set report::spesenTotal [db eval "SELECT SUM(value) FROM spesen"]
 
 } ;#END listExpenses
-
-
-proc canvas2ps {c w year} {
-
-  global tmpDir reportDir
-
-#  set tmpDir /tmp
-#  set c .reportC
-#  set w .reportT
-
-  $w conf -bg white
-  $w yview moveto 1.0
-  set numLines [$w count -lines 1.0 end]  
-  set pageNo 1
-  
-  set tmpfile $tmpDir/report_${year}_${pageNo}.ps
-  set reportPath $reportDir/Report_${year}.pdf
-  set cmd "$c postscript -rotate 1 -file $tmpfile"  
-  
-  set reportPs $tmpDir/Report_${year}.ps
-  set reportPdf [string trimright $reportPs .ps].pdf
-  
-  puts $reportPs
-  puts $reportPdf
-  
-  ###############################
-  # Handle single page report
-  ###############################
-  
-  # check if report is in full view
-  if { [$w yview] == "0.0 1.0"} {
-  
-    puts "Printing single page..."
-    
-    $w conf -bg white
-    $c postscript -rotate 1 -file $reportPs
-    NewsHandler::QueryNews "Wir versuchen nun, den Bericht anzuzeigen. Im Anzeigeprogramm können Sie ihn ausdrucken." orange
-    
-    exec xdg-open $reportPs
-    set res [tk_messageBox -type yesno -message "Wollen Sie die Datei $reportPs abschliessend in $reportDir speichern?"]
-    
-    if {$res == "yes"} {
-      
-#      exec ps2pdf $reportPs $reportPdf
-      file copy $reportPs $reportDir
-    
-      NewsHandler::QueryNews "Falls der Bericht noch nicht gedruckt ist, können Sie die Datei $reportDir/$reportPs drucken oder im blauen Fenster nochmals bearbeiten." orange
-      
-    }
-
-  } else {
-  
-  ###############################
-  # Handle multiple pages
-  ###############################
-  $w tag conf hide -elide 1
-  $w tag conf show -elide 0
-
-  #divide text by fix page height
-  set wholeBlocks [expr $::numLines / 40]
-  
-  ## 1. Handle whole 40 blocks
-  
-  #Prepare page 1
-  set top 1
-  set bot 40
-  set pageNo 1
-  $w yview moveto 0.0
-  $w tag add hide [expr $bot + 1].0 end
-  
-  ## 2. Handle following pages
-  for {set tot $wholeBlocks} {$pageNo <= $tot} {incr pageNo} {
-    
-   # $w yview moveto $top.0
-    update
-    $c postscript -rotate 1 -file $tmpDir/report_${year}_${pageNo}.ps
-    
-    #hide section just done
-    
-    $w tag remove hide 1.0 end
-    $w tag add hide $top.0 $bot.end
-    
-    set top [expr $bot + 1]
-    set bot [expr $top + 40]
-    
-    #hide section below current
-    $w tag add hide [expr $bot + 1].0 end
-       
-  }
-
-  ## 3. Handle last page
-  $w tag remove hide 1.0 end
-  $w tag add hide 1.0 $top.end
-
-  update
-  $c postscript -rotate 1 -file $tmpDir/report_${year}_${pageNo}.ps
-  
-  
-  ## 4. View full document in PDF 
-  ##Postscript all *ps in landscape format to *.ps in one batch:  
-## -c "<</Orientation 3>> setpagedevice" - seems unnecessary
-  exec gs -dNOPAUSE -dAutoRotatePages=/None -sDEVICE=pdfwrite -sOUTPUTFILE=$tmpDir/Report_${year}.ps -dBATCH $tmpDir/report_${year}*.ps
-  
-  NewsHandler::QueryNews "Wir versuchen nun, den Bericht anzuzeigen. Im Anzeigeprogramm können Sie ihn dann ausdrucken." orange
-    
-  exec xdg-open $tmpDir/Report_${year}.ps
-  set res [tk_messageBox -type yesno -message "Wollen Sie die Datei Report_${year}.ps abschliessend in $reportDir speichern?"]
-  if {$res == "yes"} {
-    file copy $report_${year}.ps $reportDir
-  }
- }
- 
-  ## 5. Final cleanup
-  $w conf -bg lightblue
-  $w tag delete hide
-  $w yview moveto 0.0
-
-} ;#END canvas2ps
 
 
 
@@ -558,26 +439,7 @@ proc canvas2ps {c w year} {
 #  $canv conf -height $origCanvHeight 
 
 #} ;#END canvas2ps
-proc canvasReport {jahr} {
-  update
-  set h [expr [winfo height .n.t3] - 100]
-  set w [expr int(1.5 * $h)]
-  
-  canvas .reportC -width $w -height $h
-  .reportC create window 0 0 -tags repwin -window .reportT -anchor nw
-  .reportC itemconf repwin -height $h -width $w
-   
-   set docPath [setReportPsPath $jahr]
-   
-   
-  #Final packing of canvas
-  #pack forget .reportT
-  pack .reportC -in .n.t3.leftF
-  pack .reportPrintBtn -in .n.t3.rightF -anchor se -side right
 
-  #raise $t
-
-} ;#END canvasReport
 
 # latexReport
 ##recreates (abschlussEinnahmen.tex) + (abschlussAuslagen.tex) > Abschluss.tex
@@ -586,7 +448,7 @@ proc canvasReport {jahr} {
 #  global db myComp currency vat texDir reportDir reportTexFile
 #  set reportTexPath [file join $texDir $reportTexFile]
 
-##  set jahr [.abschlussJahrSB get]
+##  set jahr [.repJahrSB get]
 #  set einnahmenTexFile [file join $texDir abschlussEinnahmen.tex]
 #  set auslagenTexFile  [file join $texDir abschlussAuslagen.tex]
 #  set einnahmenTex [read [open $einnahmenTexFile]]

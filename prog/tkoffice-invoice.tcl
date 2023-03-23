@@ -2,14 +2,13 @@
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
 # Updated for use with SQLite: 9sep22
-# Updated 25feb23
+# Updated 21mch23
 
 source $confFile
 ################################################################################################################
 ################# N E W   I N V O I C E   P R O C S ############################################################
 ################################################################################################################
 
-set vorlageTex [file join $texDir rechnung-vorlage.tex]
 set dataFile [file join $texDir invdata.tex]
 set itemFile [file join $texDir invitems.tex]
  
@@ -224,7 +223,6 @@ proc addInvRow {} {
 ##evaluates exit codes
 ##called by .saveinvB button
 proc doSaveInv {} {
-#TODO: remove catches, getting DVIPS and LATEX errors which are NOT errors!
   
   #1.Save to DB
   if [catch saveInv2DB res] {
@@ -232,12 +230,8 @@ proc doSaveInv {} {
     return 1
   } 
   
-	#NOTE: invNo put into ::Latex by saveInv2DB
-  #2. LatexInvoice
-  if [catch {latexInvoice $::Latex::invNo} res] {
-    NewsHandler::QueryNews $res red
-    return 1
-  }
+  #2. LatexInvoice -NOTE: invNo put into ::Latex by saveInv2DB
+	catch {latexInvoice $::Latex::invNo}
   
   return 0
 
@@ -348,7 +342,7 @@ proc saveInv2DB {} {
     '$itemListHex'
     )"]
   
-#TODO does this belong here? should we use reportResult instead?
+#TODO does this belong here?
   if [db errorcode] {
   
   #TODO how to get error message from SQLite?????????????????
@@ -369,44 +363,6 @@ proc saveInv2DB {} {
 } ;#END saveInv2DB
 
 
-# latexInvoice
-##executes latex on vorlageTex OR dvips OR dvipdf on vorlageDvi
-##with end type: PDF
-##called by doPrintNewInv & doPrintOldInv
-#code from DKF: " With plenty of experience, 'nonstopmode' or 'batchmode' are most useful
-# eval [list exec -- pdflatex --interaction=nonstopmode] $args
-proc latexInvoice {invNo} {
-
-  global db adrSpin spoolDir vorlageTex texDir tmpDir
-
-  #catch {namespace delete Latex}
-  namespace eval Latex {}
-  set Latex::invTexPath [setInvPath $invNo tex]
-  set Latex::tmpDir $tmpDir
-  set Latex::spoolDir $spoolDir
-  
-  namespace eval Latex {
-  
-    #TODO can pdf be done in draftmode?!  - NO!
-    #  eval exec -- pdflatex -draftmode -interaction nonstopmode -output-directory $spoolDir $invTexPath
-    eval exec -- pdflatex -interaction nonstopmode -output-directory $tmpDir $invTexPath
-  }  
-
-	set invPdfTmpPath [setInvPath $invNo pdftmp] 
-  set invPdfPath [setInvPath $invNo pdf]
-
-	#copy PDF to spool
-	while ![file exists $invPdfTmpPath] {
-		after 2000
-	}
-  file copy -force $invPdfTmpPath $invPdfPath
- 
- #moved to printDocument   
-#    NewsHandler::QueryNews "Das PDF-Dokument '[file tail $invPdfPath]' befindet sich in $spoolDir zur weiteren Bearbeitung." maroon
-    
-    namespace delete Latex
-    
-} ;#END latexInvoice
 
 # clearAdrInvWin
 ##called by fillAdrInvWin & newAddress
@@ -552,21 +508,37 @@ proc fillAdrInvWin {adrId} {
         set itemsT $::verbucht::itemsT
         catch {set itemlist [lindex $itemsT $n] }
         
-  #TODO change for SQLite!
+        
+        
+  #TODO change for SQLite! ??????????????????
    #     if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
           set ::verbucht::anzeige 1
-          $invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "printDocument $invNo inv"
-          pack $invF.$n.invshowB -anchor e -side right
+          #$invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "printDocument $invNo inv"
+          #pack $invF.$n.invshowB -anchor e -side right
    #     }
+
+			#Bind invNo labels to highlighting on hover & command on double-click
+			bind $invF.$n.invNoL <Enter> "%W conf -bg lightblue"
+			bind $invF.$n.invNoL <Leave> "%W conf -bg #d9d9d9"
+			bind $invF.$n.invNoL <Double-1> "printDocument $invNo inv"
 
   		} ;#end for loop
     } ;#END namspace $rowNo
     
-    if {$anzeige} {.invShowH conf -state normal} {.invShowH conf -state disabled -bg #d9d9d9}
+    
+    #TODO what's the gig now (see above) ;;;;;;;;;;;;;::::::::::::::::::::
+    #what does the ::verbucht::anzeige var do????????????????????????????
+    #if {$anzeige} {.invShowH conf -state normal} {.invShowH conf -state disabled -bg #d9d9d9}
     
   } ;#END namespace verbucht
 
   set ::credit [updateCredit $adrId]
+  
+  
+#  catch {wm destroy $invF.c}
+#canvas $invF.c -bg beigef
+#  $invF.c create window 0 0 -window $invF -anchor nw
+#  pack $invF.c -anchor nw
   
 } ;#END fillAdrInvWin
 
@@ -604,42 +576,6 @@ proc setInvPath {invNo type} {
 
 } ;#END setInvPath
 
-
-# viewInvoice - TODO why not provide PDF view?!
-##checks out DVI/PS capable viewer
-##sends rechnung.dvi / rechnung.ps to prog for viewing
-##called by "Ansicht" & "Rechnung drucken" buttons
-proc viewInvoice {invNo} {
-  set invDviPath [setInvPath $invNo dvi]
-	set invPdfPath [setInvPath $invNo pdf]
-	
-	
-	#TODO wo ist Tex-Datei?????????????????????????
-	
-	#Convert to pdf
-	if [catch {dvipdf $invDviPath}] {
-	
-		#Try viewing PDF
-		if ![catch {$pdfviewer ?$invpath? }] {
-  	
-	  	set pdfViewer [detectViewer pdf]
-	  	set dviViewer [detectViewer dvi]
-	  	
-	  	if {$pdfViewer == ""} {	
-
- 	  		exec $dviViewer $invDviPath ?AUSGABEDATEI?
-  		
-  			#B) Show warning
-  			}	 else {
-  		
-	  			NewsHandler::QueryNews "No PDF viewer found. Please open ?$file? from your file manager ..." red
-  			}
-  		}
-  	}
-   	
-
-  
-} ;#END viewInvoice
 
 
 
@@ -714,7 +650,7 @@ puts "status $status"
     "]
 
   #Update GUI    
-  reportResult $token1 "Betrag CHF $newPayedsum verbucht"
+  NewsHandler::QueryNews "Betrag CHF $newPayedsum verbucht" green
 
   ##delete OR reset zahlen entry
   if {$status == 3} {
@@ -730,7 +666,7 @@ puts "status $status"
   }
     
   set ::credit [updateCredit $adrNo]
-  #reportResult $token2 "Das aktuelle Kundenguthaben beträgt $newCredit"
+  NewsHandler::QueryNews "Das aktuelle Kundenguthaben beträgt $newCredit" green
   return 0
 } ;#END savePaymentEntry
 
@@ -804,3 +740,101 @@ proc storno {id} {
 	NewsHandler::QueryNews "Buchung Nr. $id erfolgreich storniert." green
 	fillAdrInvWin $id
 }
+
+# fetchInvData
+##1.retrieves invoice data from DB
+##2.gets some vars from Config
+##3.saves dataFile & itemFile to $texDir for Latex processing
+##called by printDocument if invoice not found in spooldir
+proc fetchInvData {invNo} {
+  global db texDir confFile itemFile dataFile tkoDir
+  
+  #1.get some vars from config
+  source $confFile
+  if {![string is digit $vat]} {set vat 0.0}
+  if {$currency=="$"} {set currency \\textdollar}
+  if {$currency=="£"} {set currency \\textsterling}
+  if {$currency=="€"} {set currency \\texteuro}
+  
+#TODO what's the deal with Swiss Francs?!
+  if {$currency=="CHF"} {set currency {Fr.}}
+
+  #2.Get invoice data from DB
+  set invToken [db eval "SELECT 
+    ref,
+    cond,
+    f_date,
+    items,
+    customeroid
+  FROM invoice WHERE f_number = $invNo"
+  ]
+
+  if [db errorcode] {
+    NewsHandler::QueryNews "[mc invRecovErr $invNo]\n$invToken" red
+    return 1
+  }
+  
+  set ref       [lindex $invToken 0]
+  set cond      [lindex $invToken 1]
+  set auftrDat  [lindex $invToken 2]
+  set itemsHex  [lindex $invToken 3]
+  set adrNo     [lindex $invToken 4]
+
+  #3.Get address data from DB & format for Latex
+  set adrToken [db eval "SELECT 
+    name1,
+    name2,
+    street,
+    zip,
+    city 
+  FROM address WHERE ts=$adrNo"
+  ]
+  
+#make sure below signs are escaped since they interfere with LaTex commands
+  lappend custAdr [lindex $adrToken 0] {\\}
+  lappend custAdr [lindex $adrToken 1] {\\}
+  lappend custAdr [lindex $adrToken 2] {\\}
+  lappend custAdr [lindex $adrToken 3] { }
+  lappend custAdr [lindex $adrToken 4]
+    
+  #4.set dataList for usepackage letter
+  append dataList \\newcommand\{\\referenz\} \{ $ref \} \n
+  append dataList \\newcommand\{\\cond\} \{ $cond \} \n
+  append dataList \\newcommand\{\\dat\} \{ $auftrDat \} \n
+  append dataList \\newcommand\{\\invNo\} \{ $invNo \} \n
+  append dataList \\newcommand\{\\custAdr\} \{ $custAdr \} \n
+  append dataList \\newcommand\{\\myBank\} \{ $myBank \} \n
+  append dataList \\newcommand\{\\myName\} \{ $myComp \} \n
+  append dataList \\newcommand\{\\myAddress\} \{ $myAdr \} \n
+  append dataList \\newcommand\{\\myPhone\} \{ $myPhone \} \n
+  append dataList \\newcommand\{\\vat\} \{ $vat \} \n
+  append dataList \\newcommand\{\\currency\} \{ $currency \} \n
+
+  ##save dataList to dataFile
+  set chan [open $dataFile w] 
+  puts $chan $dataList
+  close $chan
+
+  #save itemList to itemFile  
+  set itemList [binary decode hex $itemsHex]
+  if {$itemList == ""} {
+    NewsHandler::QueryNews "Keine Posten für Rechnung $invNo gefunden. Kann Rechnung nicht anzeigen oder ausdrucken." red 
+    return 1
+  }
+  #get rid of Latex code signs
+  regsub -all {%} $itemList {\%} itemList
+  regsub -all {&} $itemList {\&} itemList
+  regsub -all {$} $itemList {\$} itemList
+  regsub -all {#} $itemList {\#} itemList
+  regsub -all {_} $itemList {\_} itemList
+  
+  set chan [open $itemFile w]
+  puts $chan $itemList
+  close $chan
+
+  #Cleanup
+  unset invToken adrToken
+	
+  return 0
+  
+} ;#END fetchInvData

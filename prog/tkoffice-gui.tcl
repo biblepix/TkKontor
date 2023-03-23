@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17
 # Updated for use with SQlite: Sep22
-# Updated 28feb23
+# Updated 21mch23
 		
 set version 2.0
 set px 5
@@ -104,7 +104,7 @@ set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -bg lightblue -justify right 
 focus $adrSpin
 
 ##Create search field
-set adrSearch [entry .adrsearchE -width 50 -borderwidth 3 -bg beige -fg grey]
+set adrSearch [entry .adrsearchE -width 25 -borderwidth 3 -bg beige -fg grey]
 resetAdrSearch
 
 #Create address entries, to be packed when 'changeAddress' or 'newAddress' are invoked
@@ -120,18 +120,18 @@ entry .mailE -width 25 -textvar mail -justify right
 entry .wwwE -width 25 -textvar www -justify right
 
 #create Address buttons
-button .b0 -text [mc adrNew] -width 20 -command {
+button .adrNewBtn -text [mc adrNew] -width 20 -command {
   #clearAddressWin
   newAddress
   }
   
-button .b1 -text [mc adrChange] -width 20 -command {changeAddress $adrNo}
-button .b2 -text [mc adrDelete] -width 20 -command {deleteAddress $adrNo} -activebackground red
+button .adrChgBtn -text [mc adrChange] -width 20 -command {changeAddress $adrNo}
+button .adrDelBtn -text [mc adrDelete] -width 20 -command {deleteAddress $adrNo} -activebackground red
 
 #Pack adrF1 spinbox
 pack $adrSpin -in .adrF1 -anchor nw
 #Pack adrF3 buttons
-pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor ne
+pack $adrSearch .adrNewBtn .adrChgBtn .adrDelBtn -in .adrF3 -anchor ne
 
 
 #########################################################################################
@@ -145,12 +145,16 @@ pack $adrSearch .b0 .b1 .b2 -in .adrF3 -anchor ne
 
 #Create "Rechnungen" Titel
 label .adrInvTitel -justify center -text "Verbuchte Rechnungen" -font TIT -pady 5 -padx 5 -anchor w -fg steelblue -bg silver
+label .adrInvInfo -padx 5 -pady 0 -anchor w -fg steelblue -bg silver -text "Double-click on number to view"
+
 label .creditL -text "Kundenguthaben: $currency " -font "TkCaptionFont"
 label .credit2L -text "\u2196 wird bei Zahlungseingang aktualisiert" -font "TkIconFont" -fg grey
 message .creditM -textvar credit -relief sunken -width 50
 label .umsatzL -text "Kundenumsatz: $currency " -font "TkCaptionFont"
 message .umsatzM -textvar umsatz -relief sunken -bg lightblue -width 50
+
 pack .adrInvTitel -in .n.t1.mainF.f3 -anchor w -fill x -padx 10 -pady 5
+pack .adrInvInfo -in .n.t1.mainF.f3 -anchor w -padx 10 -pady 0
 
 #Umsatz unten
 pack .creditL .creditM .credit2L -in .umsatzF -side left -anchor w
@@ -163,14 +167,15 @@ label .invartH -text "Artikel" -font TkCaptionFont -justify left -anchor w -widt
 label .invSumH -text "Betrag $currency" -font TkCaptionFont -justify right -anchor w -width 11
 label .invPayedH -text "Bezahlt $currency" -font TkCaptionFont -justify right -anchor w -width 10
 label .invcommH -text "Anmerkung" -font TkCaptionFont -justify right -anchor w -width 20
-label .invShowH -text "Rechnung anzeigen" -font TkCaptionFont -fg steelblue3 -justify right -anchor e -justify right -width 20
+
+#label .invShowH -text "Rechnung anzeigen" -font TkCaptionFont -fg steelblue3 -justify right -anchor e -justify right -width 20
 
 pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x -padx 10
 pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x -padx 10
 set invF .n.t1.mainF.invF
 set headF .n.t1.mainF.headF
 pack .invNoH .invDatH .invartH .invSumH .invPayedH .invcommH -in $headF -side left
-pack .invShowH -in $headF -side right
+#pack .invShowH -in $headF -side right
 
 
 ########################################################################################
@@ -259,12 +264,11 @@ pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
 label .titel4 -text "Jahresabschlüsse" -font TIT -anchor nw -pady 5 -padx 5 -fg steelblue -bg silver
 pack .titel4 -in .n.t3 -fill x -anchor nw
 
-message .abschlussM -justify left -width 300 -text [mc reportTxt]
-#message .spesenM -justify left -width 300 -text "Text..."
-button .abschlussCreateB -text [mc reportCreate] -command {createReport}
-button .abschlussPrintB -text [mc reportPrint] ;#wird später von obigem Prog. gepackt
+message .repM -justify left -width 300 -text [mc reportTxt]
+button .repCreateBtn -text [mc reportCreate] -command {createReport}
 
-spinbox .abschlussJahrSB -width 4
+spinbox .repJahrSB -width 4
+
 message .news -textvar news -pady 10 -padx 10 -bd 3 -relief sunken -justify center -width 1000 -anchor n -bg steelblue3
 
 pack [frame .n.t3.topF -padx 15 -pady 15] -fill x
@@ -275,34 +279,23 @@ pack [frame .n.t3.leftF] -in .n.t3.mainF -side right -expand 1 -fill both -ancho
 pack [frame .n.t3.rightF] -in .n.t3.mainF -side left -fill y 
 
 pack [frame .n.t3.rightF.saichF] -fill x
-pack .abschlussCreateB -in .n.t3.rightF.saichF -side left
-pack .abschlussJahrSB -in .n.t3.rightF.saichF -side left -padx 20
-pack .abschlussM -in .n.t3.rightF -anchor nw -pady 20
+pack .repCreateBtn -in .n.t3.rightF.saichF -side left
+pack .repJahrSB -in .n.t3.rightF.saichF -side left -padx 20
+pack .repM -in .n.t3.rightF -anchor nw -pady 20
   
   #Create canvas, text window & scrollbar - height & width will be set by createReport
-  canvas .reportC -bg beige -height 500 -width 750
-  text .reportT
+  canvas .repC -bg beige -height 500 -width 750
+  text .repT
 
-  scrollbar .reportSB -orient vertical
-  .reportT conf -yscrollcommand {.reportSB set}
-  .reportSB conf -command {.reportT yview}
+  scrollbar .repSB -orient vertical
+  .repT conf -yscrollcommand {.repSB set}
+  .repSB conf -command {.repT yview}
   
-
-
   #Print button - packed later by canvasReport
-  button .reportPrintBtn -text "[mc reportPrint]" -bg lightgreen
-  pack .reportSB -in .n.t3.leftF -side right -fill y
-
-  pack .reportC -in .n.t3.leftF -side right -fill both
-  
- 
-#.reportC conf -width $w -height $h -bg blue
-#  .reportC create window 0 0 -tags repwin -window .reportT -anchor nw -width $w -height $h
-#  .reportC itemconf repwin -width $w -height $h
-#Execute initial commands if connected to DB
-#catch {pg_connect -conninfo [list host = localhost user = $dbuser dbname = $dbname]} res
-
-pack .news -in .botF -side left -anchor center -expand 1
+  button .repPrintBtn -text "[mc reportPrint]" -bg lightgreen
+  pack .repSB -in .n.t3.leftF -side right -fill y
+  pack .repC -in .n.t3.leftF -side right -fill both
+  pack .news -in .botF -side left -anchor center -expand 1 -fill x
 
 ######################################################################################
 # T A B 4 :  C O N F I G U R A T I O N

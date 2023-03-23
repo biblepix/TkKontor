@@ -123,6 +123,14 @@ proc fillAdrWin {adrId} {
  
   $adrSpin set $adrId
 
+  #Hide .adrDelBtn if address has invoices attached
+  set token [db eval "SELECT objectid FROM invoice WHERE customeroid=$adrId"]
+  if {$token != ""} {
+    .adrDelBtn conf -state disabled
+  } else {
+    .adrDelBtn conf -state normal
+  }
+  
 } ;#END fillAdrWin
 
 proc searchAddress {} {
@@ -201,10 +209,10 @@ proc resetAdrWin {} {
     $e conf -bg lightblue -validate none -fg black -state readonly -readonlybackground lightblue -relief flat -bd 0
   }
 
-  .b0 config -activebackground silver
-  .b1 config -text "Anschrift ändern" -command {changeAddress $adrNo} -activebackground silver
-  .b2 config -text "Anschrift löschen" -command {deleteAddress $adrNo} -activebackground red
-  pack .b1 .b2 .b0 -in .adrF3 -anchor se
+  .adrNewBtn config -activebackground silver
+  .adrChgBtn config -text "Anschrift ändern" -command {changeAddress $adrNo} -activebackground silver
+  .adrDelBtn config -text "Anschrift löschen" -command {deleteAddress $adrNo} -activebackground red
+  pack .adrChgBtn .adrDelBtn .adrNewBtn -in .adrF3 -anchor se
 
   $adrSpin conf -state normal -bg lightblue
   $adrSearch conf -state normal
@@ -255,9 +263,9 @@ proc newAddress {} {
   }
 
   #reconfigure buttons
-  .b1 configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
-  .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin new}
-  pack forget .b0
+  .adrChgBtn configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
+  .adrDelBtn configure -text "Abbruch" -activebackground red -command {resetAdrWin new}
+  pack forget .adrNewBtn
 
 	#clear adrInvWin
 	
@@ -297,7 +305,7 @@ proc clearAddressWin args {
 
 # newAddress - OLD???????????
 ##clears address win & button names
-##called by .b1
+##called by .adrChgBtn
 proc newAddress-OLD {} {
   global adrSpin
 
@@ -316,22 +324,22 @@ proc newAddress-OLD {} {
   $adrSpin delete 0 end
   $adrSpin conf -bg #d9d9d9
 
-  .b1 configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
-  .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
-  pack forget .b0
+  .adrChgBtn configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
+  .adrDelBtn configure -text "Abbruch" -activebackground red -command {resetAdrWin}
+  pack forget .adrNewBtn
 
   return 0
 }
 
 # changeAddress
 ##clears address win & button names
-##called by .b2
+##called by .adrDelBtn
 proc changeAddress {adrNo} {
   clearAddressWin change
   
-  .b1 configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
-  .b2 configure -text "Abbruch" -activebackground red -command {resetAdrWin}
-  pack forget .b0
+  .adrChgBtn configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
+  .adrDelBtn configure -text "Abbruch" -activebackground red -command {resetAdrWin}
+  pack forget .adrNewBtn
   return 0
 }
 
@@ -418,28 +426,20 @@ set tel2 $::tel2
   fillAdrWin $adrno
   fillAdrInvWin $adrno 
   
-  
 } ;#END saveAddress
 
+# deleteAddress
+##only funcional if no invoices attached
+##called by .adrDelBtn (visibility controlled by fillAdrWin)
 proc deleteAddress {adrNo} {
   global db
-  #Check if any invoice is attached
-  set token [db eval "SELECT f_number from invoice where customeroid=$adrNo"]
+  set res [tk_messageBox -message "Wollen Sie die Adresse $adrNo wirklich löschen?" -type yesno -icon warning]
+  if {!$res} {return 1}
 
-  if {$token == ""} {
-
-    set res [tk_messageBox -message "Wollen Sie die Adresse $adrNo wirklich löschen?" -type yesno]
-    if {!$res} {return 1}
-
-    set token [db eval "DELETE FROM address WHERE objectid=$adrNo"]
-    reportResult $token "Adresse $adrNo gelöscht."
-    resetAdrWin
-
-  } else {
-    reportResult $token "Adresse $adrNo nicht gelöscht, da mit Rechnung(en) $token verknüpft."
-  }
-
-} ;#END deleteAddress
+   db eval "DELETE FROM address WHERE objectid=$adrNo"
+   NewsHandler::QueryNews "Adresse $addrNo gelöscht" green
+   resetAdrWin
+}
 
 
 
@@ -636,7 +636,7 @@ pack .confartL .confartnumSB .confartunitL .confartpriceL .confartnameL .confart
   updateArticleList
   resetArticleWin
   setArticleLine TAB4
-  reportResult $token "Artikel $artName gespeichert"
+  NewsHandler::QueryNews "Artikel $artName gespeichert" green
 
 } ;#END saveArticle
 
@@ -645,9 +645,10 @@ proc deleteArticle {} {
   global db
   set artNo [.confartnumSB get]
   set res [tk_messageBox -message "Wollen Sie Artikel $artNo wirklich löschen?" -type yesno]
+  
   if {$res == "yes"} {
-    set token [db eval "DELETE FROM artikel WHERE artnum=$artNo"]
-    reportResult $token "Artikel $artNo gelöscht."
+    db eval "DELETE FROM artikel WHERE artnum=$artNo"
+    NewsHandler::QueryNews "Artikel $artNo gelöscht." green
     updateArticleList
     setArticleLine TAB4
   }
@@ -753,20 +754,6 @@ proc createNewNumber {objectKind} {
 }
 
 
-#TODO where is this used? -adapt to SQLight!
-proc reportResult {token text} {
-  #if error
-  
-  if [db errorcode] {
-  	NewsHandler::QueryNews "$token" red
-
-  #if empty - TODO: falsches ERgebnis bei Zahlungseingang!
-#FOR deletions? insertions?
-  } else {
-
-    NewsHandler::QueryNews "$text $token]" lightgreen
-  }
-}
 
 #TODO - adapt for SQLIGHT!
 proc initialiseDB {dbname} {
