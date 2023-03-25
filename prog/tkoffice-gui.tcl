@@ -252,9 +252,9 @@ label .invartnameL -textvar artName -padx 50
 label .invartunitL -textvar artUnit -padx 20
 label .invarttypeL -textvar artType -padx 20
 
-button .saveinvB -text [mc invEnter]
-button .abbruchinvB -text [mc cancel] -command {resetNewInvDialog} -activebackground red
-pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
+button .invSaveBtn -text [mc invEnter]
+button .invCancelBtn -text [mc cancel] -command {resetNewInvDialog} -activebackground red
+pack .invCancelBtn .invSaveBtn -in .n.t2.bottomF -side right
 
 
 ######################################################################################

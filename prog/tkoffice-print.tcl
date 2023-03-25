@@ -36,7 +36,6 @@ proc detectViewer {docPath docType} {
 } ;#END detectViewer
 
 
-
 # printReport
 ##postscripts report in page setup
 ##called by .repPrintBtn
@@ -57,7 +56,6 @@ set repPartfile report_${jahr}
   report2ps $jahr
 
   #2) if several pages: assemble ps pages to Report...ps
-  if ![file exists $tmpDir/blabla] {
     
 #ns schon da von report2ps!
  #   set report::reportPdfName $reportPdfName
@@ -91,10 +89,7 @@ eval $cmd > $repFullPs
     } ;#END namespace
     
     namespace delete report
-  }
-    
-
-
+  
   #3) View full report for printing
   while ![file exists $repFullPs] {
     after 1000
@@ -114,31 +109,68 @@ eval $cmd > $repFullPs
 
 # printInvoice
 ##fetches InvData for invNo OR ???
-##called by .... in Invoices window & .invPrintBtn?
-proc printInvoice {} {
-  global texDir ?vorlageTex reportDir tmpDir spoolDir templateDir
+##called by 'double click' binding in old Inv list & new inv .invSaveBtn
+proc printInvoice {invNo} {
+  global texDir reportDir tmpDir spoolDir templateDir
 
-#TODO testing alsways retrieving   TODO this can be dangerous > always fetchData???
-#    if ![file exists $docPath] {
+  #A) Find file in spool dir
+  set docPath [setInvPath $invNo pdf]
+  set docTmpPath [setInvPath $invNo tex]
+  set docTmpPdf [setInvPath $invNo pdftmp]
+  set docType pdf 
 
-      if [catch "fetchInvData $invNo"] {
-  puts Notfetched
+  #B) Retrieve from Spool OR retrieve from DB & run Latex
+  if [file exists $docPath] {
+    detectViewer $docPath pdf
+    return 0 
+  }
   
-        NewsHandler::QueryNews "Unable to retrieve invoice data from DB." red 
-        return 1
-      }
-      
-      #Run latex     
-      set texPath [setInvPath $invNo tex]
-      cd $texDir
-      
-			catch {latexInvoice $invNo }
-  
-    
-#    }
-
-
+  if ![catch {fetchInvData $invNo}] {
+    puts "Latexing ..."
+    latexInvoice $invNo
+    after idle detectViewer $docPath pdf
+  }
 }
+
+#  
+#  if [catch {file exists $docPath} err1] {
+#puts "no docpath"
+#    
+#    if ![catch {fetchInvData $invNo} err2] {
+#puts "no data"
+#      
+#      set texPath [setInvPath $invNo tex]
+#      
+#puts Latexing...
+#		  latexInvoice $invNo
+#		}
+#		  
+#	}
+
+proc nejutar {} {
+  NewsHandler::QueryNews "Die Rechnung $invNo wird nun angezeigt. Zum Druck betätigen Sie bitte die Druckfunktion des Anzeigeprogramms." lightblue
+  
+  #Try viewing invoice
+  after idle detectViewer $docPath pdf
+return  
+
+  #Evaluate errors if any  
+  if {[info exists err3] && $err3 != ""} {
+  
+    NewsHandler::QueryNews "$err3" red
+    
+    if {[info exists err1] && $err1 != ""} {
+      NewsHandler::QueryNews "Invoice No. $invNo: $err1" orange 
+    }
+    if {[info exists err2] && $err2 != ""} {
+      NewsHandler::QueryNews "Unable to retrieve invoice data $invNo from databank" orange
+    }
+    return 1
+  } {
+    return 0
+  }
+  
+} ;#END printInvoice
 	
 
 # latexInvoice
@@ -149,9 +181,8 @@ proc printInvoice {} {
 # eval [list exec -- pdflatex --interaction=nonstopmode] $args
 proc latexInvoice {invNo} {
 
-  global db adrSpin spoolDir vorlageTex texDir tmpDir invTex
+  global spoolDir vorlageTex texDir tmpDir
 
-  #catch {namespace delete Latex}
   namespace eval Latex {}
   set Latex::invTexPath [setInvPath $invNo tex]
   set Latex::tmpDir $tmpDir
@@ -159,23 +190,30 @@ proc latexInvoice {invNo} {
 
 	#Copy original template each time to texDir
 	file copy -force $vorlageTex $texDir
-
+  cd $texDir
+  
   namespace eval Latex {
-    eval [list exec -- pdflatex -interaction nonstopmode -output-directory $tmpDir $invTexPath]
+    #catch is inevitable, too much useless output - so no control other than below...
+    catch { exec -- pdflatex -dBATCH -interaction nonstopmode -output-directory $tmpDir $invTexPath] }
   }  
 
-	set invPdfTmpPath [setInvPath $invNo pdftmp] 
-  set invPdfPath [setInvPath $invNo pdf]
-
-	#copy PDF to spool
-	while ![file exists $invPdfTmpPath] {
-		after 2000
-	}
-
-  file copy -force $invPdfTmpPath $invPdfPath
-  
-  namespace delete Latex
+	#copy PDF to spoolDir
+	
+#	while ![file exists $invPdfTmpPath] {
+#puts "$invPdfTmpPath hali yok"
+#		after 500
+#	}
+proc filecopy {} {
+global invNo spoolDir
+file copy -force [setInvPath $invNo pdftmp] $spoolDir
+}
+ after idle {
+ filecopy  
+#  NewsHandler::QueryNews "Rechnung Nr. $invNo ist jetzt in $spoolDir zur Weiterbearbeitung" green
     
+after idle  namespace delete Latex
+  }
+  
 } ;#END latexInvoice
 
 

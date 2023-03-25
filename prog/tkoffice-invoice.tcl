@@ -2,7 +2,7 @@
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
 # Updated for use with SQLite: 9sep22
-# Updated 21mch23
+# Updated 25mch23
 
 source $confFile
 ################################################################################################################
@@ -67,8 +67,8 @@ pack .mengeE .invartunitL .invartnameL .invartpriceL -in .n.t2.f2 -side left -fi
 ##TODO testing
 #  .abbruchinvB conf -state disabled
  # .abbruchinvB conf -activebackground red -state normal
-  .saveinvB conf -state disabled -command "
-    .saveinvB conf -activebackground #ececec -state normal
+  .invSaveBtn conf -state disabled -command "
+    .invSaveBtn conf -activebackground #ececec -state normal
     doSaveInv
   "
 } ;#END resetNewInvDialog
@@ -88,9 +88,9 @@ proc addInvRow {} {
   }
 
   #Configure Abbruch button
-  pack .abbruchinvB .saveinvB -in .n.t2.bottomF -side right
-  .saveinvB conf -activebackground skyblue -state normal
-  .abbruchinvB conf -activebackground red -state normal -command {resetNewInvDialog}
+  pack .invCancelBtn .invSaveBtn -in .n.t2.bottomF -side right
+  .invSaveBtn conf -activebackground skyblue -state normal
+  .invCancelBtn conf -activebackground red -state normal -command {resetNewInvDialog}
 
 
   ##get last namespace no.
@@ -350,12 +350,11 @@ proc saveInv2DB {} {
      NewsHandler::QueryNews "[mc invNotsaved $invNo]:\n $token ]" red
      
     return 1
+  
   } else {
    	NewsHandler::QueryNews "[mc invSaved $invNo]" green
     fillAdrInvWin $adrNo
-    
-#TODO! wrong inv number printed !!!!!!!!!!!!!!!!!!!
-.saveinvB conf -text [mc printInv] -command "printDocument $invNo inv" -bg orange
+    .invSaveBtn conf -text [mc printInv] -command "printInvoice $invNo" -bg orange
 
     return 0
   } 
@@ -403,6 +402,8 @@ proc fillAdrInvWin {adrId} {
 
     set invNoT [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
     set nTuples [llength $invNoT]
+
+  	#exit if no invoices found
   	if {$nTuples == -1} {return 1}
 
 		#NOTE: these are no more tokens, but single items or lists! 
@@ -424,6 +425,10 @@ proc fillAdrInvWin {adrId} {
     }
     set ::umsatz [roundDecimal [expr $verbucht + $auslage]]
         
+        #set modulo initial vars
+        set wechselfarbe #d9d9d9
+        set normal $wechselfarbe
+
     #Create row per invoice
     for {set n 0} {$n<$nTuples} {incr n} {
     
@@ -468,7 +473,9 @@ proc fillAdrInvWin {adrId} {
         $invF.$n.payedL conf -text $bezahlt
 
         ##create showInvoice button, to show up only if inv not empty
-        catch {button $invF.$n.invshowB}
+        #catch {button $invF.$n.invshowB}
+        
+        #create comment btn
 			  catch {label $invF.$n.commM -width 50 -justify left -anchor w -padx 35}
 
 			  if {$ts==3} {
@@ -479,10 +486,7 @@ proc fillAdrInvWin {adrId} {
 			  
         #If 1 or 2 make entry widget
 			  } else {
-			  
-			  
- 
-			  
+		  
           $invF.$n.payedL conf -fg red    
           catch {entry $invF.$n.zahlenE -bg beige -fg black -width 7 -justify left}
   
@@ -494,14 +498,12 @@ proc fillAdrInvWin {adrId} {
           set gesamtbetrag "Zahlbetrag eingeben und mit Tab-Taste quittieren"
           $invF.$n.commM conf -fg red -textvar gesamtbetrag
 				  pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.beschr $invF.$n.sumL $invF.$n.payedL $invF.$n.zahlenE $invF.$n.commM -side left
-		  
         #if 2 (Teilzahlung) include payed amount
 				  if {$ts==2} {
 
 					  $invF.$n.commM conf -fg maroon -textvar restbetrag
 					  $invF.$n.payedL conf -fg maroon
 				  }
-
 			  }
 
         #Create Show button if items not empty
@@ -517,28 +519,37 @@ proc fillAdrInvWin {adrId} {
           #pack $invF.$n.invshowB -anchor e -side right
    #     }
 
-			#Bind invNo labels to highlighting on hover & command on double-click
-			bind $invF.$n.invNoL <Enter> "%W conf -bg lightblue"
-			bind $invF.$n.invNoL <Leave> "%W conf -bg #d9d9d9"
-			bind $invF.$n.invNoL <Double-1> "printDocument $invNo inv"
+			
+        #Modulo: colour lines alternately if more than 5 lines
+        if [expr $n % 2] {set wechselfarbe silver} {set wechselfarbe $normal}
+        foreach w [winfo children $invF.$n] {$w conf -bg $wechselfarbe}
+        
+        #Bind invNo labels to highlighting on hover & command on double-click
+			  bind $invF.$n.invNoL <Enter> "%W conf -bg lightblue"
+			  bind $invF.$n.invNoL <Leave> "%W conf -bg $wechselfarbe"
+			  bind $invF.$n.invNoL <Double-1> "printInvoice $invNo"
+ 		
+  		} ;#END ns $n
 
-  		} ;#end for loop
-    } ;#END namspace $rowNo
-    
+    } ;#END for loop
+ 
+    #Recolour lines to normal if only few
+    if {$n < 5} {
+      foreach f [winfo children $invF] {
+        foreach w [winfo children $f] {
+          $w conf -bg $normal
+        }
+      }
+    }
+
     
     #TODO what's the gig now (see above) ;;;;;;;;;;;;;::::::::::::::::::::
     #what does the ::verbucht::anzeige var do????????????????????????????
     #if {$anzeige} {.invShowH conf -state normal} {.invShowH conf -state disabled -bg #d9d9d9}
     
-  } ;#END namespace verbucht
+  } ;#END ns verbucht
 
   set ::credit [updateCredit $adrId]
-  
-  
-#  catch {wm destroy $invF.c}
-#canvas $invF.c -bg beigef
-#  $invF.c create window 0 0 -window $invF -anchor nw
-#  pack $invF.c -anchor nw
   
 } ;#END fillAdrInvWin
 

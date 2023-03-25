@@ -39,7 +39,7 @@ mcset de mail "E-Mail"
 mcset de www "Internet"
 
 mcset de spesen "Spesenverwaltung"
-mcset de spesenTxt "Hier können Sie jährlich anfallende Geschäftskosten auflisten, die jeweils im Jahresabschluss automatisch abgezogen werden."
+mcset de spesenTxt "Hier können Sie jährlich anfallende Geschäftskosten auflisten, die jeweils im Jahresabschlussbericht automatisch berechnet und abgezogen werden."
 
 mcset de storni "Storni"
 mcset de storniTxt "Hier können Sie fehlerhafte Buchungen stornieren (rückbuchen). \nGeben Sie eine Rechnungsnummer ein und bestätigen Sie mit Tabulatortaste."

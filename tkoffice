@@ -1,5 +1,5 @@
 #!/usr/bin/tclsh
-# ~/TktkoDir/tkoDir.tcl
+# ~/tkoffice/tkoffice
 # Main launcher prog for TktkoDir Business Software
 # Installation requirements: Tcl/Tk library, SQLite database
 # Updated: 19aug22
@@ -25,7 +25,7 @@ set templateDir [file join $tkoDir templates]
 
 set dumpDir [file join $tkoDir dump]
 set makeConfig [file join $progDir makeConfig.tcl]
-set texVorlage [file join $texDir $templateDir invoice_template.tex]
+set vorlageTex [file join $templateDir invoice_template.tex]
 set reportTexFile "Abschluss.tex"
 set msgDir [file join $tkoDir msg]
 
@@ -33,6 +33,7 @@ file mkdir $confDir $dumpDir $spoolDir $msgDir $texDir $templateDir $msgDir
 
 msgcat::mcload $msgDir
   
+#TODO not used!
 proc chooseTkoLang {}  {
   global tko
   package require Tk
@@ -70,4 +71,3 @@ if [catch {source $confFile} res] {
 	msgcat::mclocale $lang
 
 }
-
