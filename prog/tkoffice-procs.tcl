@@ -1,11 +1,13 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Updated: 11mch23
+# Updated: 22apr23
 
 ###############################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S
 ###############################################################
+
+
 
 # roundDecimal
 ##rounds any sum to $sum.$dp
@@ -94,32 +96,44 @@ proc setAdrList {} {
 
 proc fillAdrWin {adrId} {
   global adrSpin db adrWin1 adrWin2 adrWin3 adrWin4 adrWin5
-	
+		
   #set variables
 	set name1 [db eval "SELECT name1 FROM address WHERE objectid=$adrId"]
 	set name2 [db eval "SELECT name2 FROM address WHERE objectid=$adrId"]
 	set street [db eval "SELECT street FROM address WHERE objectid=$adrId"]
 	set city [db eval "SELECT city FROM address WHERE objectid=$adrId"]
 	set ::zip  [db eval "SELECT zip FROM address WHERE objectid=$adrId"]
-
-  #Export if not empty
-  set tel1 [db eval "SELECT telephone FROM address WHERE objectid=$adrId"]
-  set tel2 [db eval "SELECT mobile FROM address WHERE objectid=$adrId"]
-  #set fax  [db eval "SELECT telefax FROM address WHERE objectid=$adrId"]
-  set mail [db eval "SELECT email FROM address WHERE objectid=$adrId"]
-  set www  [db eval "SELECT www FROM address WHERE objectid=$adrId"]
-
+  #eliminate {...}
   regsub {({)(.*)(})} $name1 {\2} ::name1
   regsub {({)(.*)(})} $name2 {\2} ::name2
   regsub {({)(.*)(})} $street {\2} ::street
   regsub {({)(.*)(})} $city {\2} ::city
-  regsub {({)(.*)(})} $tel1 {\2} ::tel1
-  regsub {({)(.*)(})} $tel2 {\2} ::tel2
-
-  if {[string is punct $tel1] || $tel1==""} {set ::tel1 "Telefon1" ; .tel1E conf -fg silver} {set ::tel1 $tel1}
-  if {[string is punct $tel2] || $tel2==""} {set ::tel2 "Telefon2" ; .tel2E conf -fg silver} {set ::tel2 $tel2}
-  if {[string is punct $mail] || $mail==""} {set ::mail "Mail" ; .mailE conf -fg silver} {set ::mail $mail}
-  if {[string is punct $www] || $www==""} {set ::www "Internet" ; .wwwE conf -fg silver} {set ::www $www}
+  
+  #preset greyed out fields
+	.tel1E conf -fg grey; set ::tel1 "Phone: "
+	.tel2E conf -fg grey; set ::tel2 "Mobile: "
+	.mailE conf -fg grey; set ::mail "Mail: "
+	.wwwE conf -fg grey;  set ::www "Internet: "
+	
+  #Append values if existent
+  ##phone
+  set res [db eval "SELECT telephone FROM address WHERE objectid=$adrId"]
+  regsub {({)(.*)(})} $res {\2} res
+  if {$res != ""} {append ::tel1 $res; .tel1E conf -fg black}
+puts $res
+  ##mobile
+  set res [db eval "SELECT mobile FROM address WHERE objectid=$adrId"]
+  regsub {({)(.*)(})} $res {\2} res
+  if {$res != ""} {append ::tel2 $res; .tel2E conf -fg black}
+  ##mail
+  set res [db eval "SELECT email FROM address WHERE objectid=$adrId"]
+  regsub {({)(.*)(})} $res {\2} res
+  if {$res != ""} {append ::mail $res; .mailE conf -fg black}
+puts $res
+  ##www
+  set res [db eval "SELECT www FROM address WHERE objectid=$adrId"]
+  regsub {({)(.*)(})} $res {\2} res
+  if {$res != ""} {append ::www $res; .wwwE conf -fg black}
  
   $adrSpin set $adrId
 
@@ -129,7 +143,7 @@ proc fillAdrWin {adrId} {
     .adrDelBtn conf -state disabled
   } else {
     .adrDelBtn conf -state normal
-  }
+  } 
   
 } ;#END fillAdrWin
 
@@ -219,11 +233,12 @@ proc resetAdrWin {} {
   .adrF2 conf -bg lightblue
   catch {pack forget .adrClearSelB}
 
-  #Set address to spinbox or, if just changed, to changed address
+  #Set address to spinbox or, if just changed, to changed address - TODO zis aynt workin!
   setAdrList  
   fillAdrWin [$adrSpin get]
   fillAdrInvWin [$adrSpin get]
-}
+
+} ;#END resetAdrWin
 
 proc newAddress {} {
   global adrSpin
@@ -266,10 +281,6 @@ proc newAddress {} {
   .adrChgBtn configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
   .adrDelBtn configure -text "Abbruch" -activebackground red -command {resetAdrWin new}
   pack forget .adrNewBtn
-
-	#clear adrInvWin
-	
-	
 	
 }
 
@@ -303,34 +314,6 @@ proc clearAddressWin args {
 
 }
 
-# newAddress - OLD???????????
-##clears address win & button names
-##called by .adrChgBtn
-proc newAddress-OLD {} {
-  global adrSpin
-
-  clearAddressWin new
-
-#  set ::name1 "Anrede/Firma"
-#  set ::name2 "Name"
-#  set ::street "Strasse"
-#  set ::zip "PLZ"
-#  set ::city "Ortschaft"
-#  set ::tel1 "Telefon"
-#  set ::tel2 "Telefon"
-#  set ::www "Internet"
-#  set ::mail "E-Mail"
-  
-  $adrSpin delete 0 end
-  $adrSpin conf -bg #d9d9d9
-
-  .adrChgBtn configure -text "Anschrift speichern" -activebackground lightgreen -command {saveAddress}
-  .adrDelBtn configure -text "Abbruch" -activebackground red -command {resetAdrWin}
-  pack forget .adrNewBtn
-
-  return 0
-}
-
 # changeAddress
 ##clears address win & button names
 ##called by .adrDelBtn
@@ -356,12 +339,17 @@ proc saveAddress {} {
 	set street [.streetE get]
 	set zip [.zipE get]
 	set city [.cityE get]
-	set tel1 [.tel1E get]
-  #set tel2 [.tel2E get]
- # set mail [.mailE get]
+
+  set tel1 [.tel1E get]
+  set tel2 [.tel2E get]
+  set mail [.mailE get]
   set www [.wwwE get]
-set mail $::mail
-set tel2 $::tel2
+
+  #avoid saving empty or faulty strings
+  if { ![regexp {[0-9]} $tel1] } {set tel1 ""}
+  if { ![regexp {[0-9]} $tel2] } {set tel2 ""}
+  if { ![regexp {@} $mail] } {set mail ""}
+  if { [string equal "Internet" $www] } {set www ""}
 
 	#A: save new
 	if {$adrno == ""} {
@@ -757,27 +745,37 @@ proc createNewNumber {objectKind} {
 
 #TODO - adapt for SQLIGHT!
 proc initialiseDB {dbname} {
-  global ?db?
-  #1. Create DB
+  global tkoDir 
+  
+  package require sqlite3
+  set dbDir [file join $tkoDir db]
+  file mkdir $dbDir 
+  set dbPath [file join $dbDir tkoffice.db]
+  
+  #1. CREATE & INITIALISE DB
+  sqlite3 $dbPath
+  sqlite3 db $dbPath
 
-  #2. Create tables
+  #2. CREATE TABLES
 
-    ##1. Article table
-    set token [db eval "CREATE TABLE artikel (
+    ##1. table address    
+    
+    ##2. table artikel
+    db eval "CREATE TABLE artikel (
       artnum SERIAL,
       artname text NOT NULL,
       artunit text NOT NULL,
       artprice NUMERIC
     )"
-    ]
-  ##2. Spesen
-  set token [db eval "CREATE TABLE spesen (
+    
+    ##3. table spesen
+    db eval "CREATE TABLE spesen (
     num SERIAL,
     name text NOT NULL,
     value NUMERIC NOT NULL
   )"
-  ]
-  ##3. Invoice
+
+  ##4. table invoice
   #Invoice with yearly changing numbers!
   set token [db eval "CREATE TABLE invoice (
     ?f_number? SERIAL,
@@ -786,6 +784,7 @@ proc initialiseDB {dbname} {
     ...
   )"
   ]
+
   #include this command somewhere in tkoffice for future Jahreswechsel!!
   ALTER SEQUENCE [get correct serial name from above, prob. invoice_num_sec ] RESTART WITH "(GET CURRENT YEAR...)0001";
 
@@ -793,26 +792,50 @@ proc initialiseDB {dbname} {
 
 
 # dumpDB
-##called by 'Datenbank sichern' button
+##makes a copy of the current database
+##called by .dumpdbBtn
 proc dumpDB {} {
 
-  global dbname
+  global dbname dumpDir
   
-  file mkdir $dumpDir
-
   set date [clock format [clock seconds] -format %d-%m-%Y]
-  set dumpfile $dbname_backup-${date}.sql
+  set dumpfile ${dbname}_${date}.bak
   set dumppath [file join $dumpDir $dumpfile]
-  
-	set err [db backup $dumppath]
+
+  db backup $dumppath
  
   if [db errorcode] {
-    NewsHandler::QueryNews "Datenbank konnte nicht gesichert werden;\n$err" red
+    NewsHandler::QueryNews "Datenbank konnte nicht gesichert werden" red
   } else {
     NewsHandler::QueryNews "Datenbank erfolgreich gesichert in $dumppath" lightgreen
   }
-  
-#TODO: Add "Datenbank wiederherstellen" Btn in TAB4! & write proc
-#Achtung: vor "Wiederherstellen" unbedingt automatische Tagessicherung machen!
- 
 }
+
+# restoreDB
+##restores DB from given file dump path
+##path set by user after tk_getOpenFile
+##called by .restoredbBtn
+proc restoreDB {} {  
+  global dumpDir
+ 
+  set dumpPath [tk_getOpenFile -initialdir $dumpDir]
+  if {$dumpPath ==""} {return 1}
+  
+  NewsHandler::QueryNews "[mc restoreDbTxt]" lightblue
+
+  #1. Dump current DB 
+  dumpDB
+
+# From https://www.sqlite.org/tclsqlite.html: The "restore" method copies the content from a separate database file into the current database connection, overwriting any preexisting content. The optional target-database argument tells which database in the current connection should be overwritten with new content. The default value is main (or, in other words, the primary database file). To repopulate the TEMP tables use temp. To overwrite an auxiliary database added to the connection using the ATTACH command, use the name of that database as it was assigned in the ATTACH command. The source-filename is the name of an existing well-formed SQLite database file from which the content is extracted.
+ 
+  #2. Restore selected backup into DB
+  after idle db restore $dumpPath
+ 
+  if [db errorcode] {
+    NewsHandler::QueryNews "Datenbank konnte nicht wiederhergestellt werden" red
+  } else {
+    NewsHandler::QueryNews "Datenbank erfolgreich wiederhergestellt" lightgreen
+  }     
+ 
+} ;#END restoreDB
+

@@ -1,14 +1,17 @@
 # makeConfig
 ##saves confFile, overwriting old
-##called by .saveConfigB "Einstellungen speichern" button 
+##called by .saveConfigB "Einstellungen speichern" button &
+##called by tkoffice when run first time
 proc makeConfig {} {
   global confFile adrpos
 
+  set dbname "tkoffice.db"
+  set dbPath [file join $dbDir $dbname]
   #Get DB name & User
-  set dbname [.confdbnameE get]
-  set dbuser [.confdbUserE get]
-  append setDbName set { } dbname { } \" $dbname \"
-  append setDbUser set { } dbuser { } \" $dbuser \"
+#  set dbname [.confdbnameE get]
+#  set dbuser [.confdbUserE get]
+#  append setDbName set { } dbname { } \" $dbname \"
+#  append setDbUser set { } dbuser { } \" $dbuser \"
 
   #Get currency (default set to CHF)
   append setCurrency set { } currency { } \" [.billcurrencySB get] \"
@@ -69,8 +72,10 @@ proc makeConfig {} {
   
   #Overwrite config file with new entries, deleting old
   set chan [open $confFile w]
+
     puts $chan $setDbName
     puts $chan $setDbUser
+
     puts $chan $setLetterclass
     puts $chan $setCurrency
     puts $chan $setVat

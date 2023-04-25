@@ -4,7 +4,7 @@
 # Updated for use with SQLite: 9sep22
 # Updated 25mch23
 
-source $confFile
+catch {source $confFile}
 ################################################################################################################
 ################# N E W   I N V O I C E   P R O C S ############################################################
 ################################################################################################################
@@ -241,7 +241,7 @@ proc doSaveInv {} {
 ##saves new invoice to DB
 ##called by doSaveInv
 proc saveInv2DB {} {
-  global db env msg texDir itemFile
+  global db env msg texDir itemFile name1 name2 city
   global cond ref comm auftrDat vat
   set adrNo [.adrSB get]
 
@@ -250,10 +250,13 @@ proc saveInv2DB {} {
 	namespace eval Latex {}
 	set ::Latex::invNo $invNo
 	
+	
 	#Get current vars from GUI
-  set shortAdr "$::name1 $::name2, $::city"
+  set shortAdr "$name1 $name2, $city"
   set shortDesc $rows::beschr
- # set subtot $rows::buch
+  
+  
+  # set subtot $rows::buch
   set invTotal $rows::bill
   set auslage $rows::auslage
     
@@ -400,8 +403,13 @@ proc fillAdrInvWin {adrId} {
     set adrId [.adrSB get]
     set custId [db eval "SELECT ts FROM address WHERE objectid = $adrId"]
 
-    set invNoT [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
-    set nTuples [llength $invNoT]
+
+set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
+#TODO ...
+#    set invL [lsort -decreasing [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]]
+    set nTuples [llength $invL]
+
+
 
   	#exit if no invoices found
   	if {$nTuples == -1} {return 1}
@@ -428,7 +436,7 @@ proc fillAdrInvWin {adrId} {
         #set modulo initial vars
         set wechselfarbe #d9d9d9
         set normal $wechselfarbe
-
+        
     #Create row per invoice
     for {set n 0} {$n<$nTuples} {incr n} {
     
@@ -448,7 +456,7 @@ proc fillAdrInvWin {adrId} {
 			  } 
 			  
 			  set ts [lindex $::verbucht::statusT $n]
-			  set invNo [lindex $::verbucht::invNoT $n]
+			  set invNo [lindex $::verbucht::invL $n]
         set invdat [lindex $::verbucht::invDatT $n]
 			  set beschr [lindex $::verbucht::beschrT $n]
         set comment [lindex $::verbucht::commT $n]
@@ -472,9 +480,6 @@ proc fillAdrInvWin {adrId} {
         catch {label $invF.$n.payedL -width 13 -justify right -anchor e}
         $invF.$n.payedL conf -text $bezahlt
 
-        ##create showInvoice button, to show up only if inv not empty
-        #catch {button $invF.$n.invshowB}
-        
         #create comment btn
 			  catch {label $invF.$n.commM -width 50 -justify left -anchor w -padx 35}
 
@@ -490,7 +495,6 @@ proc fillAdrInvWin {adrId} {
           $invF.$n.payedL conf -fg red    
           catch {entry $invF.$n.zahlenE -bg beige -fg black -width 7 -justify left}
   
-  #TODO was stimmt hier nicht?        
           $invF.$n.zahlenE conf -validate focusout -vcmd "savePaymentEntry %P %W $n"
 
 			    set ::verbucht::eingabe 1
@@ -505,34 +509,21 @@ proc fillAdrInvWin {adrId} {
 					  $invF.$n.payedL conf -fg maroon
 				  }
 			  }
-
-        #Create Show button if items not empty
-        set itemsT $::verbucht::itemsT
-        catch {set itemlist [lindex $itemsT $n] }
-        
-        
-        
-  #TODO change for SQLite! ??????????????????
-   #     if {[pg_result $itemsT -error] == "" && [info exists itemlist]} {
-          set ::verbucht::anzeige 1
-          #$invF.$n.invshowB conf -width 40 -padx 40 -image $::verbucht::printBM -command "printDocument $invNo inv"
-          #pack $invF.$n.invshowB -anchor e -side right
-   #     }
-
 			
         #Modulo: colour lines alternately if more than 5 lines
+        set normal #d9d9d9
         if [expr $n % 2] {set wechselfarbe silver} {set wechselfarbe $normal}
         foreach w [winfo children $invF.$n] {$w conf -bg $wechselfarbe}
         
         #Bind invNo labels to highlighting on hover & command on double-click
-			  bind $invF.$n.invNoL <Enter> "%W conf -bg lightblue"
+			  bind $invF.$n.invNoL <Enter> "%W conf -bg orange"
 			  bind $invF.$n.invNoL <Leave> "%W conf -bg $wechselfarbe"
 			  bind $invF.$n.invNoL <Double-1> "printInvoice $invNo"
  		
   		} ;#END ns $n
 
     } ;#END for loop
- 
+
     #Recolour lines to normal if only few
     if {$n < 5} {
       foreach f [winfo children $invF] {
@@ -541,12 +532,6 @@ proc fillAdrInvWin {adrId} {
         }
       }
     }
-
-    
-    #TODO what's the gig now (see above) ;;;;;;;;;;;;;::::::::::::::::::::
-    #what does the ::verbucht::anzeige var do????????????????????????????
-    #if {$anzeige} {.invShowH conf -state normal} {.invShowH conf -state disabled -bg #d9d9d9}
-    
   } ;#END ns verbucht
 
   set ::credit [updateCredit $adrId]
@@ -558,7 +543,7 @@ proc fillAdrInvWin {adrId} {
 ##composes invoice name from company short name & invoice number
 ##returns invoice path with required ending: TEX + PDF
 ##required types: tex / pdf / pdftmp
-##called by printDocument
+##called by printInvoice
 proc setInvPath {invNo type} {
   global spoolDir myComp vorlageTex tmpDir
   
@@ -588,19 +573,7 @@ proc setInvPath {invNo type} {
 } ;#END setInvPath
 
 
-
-
-# missing operand at _@_
-#in expression "0.00 + _@_"
-#missing operand at _@_
-#in expression "0.00 + _@_"
-#    (parsing expression "0.00 + ")
-#    invoked from within
-#"expr $oldPayedsum + $newPayedsum"
-#    (procedure "savePaymentEntry" line 32)
-#
-# savePaymentEntry #TODO see error above!!!!
-#passiert beim Eintreten/Austreten? wenn keine Zahl angegeben
+# savePaymentEntry
 ##called by fillAdrInvWin by $invF.$n.zahlenE entry widget
 proc savePaymentEntry {newPayedsum curEName ns} {
   global db invF
@@ -612,13 +585,16 @@ proc savePaymentEntry {newPayedsum curEName ns} {
   set newPayedsum [$curEName get]
 
   #avoid non-digit amounts
-  if ![string is double $newPayedsum] {
+  if [string is false $newPayedsum] {
     $curEName delete 0 end
     $curEName conf -validate focusout -vcmd "savePaymentEntry %P %W $ns"
     NewsHandler::QueryNews "Fehler: Konnte Zahlbetrag nicht speichern." red
     return 1
   }
-  
+
+#puts $newPayedsum
+#return
+
   set invT [db eval "SELECT payedsum,finalsum,auslage,customeroid FROM invoice WHERE f_number=$invNo"]
   set oldPayedsum [lindex $invT 0]
   set buchungssumme [lindex $invT 1]
@@ -801,7 +777,7 @@ proc fetchInvData {invNo} {
   FROM address WHERE ts=$adrNo"
   ]
   
-#make sure below signs are escaped since they interfere with LaTex commands
+  #make sure below signs are escaped since they interfere with LaTex commands
   lappend custAdr [lindex $adrToken 0] {\\}
   lappend custAdr [lindex $adrToken 1] {\\}
   lappend custAdr [lindex $adrToken 2] {\\}

@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17
 # Updated for use with SQlite: Sep22
-# Updated 21mch23
+# Updated 28mch23
 		
 set version 2.0
 set px 5
@@ -12,13 +12,31 @@ package require Img
 
 #Initiate Sqlite DB
 package require sqlite3
-sqlite3 db $dbname
 
+if [catch {source $confFile}] {
+  set initial 1
+  
+  tk_messageBox -type ok -icon warning -message "Sie müssen das Programm erst einrichten. Wir wechseln nun auf die Einrichtungsseite."
+ 
+  set dbname \"dbname\"
+  set currency £   
+  set cond1 {}
+  set cond2 {}
+  set cond3 {}
+
+} else {
+
+  sqlite3 db $dbPath
+  set initial 0
+
+}
+
+#TODO add catches?
+source [file join $progDir tkoffice-setup.tcl]
 source [file join $progDir tkoffice-procs.tcl]
 source [file join $progDir tkoffice-invoice.tcl]
 source [file join $progDir tkoffice-report.tcl]
 source [file join $progDir tkoffice-print.tcl]
-source $confFile
 
 #Create title font
 font create TIT
@@ -29,7 +47,7 @@ pack [frame .topF -bg steelblue3] -fill x
 pack [frame .botF -bg steelblue3] -fill x -side bottom
 
 #Firmenname
-label .firmaL -text "$myComp" -font "TkHeadingFont 20 bold" -fg silver -bg steelblue3 -anchor w
+label .firmaL -textvar myComp -font "TkHeadingFont 20 bold" -fg silver -bg steelblue3 -anchor w
 pack .firmaL -in .topF -side right -padx 10 -pady 3 -anchor e
 
 #Create Notebook: (maxwidth+maxheight important to avoid overlapping of bottom frame)
@@ -52,7 +70,6 @@ pack .n -anchor center -padx 15 -pady 15 -fill x
 set winW [winfo width .n]
 
 button .abbruchB -text "Programm beenden" -activebackground red -command {
-	#catch {pg_disconnect $dbname}
 	db close 
 	exit
 	}
@@ -115,7 +132,6 @@ entry .zipE -width 7 -textvar zip -justify left
 entry .cityE -width 43 -textvar city -justify left
 entry .tel1E -width 25 -textvar tel1 -justify right
 entry .tel2E -width 25 -textvar tel2 -justify right
-#entry .faxE -width 25 -textvar fax -justify right
 entry .mailE -width 25 -textvar mail -justify right
 entry .wwwE -width 25 -textvar www -justify right
 
@@ -145,7 +161,9 @@ pack $adrSearch .adrNewBtn .adrChgBtn .adrDelBtn -in .adrF3 -anchor ne
 
 #Create "Rechnungen" Titel
 label .adrInvTitel -justify center -text "Verbuchte Rechnungen" -font TIT -pady 5 -padx 5 -anchor w -fg steelblue -bg silver
-label .adrInvInfo -padx 5 -pady 0 -anchor w -fg steelblue -bg silver -text "Double-click on number to view"
+
+label .adrInfoPfeil -text "\u2193" -fg red -bg silver -font bold
+label .adrInvInfo -anchor w -fg grey -text "[mc viewInv]"
 
 label .creditL -text "Kundenguthaben: $currency " -font "TkCaptionFont"
 label .credit2L -text "\u2196 wird bei Zahlungseingang aktualisiert" -font "TkIconFont" -fg grey
@@ -153,9 +171,10 @@ message .creditM -textvar credit -relief sunken -width 50
 label .umsatzL -text "Kundenumsatz: $currency " -font "TkCaptionFont"
 message .umsatzM -textvar umsatz -relief sunken -bg lightblue -width 50
 
-pack .adrInvTitel -in .n.t1.mainF.f3 -anchor w -fill x -padx 10 -pady 5
-pack .adrInvInfo -in .n.t1.mainF.f3 -anchor w -padx 10 -pady 0
-
+pack .adrInvTitel -in .n.t1.mainF.f3 -anchor w -fill x -padx 10 -pady 0
+pack .adrInfoPfeil -in .n.t1.mainF.f3 -anchor w -padx 10 -side left
+pack .adrInvInfo -in .n.t1.mainF.f3 -anchor w -side left
+  
 #Umsatz unten
 pack .creditL .creditM .credit2L -in .umsatzF -side left -anchor w
 pack .umsatzM .umsatzL -in .umsatzF -side right -anchor e
@@ -301,90 +320,7 @@ pack .repM -in .n.t3.rightF -anchor nw -pady 20
 # T A B 4 :  C O N F I G U R A T I O N
 ######################################################################################
 
-
-#DATENBANK ERSTELLEN & SICHERN
-label .dumpdbT -text "Datenbank verwalten" -font "TkHeadingFont"
-message .dumpdbM -width 800 -text "Es ist ratsam, die Datenbank regelmässig zu sichern. Durch Betätigen des Knopfs 'Datenbank sichern' wird jeweils eine Tagessicherung der gesamten Datenbank im Ordner $dumpDir abgelegt. Bei Problemen kann später der jeweilige Stand der Datenbank mit dem Kommando \n\tsu postgres -c 'psql $dbname < $dbname-\[DATUM\].sql' \n wieder eingelesen werden. Das Kommando 'psql' (Linux) muss durch den Datenbank-Nutzer in einer Konsole erfolgen."
-button .dumpdbB -text "Datenbank sichern" -command {dumpdb}
-pack .dumpdbT -in .n.t4.f2 -anchor nw
-pack .dumpdbM -in .n.t4.f2 -anchor nw -side left
-pack .dumpdbB -in .n.t4.f2 -anchor se -side right
-
-#DATENBANK EINRICHTEN
-label .confdbT -text "Datenbank einrichten" -font "TkHeadingFont"
-message .confdbM -width 800 -text "Fürs Einrichten der PostgreSQL-Datenbank sind folgende Schritte nötig:\n1. Das Programm PostgreSQL über die Systemsteuerung installieren.\n2. (optional) Einen Nutzernamen für PostgreSQL einrichten, welcher von TkOffice auf die Datenbank zugreifen darf. Normalerweise wird der privilegierte Nutzer 'postgres' automatisch erstellt. Sonst in einer Konsole als root (su oder sudo) folgendes Kommando eingeben: \n\t sudo useradd postgres \n3. Den Nutzernamen und einen beliebigen Namen für die TkOffice-Datenbank hier eingeben (z.B. tkofficedb).\n4. Den Knopf 'Datenbank erstellen' betätigen, um die Datenbank und die von TkOffice benötigten Tabellen einzurichten.\n5. TkOffice neu starten und hier weitermachen (Artikel erfassen, Angaben für die Rechnungsstellung)."
-label .confdbnameL -text "Name der Datenbank" -font "TKSmallCaptionFont"
-label .confdbUserL -text "Benutzer" -font "TkSmallCaptionFont"
-entry .confdbnameE -textvar dbname
-entry .confdbUserE -textvar dbuser -validate focusin -validatecommand {%W conf -bg beige -fg grey ; return 0}
-button .initdbB -text "Datenbank erstellen" -command {initdb}
-
-#TODO testing
-#pack .confdbT -in .n2.dbF -anchor nw 
-#pack .confdbM -in .n2.dbF -anchor ne -side left
-pack .initdbB -in .n.t4.f2 -anchor se -side right
-
-
-#RECHNUNGSSTELLUNG
-pack [frame .billing2F] -in .n.t4.f5 -side right -anchor ne -fill x -expand 1
-label .billingT -text "Rechnungsstellung" -font "TkHeadingFont"
-message .billingM -width 800 -text "Nachdem unter 'Neue Rechnung' neue Posten für den Kunden erfasst sind, wird der Auftrag in der Datenbank gespeichert (Button 'Rechnung speichern'). Danach kann eine Rechnung ausgedruckt werden (Button 'Rechnung drucken'). Dazu ist eine Vorinstallation von TeX/LaTeX erforderlich. Die neue Rechnung wird im Ordner $spoolDir als PDF gespeichert und wird (falls PostScript vorhanden?) an den Drucker geschickt. Das PDF kann per E-Mail versandt werden. Gleichzeitig wird eine Kopie im DVI-Format in der Datenbank gespeichert. Die Rechnung kann somit später (z.B. als Mahnung) nochmals ausgedruckt werden (Button: 'Rechnung nachdrucken').\n\nDie Felder rechts betreffen die Absenderinformationen in der Rechnung.\nDer Mehrwertsteuersatz ist obligatorisch (z.B. 0 (erscheint nicht) / 0.0 (erscheint)) / 7.5 usw.).\nIn den Feldern 'Zahlungskondition 1-3' können verschiedene Zahlungsbedingungen erfasst werden, welche bei der Rechnungserstellung jeweils zur Auswahl stehen (z.B. 10 Tage / 30 Tage / bar). Ein Eintrag 'bar' steht für Barzahlung und markiert die Rechnung als bezahlt. Ohne Voreinträge muss die Kondition von Hand eingegeben werden.\n\nDie in $spoolDir befindlichen PDFs können nach dem Ausdruck/Versand gelöscht werden."
-
-radiobutton .billformatlinksRB -text "Adressfenster links (International)" -value Links -variable adrpos
-radiobutton .billformatrechtsRB -text "Adressfenster rechts (Schweiz)" -value Rechts -variable adrpos
-.billformatrechtsRB select
-
-spinbox .billcurrencySB -width 5 -text Währung -values {€ £ $ CHF}
-
-entry .billvatE
-entry .billownerE
-entry .billcompE
-entry .billstreetE
-entry .billcityE
-entry .billphoneE
-entry .billbankE -width 50
-entry .billcond1E
-entry .billcond2E
-entry .billcond3E
-button .billcomplogoB -text "Firmenlogo hinzufügen" -command {
-  set ::logoPath [tk_getOpenFile]
-  return 0
-}
-
-pack .billingT .billingM -in .n.t4.f5 -anchor nw
-pack .billformatlinksRB .billformatrechtsRB -in .n.t4.f5 -anchor se -side bottom
-pack .billcomplogoB .billcurrencySB .billvatE .billownerE .billcompE .billstreetE .billcityE .billphoneE .billbankE .billcond1E .billcond2E .billcond3E -in .billing2F
-
-#Configure all entries to change colour & be emptied when focused
-foreach e [pack slaves .billing2F] {
-  catch {$e config -fg grey -bg beige -width 30 -validate focusin -validatecommand "
-    %W delete 0 end
-    $e config -bg beige -fg black -state normal
-    return 0
-    "
-  }
-}
-
-#Configure vat entry to accept only numbers like 0 / 1.0 / 7.5
-#.billvatE conf -validate key -vcmd {%W conf -bg beige ; string is double %P} -invcmd {%W conf -bg red}
-
-button .billingSaveB -text [mc saveConf] -command {source $makeConfig ; makeConfig}
-#pack .billingSaveB -in .billing2F -side bottom -anchor se
-
-#Check if vars in config
-if {[info exists vat] && $vat != ""} {.billvatE insert 0 $vat; .billvatE conf -bg "#d9d9d9"} {.billvatE conf -bg beige ; .billvatE insert 0 "Mehrwertsteuersatz %"}
-if {[info exists myName] && $myName != ""} {.billownerE insert 0 $myName; .billownerE conf -bg "#d9d9d9"} {.billownerE insert 0 "Name"}
-if {[info exists myComp] && $myComp != ""} {.billcompE insert 0 $myComp; .billcompE conf -bg "#d9d9d9"} {.billcompE insert 0 "Firmenname"}
-if {[info exists myAdr] && $myAdr != ""} {.billstreetE insert 0 $myAdr; .billstreetE conf -bg "#d9d9d9"} {.billstreetE insert 0 "Strasse"}
-if {[info exists myCity] && $myCity != ""} {.billcityE insert 0 $myCity; .billcityE conf -bg "#d9d9d9"} {.billcityE insert 0 "PLZ & Ortschaft"}
-if {[info exists myPhone] && $myPhone != ""} {.billphoneE insert 0 $myPhone; .billphoneE conf -bg "#d9d9d9"} {.billphoneE insert 0 "Telefon"}
-if {[info exists myBank] && $myBank != ""} {.billbankE insert 0 $myBank; .billbankE conf -bg "#d9d9d9"} {.billphoneE insert 0 "Bankverbindung"}
-
-if {[info exists cond1] && $cond1!=""} {.billcond1E insert 0 $cond1; .billcond1E conf -bg "#d9d9d9"} {.billcond1E insert 0 "Zahlungskondition 1"}
-if {[info exists cond2] && $cond2!=""} {.billcond2E insert 0 $cond2; .billcond2E conf -bg "#d9d9d9"} {.billcond2E insert 0 "Zahlungskondition 2"}
-if {[info exists cond3] && $cond3!=""} {.billcond3E insert 0 $cond3; .billcond3E conf -bg "#d9d9d9"} {.billcond3E insert 0 "Zahlungskondition 3"}
-if [info exists currency] {.billcurrencySB conf -bg "#d9d9d9" -width 5; .billcurrencySB set $currency}
-
+setupConfig
 
 ########################################################
 # T A B  5  - S P E S E N
@@ -489,24 +425,27 @@ set db $res
 
 
 # E x e c u t e   p r o g s
-setAdrList
-resetAdrWin
-resetNewInvDialog
-updateArticleList
-resetArticleWin
+if {!$initial} {
+  setAdrList
+  resetAdrWin
+  resetNewInvDialog
+  updateArticleList
+  resetArticleWin
+  setArticleLine TAB4
 
-#setArticleLine TAB2
-setArticleLine TAB4
-
-#Execute once when specific TAB opened
-bind .n <<NotebookTabChanged>> {
-  set selected [.n select]
-  if {$selected == ".n.t3"} {
-    set t3 1
+  #Execute once when specific TAB opened
+  bind .n <<NotebookTabChanged>> {
+    set selected [.n select]
+    if {$selected == ".n.t3"} {
+      set t3 1
+    }
   }
-}
 
-resetNewInvDialog
-#resetArticleWin
-setAbschlussjahrSB
-createArtMenu
+  resetNewInvDialog
+  setAbschlussjahrSB
+  createArtMenu
+
+} else {
+
+  .n select 6
+}

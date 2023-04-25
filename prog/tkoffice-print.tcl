@@ -42,9 +42,6 @@ proc detectViewer {docPath docType} {
 proc printReport {jahr} {
   global texDir reportDir tmpDir
   
-#  set reportPdfName Report_${jahr}.pdf
-#  set reportTmpPs [file join $tmpDir $reportname]
-#  set reportFullPdf [file join $reportDir $reportPdfName]
 
 #TODO tsteisng
 set repFullPs Report_${jahr}.ps
@@ -64,10 +61,17 @@ set repPartfile report_${jahr}
     set report::repFullPs $repFullPs
     cd $tmpDir
     
-    namespace eval report {
+   namespace eval report {
 
-  #    set cmd "gs -dNOPAUSE -dAutoRotatePages=/None -sDEVICE=pdfwrite -sOUTPUTFILE=Report_${jahr}.ps -dBATCH -f "
-set cmd {exec psjoin}
+     #1. Single page PDF
+     if {$pageNo == 1} {
+#       exec gs -dNOPAUSE -dAutoRotatePages=/None -sDEVICE=pdfwrite -sOUTPUTFILE=Report_${jahr}.pdf -dBATCH $repFullPs
+       exec ps2pdf -dAutoRotatePages=/None $repFullPs
+       
+     } else {
+    
+     #2. Multiple page PS
+      set cmd {exec psjoin}
 
       set num 1
       for {set max $pageNo} {$num <= $max} {incr num} { puts $num
@@ -78,15 +82,15 @@ puts $filename
         unset filename
 
 puts $cmd
-      }
+      } ;#END loop
 
  
-#      eval [exec $cmd]
-
 #This requires psutils:
 eval $cmd > $repFullPs
     
-    } ;#END namespace
+    } ;#END main clause 
+  
+  };#END report ns
     
     namespace delete report
   
@@ -96,14 +100,17 @@ eval $cmd > $repFullPs
   }
   
 #  exec gv $reportTmpPs
-  exec xdg-open $repFullPs   
+  tk_messageBox -type ok -message "Wir zeigen jetzt $repFullPs an. Sie können die Datei aus dem Anzeigeprogramm ausdrucken oder nochmals bearbeiten oder später drucken. Wichtig: im Druckdialog 'Hochformat' wählen."
+  
+  exec xdg-open $repFullPs
  
   #4) if wanted: move tmpfile to $reportDir
-  set res [tk_messageBox -type yesno -message "Wollen Sie die Datei $reportTmpPs abschliessend in $reportDir speichern?"]
+  set res [tk_messageBox -type okcancel -message "Sie können nun $repFullPs abschliessend in $reportDir speichern oder nochmal bearbeiten"]
   if {$res == "yes"} {
     file copy -force $repFullPs [file join $reportDir $repFullPs]
     file delete $reportFullPs
   }
+  
 
 } ;# END printReport
 
@@ -120,58 +127,23 @@ proc printInvoice {invNo} {
   set docType pdf 
 
   #B) Retrieve from Spool OR retrieve from DB & run Latex
-  if [file exists $docPath] {
-    detectViewer $docPath pdf
-    return 0 
-  }
-  
-  if ![catch {fetchInvData $invNo}] {
-    puts "Latexing ..."
-    latexInvoice $invNo
-    after idle detectViewer $docPath pdf
-  }
-}
-
-#  
-#  if [catch {file exists $docPath} err1] {
-#puts "no docpath"
-#    
-#    if ![catch {fetchInvData $invNo} err2] {
-#puts "no data"
-#      
-#      set texPath [setInvPath $invNo tex]
-#      
-#puts Latexing...
-#		  latexInvoice $invNo
-#		}
-#		  
-#	}
-
-proc nejutar {} {
-  NewsHandler::QueryNews "Die Rechnung $invNo wird nun angezeigt. Zum Druck betätigen Sie bitte die Druckfunktion des Anzeigeprogramms." lightblue
-  
-  #Try viewing invoice
-  after idle detectViewer $docPath pdf
-return  
-
-  #Evaluate errors if any  
-  if {[info exists err3] && $err3 != ""} {
-  
-    NewsHandler::QueryNews "$err3" red
+  if ![file exists $docPath] {
+      
+    if ![catch {fetchInvData $invNo}] {
+      puts "Latexing ..."
+      latexInvoice $invNo
+      
+    } else {
     
-    if {[info exists err1] && $err1 != ""} {
-      NewsHandler::QueryNews "Invoice No. $invNo: $err1" orange 
+      NewsHandler::QueryNews "Unable to print invoice" red
+      return 1  
     }
-    if {[info exists err2] && $err2 != ""} {
-      NewsHandler::QueryNews "Unable to retrieve invoice data $invNo from databank" orange
-    }
-    return 1
-  } {
-    return 0
+  
   }
   
+  after idle detectViewer $docPath pdf
+
 } ;#END printInvoice
-	
 
 # latexInvoice
 ##executes latex on vorlageTex OR dvips OR dvipdf on vorlageDvi
@@ -181,7 +153,7 @@ return
 # eval [list exec -- pdflatex --interaction=nonstopmode] $args
 proc latexInvoice {invNo} {
 
-  global spoolDir vorlageTex texDir tmpDir
+  global spoolDir vorlageTex texDir tmpDir tkoDir
 
   namespace eval Latex {}
   set Latex::invTexPath [setInvPath $invNo tex]
@@ -194,26 +166,17 @@ proc latexInvoice {invNo} {
   
   namespace eval Latex {
     #catch is inevitable, too much useless output - so no control other than below...
-    catch { exec -- pdflatex -dBATCH -interaction nonstopmode -output-directory $tmpDir $invTexPath] }
+    catch { exec -- pdflatex -dBATCH -interaction nonstopmode -output-directory $tmpDir $invTexPath } latexerr
   }  
 
+if [info exists latexerr] {puts $latexerr}
+
 	#copy PDF to spoolDir
-	
-#	while ![file exists $invPdfTmpPath] {
-#puts "$invPdfTmpPath hali yok"
-#		after 500
-#	}
-proc filecopy {} {
-global invNo spoolDir
-file copy -force [setInvPath $invNo pdftmp] $spoolDir
-}
- after idle {
- filecopy  
-#  NewsHandler::QueryNews "Rechnung Nr. $invNo ist jetzt in $spoolDir zur Weiterbearbeitung" green
-    
-after idle  namespace delete Latex
-  }
-  
+  after idle file copy -force [setInvPath $invNo pdftmp] $spoolDir
+ 
+  cd $tkoDir 
+  after idle  namespace delete Latex 
+
 } ;#END latexInvoice
 
 
@@ -226,7 +189,8 @@ proc report2ps {year} {
   global tmpDir reportDir
   set c .repC
   set w .repT
-  #Page height in lines
+
+  #Page height in lines TODO define in Config
   set pageH 40
   
   $w conf -bg white
@@ -255,8 +219,10 @@ puts $reportPdf
     puts "Printing single page..."
     
     update
-    eval [list $c postscript -rotate 1 -file $reportPs]
     
+    #TODO rotation not working, but not wanted for viewing! - see further below too!
+#    eval [list $c postscript -rotate 1 -file $reportPs]
+$c postscript -file $reportPs   
 
   } else {
   
@@ -307,12 +273,14 @@ puts $reportPdf
     update
     $c postscript -rotate 1 -file ${repPartfile}_${pageNo}.ps
 
+ } ;#END main clause
+ 
 #export final page number for printReport
 namespace eval report {}
 set report::pageNo $pageNo
 set report::repPartfile $repPartfile
       
- } ;#END main clause
+
  
   ## 5. Final cleanup
   $w conf -bg lightblue

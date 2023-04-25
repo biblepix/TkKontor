@@ -133,6 +133,10 @@ proc createReport {} {
   # Prepare canvas & textwin dimensions
   set t .repT
   $t delete 1.0 end
+
+set w 297m
+set h 210m
+
   .repC conf -width $w -height $h -bg blue
   .repC create window 0 0 -tags repwin -window .repT -anchor nw -width $w -height $h
   .repC itemconf repwin -width $w -height $h
@@ -146,6 +150,7 @@ proc createReport {} {
 	##requires no of LETTERS as height + no. of LETTER as width!
 	#TODO conflicts with [winfo height/width ...] for proper A4-dimensions
 	#TODO A4 = 210 x 297 mm
+	#TODO set font size!!!!
 	set scaling [tk scaling]
 	set winLetH 35
   set winLetW [expr round(3.5 * $winLetH)]
@@ -153,8 +158,7 @@ proc createReport {} {
  	set winLetX [expr round($winLetW * $scaling)]
 
   #Configure widgets & scroll bar
-  $t conf -bg lightblue -bd 0 
-    
+  $t conf -bg lightblue -bd 0 -padx 50 -pady 20  
   
  	# F i l l   t e x t w i n
 
@@ -162,9 +166,10 @@ proc createReport {} {
 	$t configure -tabs {
 	1.5c
 	4.0c
-	11c numeric
-	14c numeric
-	17c numeric
+	13c numeric
+	16c numeric
+	19c numeric
+  22c numeric
   }
 
   #Configure font tags
@@ -236,12 +241,7 @@ puts $currency
 
   #Pack & configure print button
   pack .repPrintBtn -in .n.t3.rightF -side bottom -anchor sw
-  
-#TODO implement in printReport!
-.repPrintBtn conf -command "printReport $jahr"
-.repT conf -borderwidth 3 -padx 7 -pady 7
-   
-  namespace delete report
+  .repPrintBtn conf -command "printReport $jahr"
   
 } ;#END createReport
 
@@ -289,8 +289,9 @@ proc listInvoices {jahr} {
 		  set netto [db eval "SELECT vatlesssum FROM invoice WHERE f_number = $invNo"] 
 		  array set $invNo "netto $netto"
 	   	
-		  set currency [db eval "SELECT currency FROM invoice WHERE f_number = $invNo"] 
-		  array set $invNo "currency $currency"
+	   	#TODO who needs this?
+#		  set currency [db eval "SELECT currency FROM invoice WHERE f_number = $invNo"] 
+#		  array set $invNo "currency $currency"
 			   	
 		  set finalsum [db eval "SELECT finalsum FROM invoice WHERE f_number = $invNo"] 
 		  array set $invNo "finalsum $finalsum"
