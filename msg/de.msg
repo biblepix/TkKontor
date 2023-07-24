@@ -46,3 +46,10 @@ mcset de storniTxt "Hier können Sie fehlerhafte Buchungen stornieren (rückbuch
 
 mcset de artikel "Artikelverwaltung"
 mcset de artTxt "Hier können Sie Artikel für die Rechnungsstellung verwalten.\n\nDie Felder 'Bezeichnung' und 'Einheit' (z.B. Std.) dürfen nicht leer sein.\n\nDie Kontrollkästchen 'Auslage' und 'Rabatt' für den Artikeltyp können leer sein. Wenn 'Rabatt' ein Häkchen bekommt, gilt der Artikel als Abzugswert in Prozent (im Feld 'Preis' Prozentzahl ohne %-Zeichen eingeben, z.B. 5.5). Der Rabatt wird in der Rechnung vom Gesamtbetrag abgezogen.\n\nFalls das Feld 'Auslage' angehakt wird (z.B. für Artikel 'Zugfahrt'), wird der Artikel in der Rechnung separat als Auslage aufgeführt, unterliegt nicht der Mehrwertsteuerpflicht und wird nicht als Einnahme verbucht."
+mcset de viewInv "zum Betrachten doppelklicken"
+
+mcset de restoreDb "Datenbank wiederherstellen"
+mcset de dumpDb "Datenbank sichern"
+mcset de manageDb "Datenbank verwalten"
+mcset de manageDbTxt "TkOffice speichert alle Kundendaten in einer SQLite-Datenbank. Diese wird bei der Erstinstallation automatisch eingerichtet.\n\nEs ist ratsam, die Datenbank regelmässig zu sichern (siehe Knopf rechts). Hierbei wird eine Kopie der Datenbank im SQL-Format erstellt und im Verzeichnis $dumpDir gespeichert.\n\nBei Bedarf können alte Sicherungen über den Knopf '[mc restoreDb]' wieder eingelesen werden. Da beim Einlesen alle aktuellen Daten überschrieben werden, macht TkOffice vor dem Einlesen einer Sicherung eine Sicherheitskopie nach $dumpDir." 
+mcset de restoreDbTxt "Die gewählte Datenbankkopie wird jetzt eingelesen. Zur Sicherheit machen wir vorher eine Kopie der aktuellen Datenbank in $dumpDir"
