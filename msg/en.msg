@@ -32,3 +32,5 @@ mcset en reportPrint "Display report in pre-print format"
 
 mcset en artikel "Item management"
 mcset en artTxt "Here you can manage your business items for billing. The fields 'Description' and 'Unit' (e.g. hours) must not be empty.\n\nThe tickboxes 'Expenditure' and 'Rebate' for the article type can be left empty. If 'Rebate' is ticked the item is considered a deduction value in percent (in the field 'Price' enter a percentage without the % sign, e.g. 5.5). Any rebate will be deduced form the sum total when billed.\n\nIf the field 'Expenditure' is ticked (e.g. for an article 'train ride'), it will be listed as a separate deducible item in the invoice. As such it is not liable to VAT does not figure as income."
+
+mcset en viewInv "Double-click to view"
