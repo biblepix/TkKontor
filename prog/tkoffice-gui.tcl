@@ -1,17 +1,20 @@
 # ~/TkOffice/prog/tkoffice-gui.tcl
+# ~/tkoffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17
 # Updated for use with SQlite: Sep22
-# Updated 28mch23
+# Updated 28july23
 		
 set version 2.0
 set px 5
 set py 5
 
 package require Tk
-package require Img
 
 #Initiate Sqlite DB
-package require sqlite3
+if [catch {package require sqlite3}] {
+  tk_messageBox -type ok -icon warning -message "You must install the program 'sqlite' version 3 before continuomg."
+  exit
+} 
 
 if [catch {source $confFile}] {
   set initial 1
@@ -241,8 +244,8 @@ message .totalM -width 70 -bg lightgreen -padx 20 -anchor w
 
 #Set up Artikelliste, fill later when connected to DB
 menubutton .invartlistMB -text [mc artSelect] -direction below -relief raised -menu .invartlistMB.menu
+menu .invartlistMB.menu -tearoff 0 ;#-postcommand createArtMenu ;#-postcommand {setArticleLine TAB2}
 
-menu .invartlistMB.menu -tearoff 0 ;# -postcommand {setArticleLine TAB2}
 
 label .arttitL -text "Artikel Nr."
 
@@ -382,7 +385,7 @@ namespace eval artikel {
   label .confartunitL -padx 10 -width 7 -textvar artUnit -anchor w
   label .confarttypeL -padx 10 -width 1 -textvar artType -anchor w
 }
-spinbox .confartnumSB -width 5 -command {setArticleLine TAB4}
+spinbox .confartnumSB -width 5 -command {setConfArticleLine}
 button .confartsaveB -text [mc artSave] -command {saveArticle}
 button .confartdeleteB -text [mc artDelete] -command {deleteArticle} -activebackground red
 button .confartcreateB -text [mc artCreate] -command {createArticle}
@@ -429,10 +432,14 @@ if {!$initial} {
   setAdrList
   resetAdrWin
   resetNewInvDialog
+  
   updateArticleList
   resetArticleWin
-  setArticleLine TAB4
-
+  setConfArticleLine
+  
+  #TODO buna gerek var mI?
+ # createInvArticleMenu
+  
   #Execute once when specific TAB opened
   bind .n <<NotebookTabChanged>> {
     set selected [.n select]
@@ -443,7 +450,8 @@ if {!$initial} {
 
   resetNewInvDialog
   setAbschlussjahrSB
-  createArtMenu
+  
+
 
 } else {
 

@@ -1,13 +1,15 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Updated: 22apr23
+# Updated: 28jul23
 
 ###############################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S
 ###############################################################
 
-
+## to get column headers of a table:
+# db eval "select name from PRAGMA_TABLE_INFO('artikel')";
+############################################################
 
 # roundDecimal
 ##rounds any sum to $sum.$dp
@@ -425,7 +427,7 @@ proc deleteAddress {adrNo} {
   if {!$res} {return 1}
 
    db eval "DELETE FROM address WHERE objectid=$adrNo"
-   NewsHandler::QueryNews "Adresse $addrNo gelöscht" green
+   NewsHandler::QueryNews "Adresse $addrNo gelöscht" lightgreen
    resetAdrWin
 }
 
@@ -448,65 +450,44 @@ proc resetArticleWin {} {
   .confartcreateB conf -text "Artikel erfassen" -command {createArticle}
 }
 
-proc createArtMenu {} {
+# createInvArticleMenu
+## creates article list for .invartlistMB menu button 
+## called by tkoffice-gui.tcl for "new invoice" dialog
+## needs setInvArticleLine to work
+proc createInvArticleMenu {} {
 	global db
-	set token [db eval "SELECT artnum,artname FROM artikel"]
-	array set artArr $token
-
-
-	#TODO extract artNum from string
+	set menu .invartlistMB.menu
+	
+	$menu delete 0 end
+	
+	array set artArr [db eval "SELECT rowid,artname FROM artikel"]
+		
 	foreach artNum [array names artArr] {
-		set s [array get artArr $artNum]
-	#set artNo $artNum
-		
-	puts $artNum			
-	puts $s
-		#set artNum  [lindex $s 0]
-#		set artName [lindex $s end]
 		set artName $artArr($artNum)
-		
-		.invartlistMB.menu add radiobutton -label $artName -value $artNum -command {setArticleLine TAB2}
+		$menu add radiobutton -label $artName -value $artNum -command {setInvArticleLine}
 	}
-}
+	
+} ;# END createInvArticleMenu
 	
 # setArticleLine
 ##sets Artikel line in New Invoice window + Artikelverwaltung
 ##needs TAB2 / TAB4 args
 ##called by GUI + spinboxes .confartnumSB/.invartnumSB
-proc setArticleLine {tab args} {
+proc setInvArticleLine {} {
   global db
-  .confarttypeL conf -bg #c3c3c3
-
-  if {$tab == "TAB4"} {
-    set artNum [.confartnumSB get]
-
-  } elseif {$tab == "TAB2"} {
-    .mengeE delete 0 end
+  
+  .mengeE delete 0 end
     .mengeE conf -bg beige
     .mengeE conf -insertbackground orange -insertwidth 10 -insertborderwidth 5 -insertofftime 500 -insertontime 1000
     .mengeE conf -state normal -validate key -vcmd {string is double %P} -invcmd {%W conf -bg red; after 2000 ; %W conf -bg beige}
-#    set artNum [.invartnumSB get]
-#    focus .invartnumSB
-  }
 
-  #Read spinboxes
-  if {$tab == "TAB2"} {
-    namespace eval artikel {
-#      set artNum [.invartnumSB get]
-  	set artNum [.invartlistMB.menu entrycget active -value]
-    }
-
-
-  } else {
-    namespace eval artikel {
-      set artNum [.confartnumSB get]
-    }
-  }
-
-  #Get DB data per line
-  namespace eval artikel {
+#set artNum [.invartlistMB.menu entrycget active -value]    
   
-    set token [db eval "SELECT artname,artprice,artunit,arttype FROM artikel WHERE artnum=$artNum"]
+  namespace eval invoice {
+
+   	set artNum [.invartlistMB.menu entrycget active -value]
+    
+    set token [db eval "SELECT artname,artprice,artunit,arttype FROM artikel WHERE rowid=$artNum"]
     set artName  [lindex $token 0]
     set artPrice [lindex $token 1]
     set artUnit  [lindex $token 2]
@@ -520,14 +501,49 @@ proc setArticleLine {tab args} {
     } elseif {$artType == "A"} {
       .confarttypeL conf -bg orange
     }
+  
+    if {$artPrice == 0} {
+      set artPrice [.invartpriceE get]
+      pack forget .invartpriceL
+      pack .invartunitL .invartnameL .invartpriceE .invarttypeL -in .n.t2.f2 -side left
+    } else {
+      pack forget .invartpriceE
+      pack .invartunitL .invartnameL .invartpriceL .invarttypeL -in .n.t2.f2 -side left
+    }
+
   }
 
-  if {$tab == "TAB4"} {
-    return 0
-  }
+} ;# END setInvArticleLine
 
-#TODO get order right!
+
+proc setConfArticleLine {} {
+  global db
+  
+  .confarttypeL conf -bg #c3c3c3
+
+  set artNum [.confartnumSB get]
+
+
+
   namespace eval artikel {
+
+    set artNum [.confartnumSB get]
+    
+    set token [db eval "SELECT artname,artprice,artunit,arttype FROM artikel WHERE rowid=$artNum"]
+    set artName  [lindex $token 0]
+    set artPrice [lindex $token 1]
+    set artUnit  [lindex $token 2]
+    set artType  [lindex $token 3]
+
+    if {$artType == "R"} {
+      .mengeE delete 0 end
+      .mengeE insert 0 "1"
+      .mengeE conf -bg grey -fg silver -state readonly
+      .confarttypeL conf -bg yellow
+    } elseif {$artType == "A"} {
+      .confarttypeL conf -bg orange
+    }
+  
     if {$artPrice == 0} {
       set artPrice [.invartpriceE get]
       pack forget .invartpriceL
@@ -540,7 +556,8 @@ proc setArticleLine {tab args} {
 
   return 0
 
-} ;#END setArticleLine
+} ;#END setConfArticleLine
+
 
 proc createArticle {} {
   global db
@@ -578,6 +595,7 @@ proc createArticle {} {
   .confartcreateB conf -text "Abbruch" -activebackground red -command {resetArticleWin}
 
 #TODO: articleWin is not reset after saving!!!
+
 } ;#END createArticle
 
 proc saveArticle {} {
@@ -624,6 +642,8 @@ pack .confartL .confartnumSB .confartunitL .confartpriceL .confartnameL .confart
   updateArticleList
   resetArticleWin
   setArticleLine TAB4
+  createArtMenu
+    
   NewsHandler::QueryNews "Artikel $artName gespeichert" green
 
 } ;#END saveArticle
@@ -643,15 +663,14 @@ proc deleteArticle {} {
 }
 
 # updateArticleList
-##gets articles from DB + updates spinboxes
+##gets articles from DB + updates spinbox in 'Artikelverwaltung'
 ##called by saveArticle / ...
 proc updateArticleList {} {
   global db
-  set token [db eval "SELECT artnum FROM artikel"]
-  
+  set token [db eval "SELECT rowid FROM artikel"]
   
   #TODO replace?
-  #.invartnumSB conf -values $token
+ # .invartlistMB conf -values $token
   #.invartOM artNo $token
   .confartnumSB conf -values $token
 }
@@ -762,7 +781,6 @@ proc initialiseDB {dbname} {
     
     ##2. table artikel
     db eval "CREATE TABLE artikel (
-      artnum SERIAL,
       artname text NOT NULL,
       artunit text NOT NULL,
       artprice NUMERIC
@@ -770,7 +788,6 @@ proc initialiseDB {dbname} {
     
     ##3. table spesen
     db eval "CREATE TABLE spesen (
-    num SERIAL,
     name text NOT NULL,
     value NUMERIC NOT NULL
   )"
