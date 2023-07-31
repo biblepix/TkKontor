@@ -477,21 +477,19 @@ proc setInvArticleLine {} {
   global db
   
   .mengeE delete 0 end
-    .mengeE conf -bg beige
-    .mengeE conf -insertbackground orange -insertwidth 10 -insertborderwidth 5 -insertofftime 500 -insertontime 1000
-    .mengeE conf -state normal -validate key -vcmd {string is double %P} -invcmd {%W conf -bg red; after 2000 ; %W conf -bg beige}
-
-#set artNum [.invartlistMB.menu entrycget active -value]    
-  
+  .mengeE conf -bg beige
+  .mengeE conf -insertbackground orange -insertwidth 10 -insertborderwidth 5 -insertofftime 500 -insertontime 1000
+  .mengeE conf -state normal -validate key -vcmd {string is double %P} -invcmd {%W conf -bg red; after 2000 ; %W conf -bg beige}
+ 
   namespace eval invoice {
 
-   	set artNum [.invartlistMB.menu entrycget active -value]
+   	variable artNum [.invartlistMB.menu entrycget active -value]
     
-    set token [db eval "SELECT artname,artprice,artunit,arttype FROM artikel WHERE rowid=$artNum"]
-    set artName  [lindex $token 0]
-    set artPrice [lindex $token 1]
-    set artUnit  [lindex $token 2]
-    set artType  [lindex $token 3]
+    variable token [db eval "SELECT artname,artprice,artunit,arttype FROM artikel WHERE rowid=$artNum"]
+    variable artName  [lindex $token 0]
+    variable artPrice [lindex $token 1]
+    variable artUnit  [lindex $token 2]
+    variable artType  [lindex $token 3]
 
     if {$artType == "R"} {
       .mengeE delete 0 end

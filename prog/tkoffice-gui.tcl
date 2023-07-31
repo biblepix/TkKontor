@@ -268,11 +268,12 @@ pack [frame .newInvoiceF] -in .n.t2.f3 -side bottom -fill both
 #label .clientnameL -textvariable name2 -font "TkCaptionFont"
 #pack .clientnameL .clientL -in .n.t2.f1 -side right
 
-label .invartpriceL -textvar artPrice -padx 20
-entry .invartpriceE -textvar artPrice
-label .invartnameL -textvar artName -padx 50
-label .invartunitL -textvar artUnit -padx 20
-label .invarttypeL -textvar artType -padx 20
+namespace eval invoice {}
+label .invartpriceL -textvar invoice::artPrice -padx 20
+entry .invartpriceE -textvar invoice::artPrice
+label .invartnameL -textvar invoice::artName -padx 50
+label .invartunitL -textvar invoice::artUnit -padx 20
+label .invarttypeL -textvar invoice::artType -padx 20
 
 button .invSaveBtn -text [mc invEnter]
 button .invCancelBtn -text [mc cancel] -command {resetNewInvDialog} -activebackground red
@@ -379,12 +380,12 @@ label .artL -text "Artikelliste" -font "TkHeadingFont"
 #These are packed/unpacked later by article procs
 label .confartL -text "Artikel Nr."
 
-namespace eval artikel {
-  label .confartnameL -padx 7 -width 25 -textvar artName -anchor w
-  label .confartpriceL -padx 10 -width 7 -textvar artPrice -anchor w
-  label .confartunitL -padx 10 -width 7 -textvar artUnit -anchor w
-  label .confarttypeL -padx 10 -width 1 -textvar artType -anchor w
-}
+namespace eval artikel {}
+label .confartnameL -padx 7 -width 25 -textvar artikel::artName -anchor w
+label .confartpriceL -padx 10 -width 7 -textvar artikel::artPrice -anchor w
+label .confartunitL -padx 10 -width 7 -textvar artikel::artUnit -anchor w
+label .confarttypeL -padx 10 -width 1 -textvar artikel::artType -anchor w
+
 spinbox .confartnumSB -width 5 -command {setConfArticleLine}
 button .confartsaveB -text [mc artSave] -command {saveArticle}
 button .confartdeleteB -text [mc artDelete] -command {deleteArticle} -activebackground red
@@ -438,7 +439,7 @@ if {!$initial} {
   setConfArticleLine
   
   #TODO buna gerek var mI?
- # createInvArticleMenu
+  createInvArticleMenu
   
   #Execute once when specific TAB opened
   bind .n <<NotebookTabChanged>> {

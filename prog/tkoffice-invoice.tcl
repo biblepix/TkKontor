@@ -63,6 +63,7 @@ proc resetNewInvDialog {} {
 pack .mengeE .invartunitL .invartnameL .invartpriceL -in .n.t2.f2 -side left -fill x
   pack .addrowB -in .n.t2.f2 -side right -expand 1 -fill x
   
+  
   #Reset Buttons
 ##TODO testing
 #  .abbruchinvB conf -state disabled
@@ -130,15 +131,24 @@ proc addInvRow {} {
       catch {label $F.artunitL -text $artUnit -bg lightblue -width 5 -justify left -anchor w}
       catch {label $F.arttypeL -text $artType -bg lightblue -width 20 -justify right -anchor e}
       catch {label $F.rowtotL -text $rowtot -bg lightblue  -width 50 -justify left -anchor w}
-      #Get current values from GUI
+      
+      label $F.deleterowL -text "< Posten löschen" -bg beige -fg grey -borderwidth 1 -relief raised -width 15 
+      
+   #Get current values from GUI
       set bill $rows::bill
       set buch $rows::buch
-      set auslage $rows::auslage
+      set auslage $rows::auslage             
+      
+      #Bind "deleteRow" label to highlighting on hover & command on double-click
+			  bind $F.deleterowL <Enter> "%W conf -bg red -fg black"
+			  bind $F.deleterowL <Leave> "%W conf -bg beige -fg grey"
+			  bind $F.deleterowL <Double-1> "deleteInvRow $F $rowtot $artType"
+     
 
       # H a n d l e   t y p e s
               
       #Exit if rebate doubled
-      if {$artType == "R" && [info exists ::rows::rabatt]} {
+      if {$artType == "R" && ( [info exists ::rows::rabatt] && $rows::rabatt >0 ) } {
         NewsHandler::QueryNews "Nur 1 Rabatt zulässig" red
         namespace delete [namespace current]
         return 1
@@ -198,8 +208,11 @@ proc addInvRow {} {
           $F.rowtotL conf -bg orange
       }
 
+     
       pack $F.artnameL $F.artpriceL $F.mengeL -anchor w -fill x -side left
       pack $F.artunitL $F.rowtotL $F.arttypeL -anchor w -fill x -side left
+      pack $F.deleterowL -anchor w -fill x -side right -padx 2
+
 
       #Reduce amounts to 2 decimal points -TODO better use
       set ::rows::bill [expr {double(round(100*$rows::bill))/100}]
@@ -214,10 +227,45 @@ proc addInvRow {} {
         set separator { /}
       }
       append ::rows::beschr $separator ${menge} { } $artName
-    }
-  }
+
+    } ;#END rowno ns
+  } ;#END rows ns
+          
 } ;#END addInvRow
 
+
+  #args = artType (can be empty)
+proc deleteInvRow {F rowtot args} {
+
+  global rows::bill
+  global rows::buch
+  global rows::rabatt
+  global rows::auslage
+
+  pack forget $F
+
+  if {$args == "R"} {
+   
+    set rows::bill [expr $bill + $rabatt]
+    set rows::buch [expr $buch + $rabatt]
+    set rows::rabatt 0
+    
+  } elseif {$args == "A"} {
+
+    #don't touch rows::buch!
+    set rows::bill [expr $bill - $rowtot] 
+    set rows::auslage [expr $auslage - $rowtot]
+     
+  } else {
+
+    set rows::bill [expr $bill - $rowtot]
+    set rows::buch [expr $buch - $rowtot]
+   
+  }
+   
+}
+
+ 
 # doSaveInv
 ##coordinates invoice saving + printing progs
 ##evaluates exit codes
@@ -601,7 +649,7 @@ proc savePaymentEntry {newPayedsum curEName ns} {
   set auslage [lindex $invT 2]
   set adrNo [lindex $invT 3]
   
-  if {[string is double $auslage] && $auslage >0} {
+  if {[string is double $auslage] && $auslage > 0} {
     set finalsum [expr $buchungssumme + $auslage]
   } else {
     set finalsum $buchungssumme
