@@ -183,23 +183,27 @@ pack .creditL .creditM .credit2L -in .umsatzF -side left -anchor w
 pack .umsatzM .umsatzL -in .umsatzF -side right -anchor e
 
 #Create Rechnungen Kopfdaten
-label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 9
-label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 13
-label .invartH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 47
-label .invSumH -text "Betrag $currency" -font TkCaptionFont -justify right -anchor w -width 11
-label .invPayedH -text "Bezahlt $currency" -font TkCaptionFont -justify right -anchor w -width 10
-label .invcommH -text "Anmerkung" -font TkCaptionFont -justify right -anchor w -width 20
+label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 11
+label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 11
+label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 30
 
-#label .invShowH -text "Rechnung anzeigen" -font TkCaptionFont -fg steelblue3 -justify right -anchor e -justify right -width 20
-
+label .invSumH -text "Rechnungsbetrag" -font TkCaptionFont -justify right -anchor w -width 16
+label .invPayedSumH -text "Bezahlt $currency" -font TkCaptionFont -justify right -anchor w -width 12
+label .invPayedDateH -text "Zahldatum" -font TkCaptionFont -justify center -anchor n -width 12        
+label .invPaymentEntryH -text "Eingabe Zahlbetrag" -font TkCaptionFont -justify right -anchor w 
+label .invCommentH -text "Anmerkung" -font TkCaptionFont -justify right -anchor w
+             
+##Pack with fixed gaps - must correspond with gaps given in fillAdrInvWin
 pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x -padx 10
 pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x -padx 10
 set invF .n.t1.mainF.invF
 set headF .n.t1.mainF.headF
-pack .invNoH .invDatH .invartH .invSumH .invPayedH .invcommH -in $headF -side left
-#pack .invShowH -in $headF -side right
 
+pack .invNoH .invDatH .invArtH .invSumH .invPayedSumH .invPayedDateH .invPaymentEntryH .invCommentH -in $headF -side left -padx 10
+pack .invNoH -padx 0
+pack .invDatH -padx 0
 
+	
 ########################################################################################
 # T A B  2 :   N E W   I N V O I C E
 ########################################################################################
