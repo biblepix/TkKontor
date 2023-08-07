@@ -290,6 +290,7 @@ proc doSaveInv {} {
 proc saveInv2DB {} {
   global db env msg texDir itemFile name1 name2 city
   global cond ref comm auftrDat vat
+  
   set adrNo [.adrSB get]
 
   #1. Get invNo & export to ::Latex 
@@ -301,7 +302,6 @@ proc saveInv2DB {} {
 	#Get current vars from GUI
   set shortAdr "$name1 $name2, $city"
   set shortDesc $rows::article
-  
   
   # set subtot $rows::buch
   set invTotal $rows::bill
@@ -346,7 +346,7 @@ proc saveInv2DB {} {
 
   #3. Make entry for vatlesssum if different from finalsum
   set vatlesssum $invTotal
-  if {$vat < 0} {
+  if {$vat > 0} {
     set vatlesssum [expr ($vat * $finalsum)/100]
   }
 
@@ -448,6 +448,8 @@ proc fillAdrInvWin {adrId} {
     set anzeige 0
 
     set adrId [.adrSB get]
+
+#TODO: change name of column from ts to ...?
     set custId [db eval "SELECT ts FROM address WHERE objectid = $adrId"]
 
 
@@ -524,7 +526,7 @@ set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
 			  catch {label $invF.$n.invArtL -justify left -anchor w -width 34}
 
 			  $invF.$n.invArtL conf -text $article
-			  catch {label $invF.$n.invSumL -justify right -anchor e -width 19}
+			  catch {label $invF.$n.invSumL -justify right -anchor e -width 12}
 			  $invF.$n.invSumL conf -text $invTotal
 
         #create label/entry for Bezahlt, packed later
@@ -532,7 +534,8 @@ set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
         catch {label $invF.$n.payedSumL -justify right -anchor e -width 12}
         $invF.$n.payedSumL conf -text $bezahlt
         catch {label $invF.$n.payedDatL -text $payeddate -justify right -anchor w -width 10}
-        catch {entry $invF.$n.zahlenE -bg beige -fg black -justify left -state disabled }
+        
+        catch {entry $invF.$n.zahlenE -bg beige -fg black -justify left -state disabled -width 10}
         .invPaymentEntryH conf -fg grey
         catch {label $invF.$n.commentL}
 
@@ -554,7 +557,7 @@ pack $invF.$n.payedDatL -padx 26
 		      .invPaymentEntryH conf -fg black 
           $invF.$n.payedSumL conf -fg red
           
- #  TODO lindex stimmt nicht mit Zeilennummer überein!!!!!!!!!!!!!! warum?
+ #  TODO lindex stimmt nicht mit Zeilennummer überein!!!!!!!!!!!!!! - Farbe ändert nicht, warum?
           $invF.$n.zahlenE conf -state normal
           $invF.$n.zahlenE conf -background beige
           $invF.$n.zahlenE conf -validate focusout -vcmd "savePaymentEntry %P %W $n"

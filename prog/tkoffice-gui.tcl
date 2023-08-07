@@ -3,7 +3,10 @@
 # Salvaged: 1nov17
 # Updated for use with SQlite: Sep22
 # Updated 28july23
-		
+
+#NOTE: 'tklib' required for 'tablelist'
+#Documentation in www.nemethi.de
+	
 set version 2.0
 set px 5
 set py 5
@@ -187,7 +190,7 @@ label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 11
 label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 11
 label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 30
 
-label .invSumH -text "Rechnungsbetrag" -font TkCaptionFont -justify right -anchor w -width 16
+label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 12
 label .invPayedSumH -text "Bezahlt $currency" -font TkCaptionFont -justify right -anchor w -width 12
 label .invPayedDateH -text "Zahldatum" -font TkCaptionFont -justify center -anchor n -width 12        
 label .invPaymentEntryH -text "Eingabe Zahlbetrag" -font TkCaptionFont -justify right -anchor w 

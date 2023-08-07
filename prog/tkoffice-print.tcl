@@ -127,10 +127,13 @@ proc printInvoice {invNo} {
   set docType pdf 
 
   #B) Retrieve from Spool OR retrieve from DB & run Latex
-  if ![file exists $docPath] {
+  
+  #TODO commenting out for testing! 
+  
+#  if ![file exists $docPath] {
       
     if ![catch {fetchInvData $invNo}] {
-      puts "Latexing ..."
+      puts "Latexing invoice $invNo..."
       latexInvoice $invNo
       
     } else {
@@ -139,7 +142,7 @@ proc printInvoice {invNo} {
       return 1  
     }
   
-  }
+ # }
   
   after idle detectViewer $docPath pdf
 
@@ -166,7 +169,8 @@ proc latexInvoice {invNo} {
   
   namespace eval Latex {
     #catch is inevitable, too much useless output - so no control other than below...
-    catch { exec -- pdflatex -dBATCH -interaction nonstopmode -output-directory $tmpDir $invTexPath } latexerr
+    #catch { exec -- pdflatex -dBATCH -interaction nonstopmode -output-directory $tmpDir $invTexPath } latexerr
+    catch { exec -- pdflatex -interaction nonstopmode -output-directory $tmpDir $invTexPath } latexerr
   }  
 
 if [info exists latexerr] {puts $latexerr}
@@ -175,7 +179,9 @@ if [info exists latexerr] {puts $latexerr}
   after idle file copy -force [setInvPath $invNo pdftmp] $spoolDir
  
   cd $tkoDir 
-  after idle  namespace delete Latex 
+ 
+ #TODO commented for testing
+#  after idle  namespace delete Latex 
 
 } ;#END latexInvoice
 
