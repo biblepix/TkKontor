@@ -2,7 +2,7 @@
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
 # Updated for use with SQLite: 9sep22
-# Updated 05aug23
+# Updated 12aug23
 
 catch {source $confFile}
 ################################################################################################################
@@ -237,6 +237,11 @@ proc addInvRow {} {
 ## args = artType (can be empty)
 ## called by "delete row" label in new invoice dialog
 proc deleteInvRow {F rowtot args} {
+
+#TODO jesh balagan with rows:: vars !!!!!!!!!!!
+# info vars rows::* gives much more info to be considered.
+# Sonuç: silinen diziler hesaplanmasa da, hesapta gösteriyor.
+
   global rows::bill
   global rows::buch
   global rows::rabatt
@@ -417,11 +422,22 @@ proc saveInv2DB {} {
 ##called by fillAdrInvWin & newAddress
 proc clearAdrInvWin {} {
 	global invF
-  set slaveList [pack slaves $invF]
-  foreach  w $slaveList {
-    foreach w [pack slaves $w] {
-      pack forget $w
+	
+	#Empty columns except Headers
+	lappend columnL $invF.c1 $invF.c2 $invF.c3 $invF.c4 $invF.c5 $invF.c6 $invF.c7 $invF.c8
+puts $columnL
+  
+  foreach col $columnL {
+    
+    set itemL [pack slaves $col]
+puts $itemL
+    
+      foreach i $itemL {
+      if { [string index $i end] != "H"} {
+        pack forget $i
+      }
     }
+  
   }
 }
 
@@ -488,16 +504,17 @@ set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
         set normal $wechselfarbe
         
     #Create row per invoice
-    for {set n 0} {$n<$nTuples} {incr n} {
+    for {set row 0} {$row<$nTuples} {incr row} {
     
-      namespace eval $n {
+      namespace eval $row {
 
         set n [namespace tail [namespace current]]
         set invF $::invF
+        set row $n
         
         #compute Rechnungsbetrag from sumtotal+auslage
-			  set sumtotal [lindex $::verbucht::sumtotalT $n]
-			  set auslage [lindex $::verbucht::auslageT $n]
+			  set sumtotal [lindex $::verbucht::sumtotalT $row]
+			  set auslage [lindex $::verbucht::auslageT $row]
 
 			  if {[string is double $auslage] && $auslage >0} {
   			  set invTotal [expr $sumtotal + $auslage]
@@ -505,79 +522,88 @@ set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
 			    set invTotal $sumtotal
 			  } 
 			  
-			  set ts [lindex $::verbucht::statusT $n]
-			  set invNo [lindex $::verbucht::invL $n]
-        set invdat [lindex $::verbucht::invDatT $n]
-			  set article [lindex $::verbucht::articleT $n]
-        set comment [lindex $::verbucht::commT $n]
-        set payeddate [lindex $::verbucht::payeddate $n] 
-
+			  set ts [lindex $::verbucht::statusT $row]
+			  set invNo [lindex $::verbucht::invL $row]
+        set invdat [lindex $::verbucht::invDatT $row]
+			  set article [lindex $::verbucht::articleT $row]
+        set comment [lindex $::verbucht::commT $row]
+        set payeddate [lindex $::verbucht::payeddate $row] 
+        set bezahlt [lindex $::verbucht::payedsumT $row]
+        
 			  #increase but don't overwrite frames per line	
-			  catch {frame $invF.$n}
-			  pack $invF.$n -anchor nw -side top -fill x -expand 0
+			  catch {frame $invF.$row}
+			  pack $invF.$row -anchor nw -side top -fill x -expand 0
 
     		#create entries per line, or refill present entries
     		## with fixed widths corresponding to GUI
-			  catch {label $invF.$n.invNoL -anchor w -width 11}
-			  $invF.$n.invNoL conf -text $invNo
-        catch {label $invF.$n.invDatL -anchor w -justify left -width 11}
-        $invF.$n.invDatL conf -text $invdat
+			  
+			  catch {label .invNoL-$row -anchor w -width 11}
+			  .invNoL-$row conf -text $invNo
+        
+        catch {label .invDatL-$row -anchor w -justify left -width 11}
+        .invDatL-$row conf -text $invdat
+        
         ##letter width of TkDefaultFont is 1.2 bigger than TkHeaderFont!
-			  catch {label $invF.$n.invArtL -justify left -anchor w -width 34}
+			  catch {label .invArtL-$row -justify left -anchor w -width 34}
+			  .invArtL-$row conf -text $article
 
-			  $invF.$n.invArtL conf -text $article
-			  catch {label $invF.$n.invSumL -justify right -anchor e -width 12}
-			  $invF.$n.invSumL conf -text $invTotal
+			  catch {label .invSumL-$row -justify right -anchor e -width 12}
+			  .invSumL-$row conf -text $invTotal
 
         #create label/entry for Bezahlt, packed later
-        set bezahlt [lindex $::verbucht::payedsumT $n]
-        catch {label $invF.$n.payedSumL -justify right -anchor e -width 12}
-        $invF.$n.payedSumL conf -text $bezahlt
-        catch {label $invF.$n.payedDatL -text $payeddate -justify right -anchor w -width 10}
+        catch {label .payedSumL-$row -justify right -anchor e -width 12}
+        .payedSumL-$row conf -text $bezahlt
         
-        catch {entry $invF.$n.zahlenE -bg beige -fg black -justify left -state disabled -width 10}
-        .invPaymentEntryH conf -fg grey
-        catch {label $invF.$n.commentL}
+        catch {label .payedDatL-$row -text $payeddate -justify right -anchor w -width 10}
+        
+        catch {entry .zahlenE-$row -bg beige -fg black -justify left -state disabled -width 10}
+        #.zahlenE conf -fg grey
+        
+        catch {label .commentL-$row}
 
-#Pack with gaps, corresponding to headers in GUI
-pack $invF.$n.invNoL $invF.$n.invDatL $invF.$n.invArtL $invF.$n.invSumL $invF.$n.payedSumL $invF.$n.payedDatL $invF.$n.zahlenE $invF.$n.commentL -side left -padx 10
-pack $invF.$n.invNoL -padx 0 
-pack $invF.$n.invDatL -padx 30
-pack $invF.$n.payedDatL -padx 26
+        #Pack all in corresponding columns
+        pack .invNoL-$row -in $invF.c1 
+        pack .invDatL-$row -in $invF.c2
+        pack .invArtL-$row -padx 0 -in $invF.c3
+        pack .invSumL-$row -padx 30 -in $invF.c4
+        pack .payedSumL-$row -padx 26 -in $invF.c5
+        pack .payedDatL-$row -in $invF.c6
+        pack .zahlenE-$row -in $invF.c7
+        pack .commentL-$row -in $invF.c8
 
 			  if {$ts==3} {
 			  
-			    $invF.$n.payedSumL conf -fg green
-				  $invF.$n.commentL conf -fg grey -text $comment -textvar {}
+			    .payedSumL-$row conf -fg green
+				  .commentL-$row conf -fg grey -text $comment -textvar {}
           
 			    			    
         #If 1 or 2 activate entry widget
 			  } else {
 			  
-		      .invPaymentEntryH conf -fg black 
-          $invF.$n.payedSumL conf -fg red
+		      .zahlenE-$row conf -fg black 
+          .payedSumL-$row conf -fg red
           
  #  TODO lindex stimmt nicht mit Zeilennummer überein!!!!!!!!!!!!!! - Farbe ändert nicht, warum?
-          $invF.$n.zahlenE conf -state normal
-          $invF.$n.zahlenE conf -background beige
-          $invF.$n.zahlenE conf -validate focusout -vcmd "savePaymentEntry %P %W $n"
+          .zahlenE-$row conf -state normal
+          .zahlenE-$row conf -background beige
+          .zahlenE-$row conf -validate focusout -vcmd "savePaymentEntry %P %W $n"
 
 			    set ::verbucht::eingabe 1
           set restbetrag "Restbetrag eingeben und mit Tab-Taste quittieren"
           set gesamtbetrag "Zahlbetrag eingeben und mit Tab-Taste quittieren"
-          $invF.$n.commentL conf -fg red -textvar gesamtbetrag
+          .commentL-$row conf -fg red -textvar gesamtbetrag
           
 				  
         #if 2 (Teilzahlung) include payed amount
 				  if {$ts==2} {
                 
-					  $invF.$n.commentL conf -fg maroon -textvar restbetrag
-					  $invF.$n.payedSumL conf -fg maroon
+					  .commentL-$row conf -fg maroon -textvar restbetrag
+					  .payedSumL-$row conf -fg maroon
 				  }
 			  }
 
         #create comment btn
-			  catch {label $invF.$n.commentL -width 50 -justify left -anchor w -padx 35}
+			  #catch {label $invF.$n.commentL -width 50 -justify left -anchor w -padx 35}
 			  
         #Modulo: colour lines alternately if more than 5 lines
         set normal #d9d9d9
@@ -585,16 +611,16 @@ pack $invF.$n.payedDatL -padx 26
         foreach w [winfo children $invF.$n] {$w conf -bg $wechselfarbe}
         
         #Bind invNo labels to highlighting on hover & command on double-click
-			  bind $invF.$n.invNoL <Enter> "%W conf -bg orange"
-			  bind $invF.$n.invNoL <Leave> "%W conf -bg $wechselfarbe"
-			  bind $invF.$n.invNoL <Double-1> "printInvoice $invNo"
+			  bind .invNoL-$row <Enter> "%W conf -bg orange"
+			  bind .invNoL-$row <Leave> "%W conf -bg $wechselfarbe"
+			  bind .invNoL-$row <Double-1> "printInvoice $invNo"
  		
   		} ;#END ns $n
 
     } ;#END for loop
 
     #Recolour lines to normal if only few
-    if {$n < 5} {
+    if {$row < 5} {
       foreach f [winfo children $invF] {
         foreach w [winfo children $f] {
           $w conf -bg $normal
@@ -692,10 +718,10 @@ proc savePaymentEntry {newPayedsum curEName ns} {
   }
 
 #puts "OldCredit $oldCredit"
-puts "NewCredit $newCredit"
-puts "OldPS $oldPayedsum"
-puts "NewPS $newPayedsum"
-puts "status $status"
+#puts "NewCredit $newCredit"
+#puts "OldPS $oldPayedsum"
+#puts "NewPS $newPayedsum"
+#puts "status $status"
 #puts "diff $diff"
 
 	# S a v e  totalPayedsum  to 'invoice' 
@@ -712,19 +738,20 @@ puts "status $status"
   ##delete OR reset zahlen entry
   if {$status == 3} {
     pack forget $curEName
- 		$invF.$rowNo.payedSumL conf -text $totalPayedsum -fg green
-    pack forget $invF.$rowNo.commentL
+ 		.payedSumL conf -text $totalPayedsum -fg green
+    pack forget .commentL
     
   } else {
   
     $curEName delete 0 end
     $curEName conf -validate focusout -vcmd "savePaymentEntry %P %W $ns"
- 		$invF.$rowNo.payedSumL conf -text $totalPayedsum -fg maroon
+ 		.payedSumL conf -text $totalPayedsum -fg maroon
   }
     
   set ::credit [updateCredit $adrNo]
   NewsHandler::QueryNews "Das aktuelle Kundenguthaben beträgt $newCredit" green
   return 0
+  
 } ;#END savePaymentEntry
 
 # updateCredit
@@ -796,7 +823,8 @@ proc storno {id} {
 	db eval "DELETE $code"
 	NewsHandler::QueryNews "Buchung Nr. $id erfolgreich storniert." green
 	fillAdrInvWin $id
-}
+
+} ;#END storno
 
 # fetchInvData
 ##1.retrieves invoice data from DB

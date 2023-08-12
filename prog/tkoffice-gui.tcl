@@ -159,6 +159,7 @@ pack $adrSearch .adrNewBtn .adrChgBtn .adrDelBtn -in .adrF3 -anchor ne
 #########################################################################################
 # T A B 1 :  I N V O I C E   L I S T
 #########################################################################################
+
 #pack [frame .umsatzF] -in .n.t1 -fill x -side bottom
 .umsatzF conf -bd 2 -relief sunken
 
@@ -189,22 +190,32 @@ pack .umsatzM .umsatzL -in .umsatzF -side right -anchor e
 label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 11
 label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 11
 label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 30
-
 label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 12
 label .invPayedSumH -text "Bezahlt $currency" -font TkCaptionFont -justify right -anchor w -width 12
-label .invPayedDateH -text "Zahldatum" -font TkCaptionFont -justify center -anchor n -width 12        
+label .invPayedDatH -text "Zahldatum" -font TkCaptionFont -justify center -anchor n -width 12        
 label .invPaymentEntryH -text "Eingabe Zahlbetrag" -font TkCaptionFont -justify right -anchor w 
 label .invCommentH -text "Anmerkung" -font TkCaptionFont -justify right -anchor w
              
+
 ##Pack with fixed gaps - must correspond with gaps given in fillAdrInvWin
-pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x -padx 10
+#pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x -padx 10
 pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x -padx 10
 set invF .n.t1.mainF.invF
-set headF .n.t1.mainF.headF
+#instead the above do:
+#pack [frame .n.t1.mainF] -anchor nw -fill both 
+pack [frame $invF.c1] [frame $invF.c2] [frame $invF.c3] [frame $invF.c4] [frame $invF.c5] [frame $invF.c6] [frame $invF.c7] [frame $invF.c8] -side left -fill y -padx 10
 
-pack .invNoH .invDatH .invArtH .invSumH .invPayedSumH .invPayedDateH .invPaymentEntryH .invCommentH -in $headF -side left -padx 10
-pack .invNoH -padx 0
-pack .invDatH -padx 0
+
+#set headF .n.t1.mainF.headF
+pack .invNoH -in $invF.c1 -pady 7
+pack .invDatH -in $invF.c2 -pady 7
+pack .invArtH -in $invF.c3 -pady 7
+pack .invSumH -in $invF.c4 -pady 7
+pack .invPayedSumH -in $invF.c5 -pady 7
+pack .invPayedDatH -in $invF.c6 -pady 7
+pack .invPaymentEntryH -in $invF.c7 -pady 7
+pack .invCommentH -in $invF.c8 -pady 7
+
 
 	
 ########################################################################################
