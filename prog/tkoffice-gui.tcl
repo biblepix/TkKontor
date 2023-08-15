@@ -86,9 +86,17 @@ createTkOfficeLogo
 pack [frame .umsatzF] -in .n.t1 -side bottom  -fill x
 
 #Tab 1
-pack [frame .n.t1.mainF] -fill x -expand 0
-pack [frame .n.t1.mainF.f2 -pady 10 -padx 10] -anchor nw -fill x
-pack [frame .n.t1.mainF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
+pack [frame .n.t1.topF] -fill x -pady 10 -padx 10
+pack [frame .n.t1.midF] -fill x -pady 10 -padx 10 ;#for permanent Headers
+
+frame .n.t1.botF1 ;# for canvas
+frame .n.t1.botF2 ;# for scrollbar
+pack .n.t1.botF1 .n.t1.botF2 -side left
+#pack .n.t1.botF1 -fill both -expand 1
+#pack .n.t1.botF2 -fill y
+
+#pack [frame .n.t1.topF.f2 ] -anchor nw -fill x
+#pack [frame .n.t1.topF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
 
 #Tab 2
 pack [frame .n.t2.f1a -pady $py -padx $px -bd 5] -anchor nw -fill x
@@ -114,13 +122,13 @@ pack [frame .n.t4.f5 -pady $py -padx $px -borderwidth 5 -highlightbackground sil
 #Pack 3 top frames seitwärts
 #Create "Adressen" title
 label .adrTitel -text "Adressverwaltung" -font TIT -pady 5 -padx 5 -anchor w -fg steelblue -bg silver
-pack .adrTitel -in .n.t1.mainF.f2 -anchor w -fill x
+pack .adrTitel -in .n.t1.topF -anchor w -fill x
 
 ##obere Frames in .n.t1.f2
-pack [frame .adrF2 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
-pack [frame .adrF4 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.mainF.f2 -side left
-pack [frame .adrF1] -anchor nw -in .n.t1.mainF.f2 -side left
-pack [frame .adrF3] -anchor se -in .n.t1.mainF.f2 -expand 1 -side left
+pack [frame .adrF2 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.topF -side left
+pack [frame .adrF4 -bd 3 -relief flat -bg lightblue -pady $py -padx $px] -anchor nw -in .n.t1.topF -side left
+pack [frame .adrF1] -anchor nw -in .n.t1.topF -side left
+pack [frame .adrF3] -anchor se -in .n.t1.topF -expand 1 -side left
 
 ##create Address number 
 set adrSpin [spinbox .adrSB -takefocus 1 -width 15 -bg lightblue -justify right -textvar adrNo]
@@ -178,44 +186,50 @@ message .creditM -textvar credit -relief sunken -width 50
 label .umsatzL -text "Kundenumsatz: $currency " -font "TkCaptionFont"
 message .umsatzM -textvar umsatz -relief sunken -bg lightblue -width 50
 
-pack .adrInvTitel -in .n.t1.mainF.f3 -anchor w -fill x -padx 10 -pady 0
-pack .adrInfoPfeil -in .n.t1.mainF.f3 -anchor w -padx 10 -side left
-pack .adrInvInfo -in .n.t1.mainF.f3 -anchor w -side left
+#Pack midFrame
+pack .adrInvTitel -in .n.t1.midF -anchor w -fill x -padx 10 -pady 0
+pack .adrInfoPfeil -in .n.t1.midF -anchor w -padx 10 -side left
+pack .adrInvInfo -in .n.t1.midF -anchor w -side left
   
 #Umsatz unten
 pack .creditL .creditM .credit2L -in .umsatzF -side left -anchor w
 pack .umsatzM .umsatzL -in .umsatzF -side right -anchor e
 
 #Create Rechnungen Kopfdaten
-label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 11
-label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 11
+label .invNoH -text "Nr."  -font TkCaptionFont -justify left -anchor w -width 10
+label .invDatH -text "Datum"  -font TkCaptionFont -justify left -anchor w -width 10
 label .invArtH -text "Artikel" -font TkCaptionFont -justify left -anchor w -width 30
-label .invSumH -text "Betrag" -font TkCaptionFont -justify right -anchor w -width 12
-label .invPayedSumH -text "Bezahlt $currency" -font TkCaptionFont -justify right -anchor w -width 12
-label .invPayedDatH -text "Zahldatum" -font TkCaptionFont -justify center -anchor n -width 12        
+label .invSumH -text "Betrag $currency" -font TkCaptionFont -justify right -anchor w -width 10
+label .invPayedSumH -text "Bezahlt $currency" -font TkCaptionFont -justify right -anchor w -width 10
+label .invPayedDatH -text "Zahldatum" -font TkCaptionFont -justify left -anchor w -width 10        
 label .invPaymentEntryH -text "Eingabe Zahlbetrag" -font TkCaptionFont -justify right -anchor w 
-label .invCommentH -text "Anmerkung" -font TkCaptionFont -justify right -anchor w
+label .invCommentH -text "Anmerkung" -font TkCaptionFont -justify left -anchor w
              
+#Pack labels into columns, gaps controlled by label widths & frame x-pads
+canvas .invC -width 1200 -height 700
+pack .invC -in .n.t1.botF1 -fill both -expand 1
 
-##Pack with fixed gaps - must correspond with gaps given in fillAdrInvWin
-#pack [frame .n.t1.mainF.headF -padx $px] -anchor nw -fill x -padx 10
-pack [frame .n.t1.mainF.invF -padx $px] -anchor nw -fill x -padx 10
-set invF .n.t1.mainF.invF
-#instead the above do:
-#pack [frame .n.t1.mainF] -anchor nw -fill both 
-pack [frame $invF.c1] [frame $invF.c2] [frame $invF.c3] [frame $invF.c4] [frame $invF.c5] [frame $invF.c6] [frame $invF.c7] [frame $invF.c8] -side left -fill y -padx 10
+frame .invC.invF
+set invF .invC.invF
+
+pack [frame .c1] [frame .c2] [frame .c3] [frame .c4] [frame .c5] [frame .c6] [frame .c7] [frame .c8]  -padx 10 -anchor w -in $invF -side left -fill y -expand 1
 
 
-#set headF .n.t1.mainF.headF
-pack .invNoH -in $invF.c1 -pady 7
-pack .invDatH -in $invF.c2 -pady 7
-pack .invArtH -in $invF.c3 -pady 7
-pack .invSumH -in $invF.c4 -pady 7
-pack .invPayedSumH -in $invF.c5 -pady 7
-pack .invPayedDatH -in $invF.c6 -pady 7
-pack .invPaymentEntryH -in $invF.c7 -pady 7
-pack .invCommentH -in $invF.c8 -pady 7
+.invC conf -yscrollcommand {.invSB set}
 
+scrollbar .invSB -command {.invC yview}
+pack .invSB -in .n.t1.botF2 -side right -fill y
+
+pack .invNoH -in .c1 -pady 7
+pack .invDatH -in .c2 -pady 7
+pack .invArtH -in .c3 -pady 7
+pack .invSumH -in .c4 -pady 7
+pack .invPayedSumH -in .c5 -pady 7
+pack .invPayedDatH -in .c6 -pady 7
+pack .invPaymentEntryH -in .c7 -pady 7
+pack .invCommentH -in .c8 -pady 7 -anchor w
+
+.invC create window 0 0 -window $invF -anchor nw
 
 	
 ########################################################################################

@@ -424,13 +424,11 @@ proc clearAdrInvWin {} {
 	global invF
 	
 	#Empty columns except Headers
-	lappend columnL $invF.c1 $invF.c2 $invF.c3 $invF.c4 $invF.c5 $invF.c6 $invF.c7 $invF.c8
-puts $columnL
+	lappend columnL .c1 .c2 .c3 .c4 .c5 .c6 .c7 .c8
   
   foreach col $columnL {
     
     set itemL [pack slaves $col]
-puts $itemL
     
       foreach i $itemL {
       if { [string index $i end] != "H"} {
@@ -562,14 +560,14 @@ set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
         catch {label .commentL-$row}
 
         #Pack all in corresponding columns
-        pack .invNoL-$row -in $invF.c1 
-        pack .invDatL-$row -in $invF.c2
-        pack .invArtL-$row -padx 0 -in $invF.c3
-        pack .invSumL-$row -padx 30 -in $invF.c4
-        pack .payedSumL-$row -padx 26 -in $invF.c5
-        pack .payedDatL-$row -in $invF.c6
-        pack .zahlenE-$row -in $invF.c7
-        pack .commentL-$row -in $invF.c8
+        pack .invNoL-$row -in .c1 -anchor w 
+        pack .invDatL-$row -in .c2 -anchor w
+        pack .invArtL-$row -padx 0 -in .c3 -anchor w
+        pack .invSumL-$row -padx 30 -in .c4 -anchor e
+        pack .payedSumL-$row -padx 26 -in .c5 -anchor e
+        pack .payedDatL-$row -in .c6 -anchor w
+        pack .zahlenE-$row -in .c7 -anchor w
+        pack .commentL-$row -in .c8 -anchor w
 
 			  if {$ts==3} {
 			  
