@@ -2,7 +2,7 @@
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
 # Updated for use with SQLite: 9sep22
-# Updated 12aug23
+# Updated 19aug23
 
 catch {source $confFile}
 ################################################################################################################
@@ -421,10 +421,10 @@ proc saveInv2DB {} {
 # clearAdrInvWin
 ##called by fillAdrInvWin & newAddress
 proc clearAdrInvWin {} {
-	global invF
+	global invF c1 c2 c3 c4 c5 c6 c7 c8
 	
 	#Empty columns except Headers
-	lappend columnL .c1 .c2 .c3 .c4 .c5 .c6 .c7 .c8
+	lappend columnL $c1 $c2 $c3 $c4 $c5 $c6 $c7 $c8
   
   foreach col $columnL {
     
@@ -444,6 +444,7 @@ proc clearAdrInvWin {} {
 ##Note: ts=customerOID in 'address', now identical with objectid,needed for identification with 'invoice'
 proc fillAdrInvWin {adrId} {
   global invF db
+  global c1 c2 c3 c4 c5 c6 c7 c8
 
   #Delete previous frames
   clearAdrInvWin
@@ -460,18 +461,59 @@ proc fillAdrInvWin {adrId} {
     ##set ::verbucht vars to manipulate header visibility
     set eingabe 0
     set anzeige 0
-
     set adrId [.adrSB get]
 
 #TODO: change name of column from ts to ...?
     set custId [db eval "SELECT ts FROM address WHERE objectid = $adrId"]
+    set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
 
+#TODO use (lreplace)  lrange! instead!!!!
+for {set max 25} {n <= $max} {incr n} {
+  lappend [lindex $invL $n] invL-$no
+  incr no
+}  
 
-set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
 #TODO ...
 #    set invL [lsort -decreasing [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]]
-    set nTuples [llength $invL]
+ 
+ 
+   set nTuples [llength $invL]
 
+#TODO limit nTuples to 25 per page !!!!!!
+## activating scrolling for next pages
+## continue from last 'number' in invL, i.e remember position in list!
+## watch umsatzL, which must comprise ALL turnover from customer
+
+# invScroll
+## checks if invL has more than 25 entries & writes 1 or several 25 item vars into ::verbucht
+## called by .invSB scrollbar?
+proc invScroll {invL nTuples} {
+  
+  namespace eval verbucht {
+    variable invL-1
+  }
+
+  if {$nTuples <= 25} {
+    set verbucht::invL-1 $invL
+    return 
+  } 
+
+#TODO is this doing what I want?
+set numChunks [expr ceil($nTuples./25)]
+
+  #split invL into 25 item chunks & save into vars
+  for {set num $numChunks} {max <= $num} {incr num} {
+    
+    
+    set invL-$num [lrange $invL 0 24 ...] ;#da got no nöd!
+    variable verbucht::invL-$no $invL-$no
+  
+  } 
+  #TODO Handle rest! ??
+  
+} ;#END invScroll
+  	
+  	
   	#exit if no invoices found
   	if {$nTuples == -1} {return 1}
 
@@ -560,14 +602,14 @@ set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
         catch {label .commentL-$row}
 
         #Pack all in corresponding columns
-        pack .invNoL-$row -in .c1 -anchor w 
-        pack .invDatL-$row -in .c2 -anchor w
-        pack .invArtL-$row -padx 0 -in .c3 -anchor w
-        pack .invSumL-$row -padx 30 -in .c4 -anchor e
-        pack .payedSumL-$row -padx 26 -in .c5 -anchor e
-        pack .payedDatL-$row -in .c6 -anchor w
-        pack .zahlenE-$row -in .c7 -anchor w
-        pack .commentL-$row -in .c8 -anchor w
+        pack .invNoL-$row -in $c1 -anchor w 
+        pack .invDatL-$row -in $c2 -anchor w
+        pack .invArtL-$row -padx 0 -in $c3 -anchor w
+        pack .invSumL-$row -padx 30 -in $c4 -anchor e
+        pack .payedSumL-$row -padx 26 -in $c5 -anchor e
+        pack .payedDatL-$row -in $c6 -anchor w
+        pack .zahlenE-$row -in $c7 -anchor w
+        pack .commentL-$row -in $c8 -anchor w
 
 			  if {$ts==3} {
 			  

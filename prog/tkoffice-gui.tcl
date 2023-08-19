@@ -2,7 +2,7 @@
 # ~/tkoffice/prog/tkoffice-gui.tcl
 # Salvaged: 1nov17
 # Updated for use with SQlite: Sep22
-# Updated 28july23
+# Updated 28aug23
 
 #NOTE: 'tklib' required for 'tablelist'
 #Documentation in www.nemethi.de
@@ -91,12 +91,8 @@ pack [frame .n.t1.midF] -fill x -pady 10 -padx 10 ;#for permanent Headers
 
 frame .n.t1.botF1 ;# for canvas
 frame .n.t1.botF2 ;# for scrollbar
-pack .n.t1.botF1 .n.t1.botF2 -side left
-#pack .n.t1.botF1 -fill both -expand 1
-#pack .n.t1.botF2 -fill y
-
-#pack [frame .n.t1.topF.f2 ] -anchor nw -fill x
-#pack [frame .n.t1.topF.f3 -borderwidth 0 -pady 10] -anchor nw -fill x
+pack .n.t1.botF1 -side left -expand 1 -anchor nw 
+pack .n.t1.botF2 -side right -anchor se
 
 #Tab 2
 pack [frame .n.t2.f1a -pady $py -padx $px -bd 5] -anchor nw -fill x
@@ -168,7 +164,6 @@ pack $adrSearch .adrNewBtn .adrChgBtn .adrDelBtn -in .adrF3 -anchor ne
 # T A B 1 :  I N V O I C E   L I S T
 #########################################################################################
 
-#pack [frame .umsatzF] -in .n.t1 -fill x -side bottom
 .umsatzF conf -bd 2 -relief sunken
 
 #TODO pack all into canvas w/ scrollbar!
@@ -206,30 +201,41 @@ label .invPaymentEntryH -text "Eingabe Zahlbetrag" -font TkCaptionFont -justify 
 label .invCommentH -text "Anmerkung" -font TkCaptionFont -justify left -anchor w
              
 #Pack labels into columns, gaps controlled by label widths & frame x-pads
-canvas .invC -width 1200 -height 700
-pack .invC -in .n.t1.botF1 -fill both -expand 1
+##outer frame
+#canvas .invC 
+#pack .invC -in .n.t1.botF1 -fill both -expand 1 -padx 50 -pady 50 -side left -anchor nw
+##inner frame
+#pack [frame .invC.invF]
+set invF .n.t1.botF1
 
-frame .invC.invF
-set invF .invC.invF
+pack [frame $invF.c1] [frame $invF.c2] [frame $invF.c3] [frame $invF.c4] [frame $invF.c5] [frame $invF.c6] [frame $invF.c7] [frame $invF.c8] -padx 10 -anchor nw -side left
 
-pack [frame .c1] [frame .c2] [frame .c3] [frame .c4] [frame .c5] [frame .c6] [frame .c7] [frame .c8]  -padx 10 -anchor w -in $invF -side left -fill y -expand 1
+set c1 $invF.c1
+set c2 $invF.c2
+set c3 $invF.c3
+set c4 $invF.c4
+set c5 $invF.c5
+set c6 $invF.c6
+set c7 $invF.c7
+set c8 $invF.c8
 
+#pack headers into columns
+pack .invNoH -in $c1 -pady 7 -anchor n
+pack .invDatH -in $c2 -pady 7
+pack .invArtH -in $c3 -pady 7
+pack .invSumH -in $c4 -pady 7
+pack .invPayedSumH -in $c5 -pady 7
+pack .invPayedDatH -in $c6 -pady 7
+pack .invPaymentEntryH -in $c7 -pady 7
+pack .invCommentH -in $c8 -pady 7 -anchor w
 
-.invC conf -yscrollcommand {.invSB set}
+#Create scrollbar
+scrollbar .invSB -command {invScroll}
+pack .invSB -in .n.t1.botF2 -fill y
 
-scrollbar .invSB -command {.invC yview}
-pack .invSB -in .n.t1.botF2 -side right -fill y
+#.invC conf -yscrollcommand {.invSB set} ;#-width [winfo width .n] -height [winfo height .n]
+#.invC create window 0 0 -window $invF -tags inv -anchor nw ;# -width [winfo width .invC] -height [winfo height .invC] 
 
-pack .invNoH -in .c1 -pady 7
-pack .invDatH -in .c2 -pady 7
-pack .invArtH -in .c3 -pady 7
-pack .invSumH -in .c4 -pady 7
-pack .invPayedSumH -in .c5 -pady 7
-pack .invPayedDatH -in .c6 -pady 7
-pack .invPaymentEntryH -in .c7 -pady 7
-pack .invCommentH -in .c8 -pady 7 -anchor w
-
-.invC create window 0 0 -window $invF -anchor nw
 
 	
 ########################################################################################
