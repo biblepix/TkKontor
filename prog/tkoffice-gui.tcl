@@ -166,9 +166,6 @@ pack $adrSearch .adrNewBtn .adrChgBtn .adrDelBtn -in .adrF3 -anchor ne
 
 .umsatzF conf -bd 2 -relief sunken
 
-#TODO pack all into canvas w/ scrollbar!
-#main prog is fillAdrInvWin, but it may not have to be changed...
-
 #Create "Rechnungen" Titel
 label .adrInvTitel -justify center -text "Verbuchte Rechnungen" -font TIT -pady 5 -padx 5 -anchor w -fg steelblue -bg silver
 
@@ -229,13 +226,10 @@ pack .invPayedDatH -in $c6 -pady 7
 pack .invPaymentEntryH -in $c7 -pady 7
 pack .invCommentH -in $c8 -pady 7 -anchor w
 
-#Create scrollbar
-scrollbar .invSB -command {invScroll}
-pack .invSB -in .n.t1.botF2 -fill y
-
-#.invC conf -yscrollcommand {.invSB set} ;#-width [winfo width .n] -height [winfo height .n]
-#.invC create window 0 0 -window $invF -tags inv -anchor nw ;# -width [winfo width .invC] -height [winfo height .invC] 
-
+#Create up+down buttons
+button .invupBtn -text ⬆️ -command {invSelectPage up}
+button .invdownBtn -text ⬇️ -command {invSelectPage down}
+pack .invdownBtn .invupBtn -in .n.t1.botF2 -side bottom
 
 	
 ########################################################################################

@@ -1,7 +1,7 @@
 # ~/TkOffice/prog/tkoffice-procs.tcl
 # called by tkoffice-gui.tcl
 # Salvaged: 1nov17
-# Updated: 28jul23
+# Updated: 23aug23
 
 ###############################################################
 ### G E N E R A L   &&   A D D R E S S  P R O C S
@@ -56,21 +56,6 @@ proc createTkOfficeLogo {} {
 #  .logoC itemconf $schrift5 -fill $blau -font "TkCaptionFont 14 bold"
 }
 
-#Create small bitmap ::verbucht::im
-##called by fillAdrInvWin
-#for printInvButton
-#Bitmap should work, but donno why it doesn't:
-# $invF.$n.invshowB conf -bitmap $::verbucht::bmdata -command "showInvoice $invno"
-proc createPrintBitmap {} {
-    set bmdata {
-      #define printInvB_width 7
-      #define printInvB_height 7
-      static unsigned char printInvB_bits[] = {
-      0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f};
-    }
-    set ::verbucht::printBM [image create bitmap -data $bmdata]
-    $::verbucht::printBM conf -foreground red -background red
-}
 
 #############################################################################################
 ###  A D D R E S S  P R O C S
@@ -84,7 +69,7 @@ proc setAdrList {} {
 
 	$adrSpin conf -command {
 		fillAdrWin %s
-		fillAdrInvWin %s
+		fillAdrInvWin %s 
 	} -validate key -vcmd {
   	fillAdrWin %s
   	after idle {%W config -validate %v}
@@ -184,6 +169,7 @@ proc searchAddress {} {
 
     $adrSpin config -bg beige -values "$adrNumL"
     fillAdrWin [$adrSpin get]
+    
     fillAdrInvWin [$adrSpin get]
     catch {button .adrClearSelB -width 13 -text "^ Auswahl löschen" -command setAdrList}
     pack .adrClearSelB -in .adrF1

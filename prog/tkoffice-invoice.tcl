@@ -440,12 +440,24 @@ proc clearAdrInvWin {} {
 }
 
 # fillAdrInvWin
-##called by .adrSB 
+##refills address invoice window with max 30 entries, paging through up+down btns
 ##Note: ts=customerOID in 'address', now identical with objectid,needed for identification with 'invoice'
-proc fillAdrInvWin {adrId} {
+##called by invPager & up+down btns
+proc fillAdrInvWin { adrId } {
+  
   global invF db
   global c1 c2 c3 c4 c5 c6 c7 c8
+  
 
+  #run invPager to rerun this prog if invpages:: ns not found
+#TODO this condition is crap, you never get over the first run of invPager, but needed for each run for page size!!!!
+  if [catch {global invpages::curPage}] {
+    invPager
+  }
+  
+puts "running fillAdrInvWin..."
+  set invL $curPage
+  
   #Delete previous frames
   clearAdrInvWin
   
@@ -457,65 +469,17 @@ proc fillAdrInvWin {adrId} {
   #Add new namespace no.
   namespace eval verbucht {
 
-    createPrintBitmap
-    ##set ::verbucht vars to manipulate header visibility
-    set eingabe 0
-    set anzeige 0
-    set adrId [.adrSB get]
+set adrId [.adrSB get]
+
 
 #TODO: change name of column from ts to ...?
     set custId [db eval "SELECT ts FROM address WHERE objectid = $adrId"]
     set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
+    set nTuples [llength $invL]
 
-#TODO use (lreplace)  lrange! instead!!!!
-for {set max 25} {n <= $max} {incr n} {
-  lappend [lindex $invL $n] invL-$no
-  incr no
-}  
 
-#TODO ...
-#    set invL [lsort -decreasing [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]]
- 
- 
-   set nTuples [llength $invL]
-
-#TODO limit nTuples to 25 per page !!!!!!
-## activating scrolling for next pages
-## continue from last 'number' in invL, i.e remember position in list!
-## watch umsatzL, which must comprise ALL turnover from customer
-
-# invScroll
-## checks if invL has more than 25 entries & writes 1 or several 25 item vars into ::verbucht
-## called by .invSB scrollbar?
-proc invScroll {invL nTuples} {
+#TODO ?  set invL [lsort -decreasing [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]]
   
-  namespace eval verbucht {
-    variable invL-1
-  }
-
-  if {$nTuples <= 25} {
-    set verbucht::invL-1 $invL
-    return 
-  } 
-
-#TODO is this doing what I want?
-set numChunks [expr ceil($nTuples./25)]
-
-  #split invL into 25 item chunks & save into vars
-  for {set num $numChunks} {max <= $num} {incr num} {
-    
-    
-    set invL-$num [lrange $invL 0 24 ...] ;#da got no nöd!
-    variable verbucht::invL-$no $invL-$no
-  
-  } 
-  #TODO Handle rest! ??
-  
-} ;#END invScroll
-  	
-  	
-  	#exit if no invoices found
-  	if {$nTuples == -1} {return 1}
 
 		#NOTE: T stands for "token", yet these are no more tokens, but single items or lists! 
     set invDatT   [db eval "SELECT f_date FROM invoice WHERE customeroid = $custId"]
@@ -537,11 +501,13 @@ set numChunks [expr ceil($nTuples./25)]
     if {![string is double $auslage] || $auslage == ""} {
       set auslage 0.00
     }
+    
+    #TODO look below!
     set ::umsatz [roundDecimal [expr $verbucht + $auslage]]
         
-        #set modulo initial vars
-        set wechselfarbe #d9d9d9
-        set normal $wechselfarbe
+    #set modulo initial vars
+    set wechselfarbe #d9d9d9
+    set normal $wechselfarbe
         
     #Create row per invoice
     for {set row 0} {$row<$nTuples} {incr row} {
@@ -628,7 +594,7 @@ set numChunks [expr ceil($nTuples./25)]
           .zahlenE-$row conf -background beige
           .zahlenE-$row conf -validate focusout -vcmd "savePaymentEntry %P %W $n"
 
-			    set ::verbucht::eingabe 1
+	#		    set ::verbucht::eingabe 1
           set restbetrag "Restbetrag eingeben und mit Tab-Taste quittieren"
           set gesamtbetrag "Zahlbetrag eingeben und mit Tab-Taste quittieren"
           .commentL-$row conf -fg red -textvar gesamtbetrag
@@ -672,7 +638,112 @@ set numChunks [expr ceil($nTuples./25)]
 
   set ::credit [updateCredit $adrId]
   
+  #TODO watch umsatzL, which must comprise ALL turnover from customer
+  #s.o. set umsatz...
+  
 } ;#END fillAdrInvWin
+
+# invPager
+## checks if invL has more than 25 entries & writes 1 or several $chunk item vars into ::invpages
+## for filladrInvWin & up+down buttons to retrieve
+## called by .adrSB 
+proc invPager {} {
+  
+  puts "running invPager.."
+  
+  set adrId [.adrSB get]
+  set chunk 30
+  
+  #Clear any invpages info for new run & create mandatory invL-1
+  namespace eval invpages {
+    variable invL-1
+    variable curPage invL-1
+  }
+  
+  set custId [db eval "SELECT ts FROM address WHERE objectid = $adrId"]
+  set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
+  set nTuples [llength $invL]
+
+  #exit if no invoices found
+	if {$nTuples == -1} {
+	  return 1
+  }
+
+  # 1. if 1 page set invL-1 & return
+  if {$nTuples <= $chunk} {
+    set invpages::invL-1 $invL
+    .invupBtn conf -state disabled
+    .invdownBtn conf -state disabled
+
+puts zisisworkin 
+
+  
+  # 2. if several pages set pageL for invSelectPage to evaluate
+  } else {
+
+    #Create page list for ? to evaluate  - TODO Who needs this? - we work with curPage set by selectPage!
+  #  namespace eval invpages {
+  #    variable pageL
+  #  }
+
+    #Enable up+down btns for several pages
+    .invupBtn conf -state enabled
+    .invdownBtn conf -state enabled
+
+
+  #set numChunks [expr ceil($nTuples./30)]
+
+    #split invL into 30 item chunks & save into vars
+    set beg 0
+    set end 30
+    set no 1
+      
+    while {[lrange $nTuples $beg $end] != ""} {
+
+puts zisayntworkin!
+      
+      set invL-$no [lrange $nTuples $beg $end]
+      variable invpages::invL-$no $invL-$no
+      lappend invpages::pageL $invL-$no
+           
+      incr beg $chunk
+      incr end $chunk
+      incr no 1
+    }
+  
+  
+  } ;#END main clause
+  
+  
+  fillAdrInvWin $adrId
+    
+} ;#END invPager
+
+# invSelectPage
+## checks how many pages exist & moves 1 up or down from $curPage
+## resets $::invpages::curPage
+## called by .invSB scrollbar if activated
+proc invSelectPage {args} {
+  global invpages::curPage
+  
+  if {$args == "up"} {
+  
+    set curPage [incr curPage -1]
+     
+  } elseif {$args == "down"} {
+  
+    set curPage [incr curPage 1]
+
+  }
+  
+  set invpages::curPage $curPage
+  
+  #avoid empty pages
+  if {$invpages::curPage != $curPage} {
+    fillAdrInvWin $curPage
+  }
+}
+  	
 
 
 # setInvPath
