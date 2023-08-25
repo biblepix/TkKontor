@@ -2,7 +2,7 @@
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
 # Updated for use with SQLite: 9sep22
-# Updated 19aug23
+# Updated 25aug23
 
 catch {source $confFile}
 ################################################################################################################
@@ -443,23 +443,22 @@ proc clearAdrInvWin {} {
 ##refills address invoice window with max 30 entries, paging through up+down btns
 ##Note: ts=customerOID in 'address', now identical with objectid,needed for identification with 'invoice'
 ##called by invPager & up+down btns
-proc fillAdrInvWin { adrId } {
+#TODO ?  set invL [lsort -decreasing [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]]
+#TODO: change name of column from ts to ...?
+proc fillAdrInvWin {adrId args} {
   
   global invF db
   global c1 c2 c3 c4 c5 c6 c7 c8
-  
 
-  #run invPager to rerun this prog if invpages:: ns not found
-#TODO this condition is crap, you never get over the first run of invPager, but needed for each run for page size!!!!
-  if [catch {global invpages::curPage}] {
-    invPager
-  }
-  
-puts "running fillAdrInvWin..."
-  set invL $curPage
   
   #Delete previous frames
   clearAdrInvWin
+
+puts "running fillAdrInvWin..."
+
+if {$args == "select"} {
+  variable invpages::select 1
+}  
   
   #Clear old window+namespace
   if [namespace exists verbucht] {
@@ -469,17 +468,20 @@ puts "running fillAdrInvWin..."
   #Add new namespace no.
   namespace eval verbucht {
 
-set adrId [.adrSB get]
-
-
-#TODO: change name of column from ts to ...?
+    set adrId [.adrSB get]
     set custId [db eval "SELECT ts FROM address WHERE objectid = $adrId"]
-    set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
+    set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"] 
+
+    #run Pager unless invSelect is calling with argument "select"
+    if {![info exists invpages::select]} { 
+      invPager $invL
+    }
+
+    #redefine invL after Pager run
+    global invpages::curPage
+    set cur $invpages::curPage
+    set invL [set invpages::$cur]
     set nTuples [llength $invL]
-
-
-#TODO ?  set invL [lsort -decreasing [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]]
-  
 
 		#NOTE: T stands for "token", yet these are no more tokens, but single items or lists! 
     set invDatT   [db eval "SELECT f_date FROM invoice WHERE customeroid = $custId"]
@@ -647,21 +649,19 @@ set adrId [.adrSB get]
 ## checks if invL has more than 25 entries & writes 1 or several $chunk item vars into ::invpages
 ## for filladrInvWin & up+down buttons to retrieve
 ## called by .adrSB 
-proc invPager {} {
+proc invPager {invL} {
   
   puts "running invPager.."
   
-  set adrId [.adrSB get]
-  set chunk 30
+  set chunk 25
   
   #Clear any invpages info for new run & create mandatory invL-1
   namespace eval invpages {
-    variable invL-1
-    variable curPage invL-1
+    variable 1
+    variable curPage
   }
-  
-  set custId [db eval "SELECT ts FROM address WHERE objectid = $adrId"]
-  set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]
+
+  global invpages::curPage
   set nTuples [llength $invL]
 
   #exit if no invoices found
@@ -669,12 +669,16 @@ proc invPager {} {
 	  return 1
   }
 
+puts $nTuples
+puts $chunk
+
   # 1. if 1 page set invL-1 & return
   if {$nTuples <= $chunk} {
-    set invpages::invL-1 $invL
+    set invpages::1 $invL
     .invupBtn conf -state disabled
     .invdownBtn conf -state disabled
-
+    set curPage 1
+    
 puts zisisworkin 
 
   
@@ -687,24 +691,30 @@ puts zisisworkin
   #  }
 
     #Enable up+down btns for several pages
-    .invupBtn conf -state enabled
-    .invdownBtn conf -state enabled
+    .invupBtn conf -state normal
+    .invdownBtn conf -state normal
 
 
   #set numChunks [expr ceil($nTuples./30)]
 
     #split invL into 30 item chunks & save into vars
     set beg 0
-    set end 30
+    set end $chunk
     set no 1
       
-    while {[lrange $nTuples $beg $end] != ""} {
+      #TODO this loop aynt workin
+    while {[lrange $invL $beg $end] != ""} {
 
-puts zisayntworkin!
+puts "run $no"
+
+      catch {variable invpages::$no}
       
-      set invL-$no [lrange $nTuples $beg $end]
-      variable invpages::invL-$no $invL-$no
-      lappend invpages::pageL $invL-$no
+      set invpages::$no [lrange $invL $beg $end]
+puts [lrange $invL $beg $end]
+
+      #TODO do we need this?      
+#      set invpages::$no $invL-$no
+      #lappend invpages::pageL $no
            
       incr beg $chunk
       incr end $chunk
@@ -714,35 +724,46 @@ puts zisayntworkin!
   
   } ;#END main clause
   
-  
-  fillAdrInvWin $adrId
     
 } ;#END invPager
 
 # invSelectPage
 ## checks how many pages exist & moves 1 up or down from $curPage
 ## resets $::invpages::curPage
-## called by .invSB scrollbar if activated
+## called by .invupBtn & .invdownBtn when activated
 proc invSelectPage {args} {
+
   global invpages::curPage
-  
+    
+  set cur $invpages::curPage
+  set orig $cur
+    
   if {$args == "up"} {
   
-    set curPage [incr curPage -1]
+    incr cur -1
      
   } elseif {$args == "down"} {
   
-    set curPage [incr curPage 1]
+    incr cur 1
 
   }
   
-  set invpages::curPage $curPage
-  
-  #avoid empty pages
-  if {$invpages::curPage != $curPage} {
-    fillAdrInvWin $curPage
-  }
+  #TODO s harzet no!!!!
+
+puts $cur
+puts $invpages::curPage
+
+if { [info exists invpages::$cur] && $invpages::curPage != $cur} {
+    
+    fillAdrInvWin $cur select
+    set invpages::curPage $cur
+
+} else {
+
+  set invpages::curPage $orig 
 }
+
+} ;#END invSelectPage
   	
 
 
