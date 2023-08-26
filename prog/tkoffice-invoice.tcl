@@ -422,6 +422,9 @@ proc saveInv2DB {} {
 ##called by fillAdrInvWin & newAddress
 proc clearAdrInvWin {} {
 	global invF c1 c2 c3 c4 c5 c6 c7 c8
+
+#catch {namespace delete invpages}
+catch {namespace delete verbucht}
 	
 	#Empty columns except Headers
 	lappend columnL $c1 $c2 $c3 $c4 $c5 $c6 $c7 $c8
@@ -659,50 +662,40 @@ proc invPager {invL} {
   namespace eval invpages {
     variable 1
     variable curPage
+    variable lsize 0
   }
 
   global invpages::curPage
-  set nTuples [llength $invL]
+  global invpages::lsize
 
   #exit if no invoices found
+	set nTuples [llength $invL]
 	if {$nTuples == -1} {
 	  return 1
   }
-
-puts $nTuples
-puts $chunk
 
   # 1. if 1 page set invL-1 & return
   if {$nTuples <= $chunk} {
     set invpages::1 $invL
     .invupBtn conf -state disabled
     .invdownBtn conf -state disabled
+  .invSB conf -state disabled
     set curPage 1
     
-puts zisisworkin 
-
   
   # 2. if several pages set pageL for invSelectPage to evaluate
   } else {
-
-    #Create page list for ? to evaluate  - TODO Who needs this? - we work with curPage set by selectPage!
-  #  namespace eval invpages {
-  #    variable pageL
-  #  }
 
     #Enable up+down btns for several pages
     .invupBtn conf -state normal
     .invdownBtn conf -state normal
 
-
-  #set numChunks [expr ceil($nTuples./30)]
-
-    #split invL into 30 item chunks & save into vars
+    
+    #split invL into item chunks & save into vars
     set beg 0
     set end $chunk
     set no 1
       
-      #TODO this loop aynt workin
     while {[lrange $invL $beg $end] != ""} {
 
 puts "run $no"
@@ -715,12 +708,19 @@ puts [lrange $invL $beg $end]
       #TODO do we need this?      
 #      set invpages::$no $invL-$no
       #lappend invpages::pageL $no
-           
+      lappend numPages "page $no"
+            
       incr beg $chunk
       incr end $chunk
       incr no 1
+      incr lsize
+ 
+
     }
   
+  .invSB conf -state normal
+  .invSB conf -values [lsort -decreasing $numPages]
+  .invSB set "page 1"
   
   } ;#END main clause
   
@@ -734,34 +734,34 @@ puts [lrange $invL $beg $end]
 proc invSelectPage {args} {
 
   global invpages::curPage
-    
-  set cur $invpages::curPage
-  set orig $cur
-    
-  if {$args == "up"} {
+  global invpages::lsize
   
-    incr cur -1
-     
-  } elseif {$args == "down"} {
+  set max $lsize
   
-    incr cur 1
-
+  if {$curPage <= $max} {
+    set cur $curPage
+  } else {
+    return 1
   }
   
-  #TODO s harzet no!!!!
+  if {$args == "up"} {
+    if {[incr cur -1] <= 0} {
+      return 1
+    } 
+       
+  } elseif {$args == "down"} {
+  
+    if {[incr cur] > $max} {
+      return 1
+    }
 
-puts $cur
+  } ;#END main if
+
+#puts $cur
 puts $invpages::curPage
 
-if { [info exists invpages::$cur] && $invpages::curPage != $cur} {
-    
     fillAdrInvWin $cur select
     set invpages::curPage $cur
-
-} else {
-
-  set invpages::curPage $orig 
-}
 
 } ;#END invSelectPage
   	

@@ -227,9 +227,14 @@ pack .invPaymentEntryH -in $c7 -pady 7
 pack .invCommentH -in $c8 -pady 7 -anchor w
 
 #Create up+down buttons
+spinbox .invSB -width 7 -bg beige -state disabled ;#-command {invSelectPage %s} 
+
+pack .invSB -in .n.t1.botF2 -side bottom
+
 button .invupBtn -text ⬆️ -command {invSelectPage up}
 button .invdownBtn -text ⬇️ -command {invSelectPage down}
-pack .invdownBtn .invupBtn -in .n.t1.botF2 -side bottom
+#pack .invdownBtn .invupBtn -in .n.t1.botF2 -side bottom
+
 
 	
 ########################################################################################
