@@ -226,15 +226,11 @@ pack .invPayedDatH -in $c6 -pady 7
 pack .invPaymentEntryH -in $c7 -pady 7
 pack .invCommentH -in $c8 -pady 7 -anchor w
 
-#Create up+down buttons
-spinbox .invSB -width 7 -bg beige -state disabled ;#-command {invSelectPage %s} 
-
-pack .invSB -in .n.t1.botF2 -side bottom
-
-button .invupBtn -text ⬆️ -command {invSelectPage up}
-button .invdownBtn -text ⬇️ -command {invSelectPage down}
-#pack .invdownBtn .invupBtn -in .n.t1.botF2 -side bottom
-
+#Create spinbox for paging
+label .invPageinfoL -text "Page" -padx 5 -state disabled
+spinbox .invSB -width 3 -bg beige -state disabled 
+.invSB conf -command {invSelectPage %s}
+pack .invPageinfoL .invSB -in .n.t1.botF2 -side left -anchor se
 
 	
 ########################################################################################

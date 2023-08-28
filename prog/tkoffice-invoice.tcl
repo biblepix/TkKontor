@@ -445,28 +445,28 @@ catch {namespace delete verbucht}
 # fillAdrInvWin
 ##refills address invoice window with max 30 entries, paging through up+down btns
 ##Note: ts=customerOID in 'address', now identical with objectid,needed for identification with 'invoice'
-##called by invPager & up+down btns
+##called by .invSB  & ???up+down btns
 #TODO ?  set invL [lsort -decreasing [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"]]
 #TODO: change name of column from ts to ...?
-proc fillAdrInvWin {adrId args} {
+proc fillAdrInvWin {adrId } {
   
   global invF db
   global c1 c2 c3 c4 c5 c6 c7 c8
-
-  
-  #Delete previous frames
-  clearAdrInvWin
-
-puts "running fillAdrInvWin..."
-
-if {$args == "select"} {
-  variable invpages::select 1
-}  
   
   #Clear old window+namespace
   if [namespace exists verbucht] {
     namespace delete verbucht
   }
+  #Delete previous frames
+  clearAdrInvWin
+
+puts "running fillAdrInvWin..."
+
+#if {$args != ""} {
+#  variable invpages::select 1
+#}  
+
+#set pages::curPage $pageNo   
 
   #Add new namespace no.
   namespace eval verbucht {
@@ -475,20 +475,31 @@ if {$args == "select"} {
     set custId [db eval "SELECT ts FROM address WHERE objectid = $adrId"]
     set invL [db eval "SELECT f_number FROM invoice WHERE customeroid = $custId"] 
 
-    #run Pager unless invSelect is calling with argument "select"
+    #run Pager unless invSelect is calling with argument "select"???
     if {![info exists invpages::select]} { 
       invPager $invL
-    }
+    
+    } else {
+      
+    #  set invpages::1 $invL
+          }
 
     #redefine invL after Pager run
-    global invpages::curPage
+    #global invpages::curPage
+    #set cur [set invpages::$curPage]
+
+#TODO Jesh balagan im invL & curL above    
+
+global invpages::curPage
     set cur $invpages::curPage
     set invL [set invpages::$cur]
     set nTuples [llength $invL]
+#namespace upvar ::invpages curPage curL
+#set invL $::invpages::curPage
 
 		#NOTE: T stands for "token", yet these are no more tokens, but single items or lists! 
     set invDatT   [db eval "SELECT f_date FROM invoice WHERE customeroid = $custId"]
-	  set articleT   [db eval "SELECT shortdescription FROM invoice WHERE customeroid = $custId"]
+	  set articleT  [db eval "SELECT shortdescription FROM invoice WHERE customeroid = $custId"]
 	  set sumtotalT [db eval "SELECT finalsum FROM invoice WHERE customeroid = $custId"]
 	  set payedsumT [db eval "SELECT payedsum FROM invoice WHERE customeroid = $custId"]
 
@@ -661,7 +672,7 @@ proc invPager {invL} {
   #Clear any invpages info for new run & create mandatory invL-1
   namespace eval invpages {
     variable 1
-    variable curPage
+    variable curPage 1
     variable lsize 0
   }
 
@@ -676,21 +687,14 @@ proc invPager {invL} {
 
   # 1. if 1 page set invL-1 & return
   if {$nTuples <= $chunk} {
+
     set invpages::1 $invL
-    .invupBtn conf -state disabled
-    .invdownBtn conf -state disabled
-  .invSB conf -state disabled
-    set curPage 1
-    
+    .invSB conf -state disabled
+    .invPageinfoL conf -state disabled
   
   # 2. if several pages set pageL for invSelectPage to evaluate
   } else {
 
-    #Enable up+down btns for several pages
-    .invupBtn conf -state normal
-    .invdownBtn conf -state normal
-
-    
     #split invL into item chunks & save into vars
     set beg 0
     set end $chunk
@@ -708,60 +712,74 @@ puts [lrange $invL $beg $end]
       #TODO do we need this?      
 #      set invpages::$no $invL-$no
       #lappend invpages::pageL $no
-      lappend numPages "page $no"
+      lappend numPages "$no"
             
       incr beg $chunk
       incr end $chunk
       incr no 1
       incr lsize
- 
-
     }
   
   .invSB conf -state normal
   .invSB conf -values [lsort -decreasing $numPages]
-  .invSB set "page 1"
+  .invSB set "1"
+  .invPageinfoL configure -state normal
+ 
   
   } ;#END main clause
+ 
+# global invpages {
+#   set curPage 1
+# }
   
+  #TODO jesh balagan... - lo, fillAdrInvWin mitmaschech kan!!!!
+  #fillAdrInvWin $adrId 1
     
 } ;#END invPager
 
 # invSelectPage
 ## checks how many pages exist & moves 1 up or down from $curPage
 ## resets $::invpages::curPage
-## called by .invupBtn & .invdownBtn when activated
-proc invSelectPage {args} {
+## called by .invSB
+proc invSelectPage {pageNo} {
 
-  global invpages::curPage
-  global invpages::lsize
-  
-  set max $lsize
-  
-  if {$curPage <= $max} {
-    set cur $curPage
-  } else {
-    return 1
-  }
-  
-  if {$args == "up"} {
-    if {[incr cur -1] <= 0} {
-      return 1
-    } 
-       
-  } elseif {$args == "down"} {
-  
-    if {[incr cur] > $max} {
-      return 1
-    }
+#set select var for fillAdrInvWin to skip pager
+namespace eval invpages {
+  variable select 1
+}
 
-  } ;#END main if
+set invpages::curPage $pageNo
+set adrId [.adrSB get]
+fillAdrInvWin $adrId
 
-#puts $cur
-puts $invpages::curPage
+#  global invpages::curPage
+#  global invpages::lsize
+#  set max $lsize
+  
+#  if {$curPage <= $max} {
+#    set cur $curPage
+#  } else {
+#    return 1
+#  }
+#  
+#  if {$args == "up"} {
+#    if {[incr cur -1] <= 0} {
+#      return 1
+#    } 
+#       
+#  } elseif {$args == "down"} {
+#  
+#    if {[incr cur] > $max} {
+#      return 1
+#    }
 
-    fillAdrInvWin $cur select
-    set invpages::curPage $cur
+#  } ;#END main if
+
+##puts $cur
+#puts $invpages::curPage
+
+#    fillAdrInvWin $cur select
+#    set invpages::curPage $cur
 
 } ;#END invSelectPage
   	
