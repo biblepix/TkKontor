@@ -228,9 +228,10 @@ pack .invCommentH -in $c8 -pady 7 -anchor w
 
 #Create spinbox for paging
 label .invPageinfoL -text "Page" -padx 5 -state disabled
+label .invNumPagesL -textvar numpages -padx 5 -state disabled
 spinbox .invSB -width 3 -bg beige -state disabled 
 .invSB conf -command {invSelectPage %s}
-pack .invPageinfoL .invSB -in .n.t1.botF2 -side left -anchor se
+pack .invPageinfoL .invSB .invNumPagesL -in .n.t1.botF2 -side left -anchor se
 
 	
 ########################################################################################

@@ -485,17 +485,10 @@ puts "running fillAdrInvWin..."
           }
 
     #redefine invL after Pager run
-    #global invpages::curPage
-    #set cur [set invpages::$curPage]
-
-#TODO Jesh balagan im invL & curL above    
-
-global invpages::curPage
+    global invpages::curPage
     set cur $invpages::curPage
     set invL [set invpages::$cur]
     set nTuples [llength $invL]
-#namespace upvar ::invpages curPage curL
-#set invL $::invpages::curPage
 
 		#NOTE: T stands for "token", yet these are no more tokens, but single items or lists! 
     set invDatT   [db eval "SELECT f_date FROM invoice WHERE customeroid = $custId"]
@@ -691,7 +684,9 @@ proc invPager {invL} {
     set invpages::1 $invL
     .invSB conf -state disabled
     .invPageinfoL conf -state disabled
-  
+    .invNumPagesL conf -state disabled
+    set ::numpages 1
+    
   # 2. if several pages set pageL for invSelectPage to evaluate
   } else {
 
@@ -702,20 +697,13 @@ proc invPager {invL} {
       
     while {[lrange $invL $beg $end] != ""} {
 
-puts "run $no"
-
       catch {variable invpages::$no}
       
       set invpages::$no [lrange $invL $beg $end]
-puts [lrange $invL $beg $end]
-
-      #TODO do we need this?      
-#      set invpages::$no $invL-$no
-      #lappend invpages::pageL $no
       lappend numPages "$no"
             
-      incr beg $chunk
-      incr end $chunk
+      incr beg [expr $chunk + 1]
+      incr end [expr $chunk + 1]
       incr no 1
       incr lsize
     }
@@ -724,17 +712,11 @@ puts [lrange $invL $beg $end]
   .invSB conf -values [lsort -decreasing $numPages]
   .invSB set "1"
   .invPageinfoL configure -state normal
- 
+  .invNumPagesL configure -state normal
+  set ::numpages "/ [lindex $numPages end]"
   
   } ;#END main clause
  
-# global invpages {
-#   set curPage 1
-# }
-  
-  #TODO jesh balagan... - lo, fillAdrInvWin mitmaschech kan!!!!
-  #fillAdrInvWin $adrId 1
-    
 } ;#END invPager
 
 # invSelectPage
