@@ -207,6 +207,7 @@ set invF .n.t1.botF1
 
 pack [frame $invF.c1] [frame $invF.c2] [frame $invF.c3] [frame $invF.c4] [frame $invF.c5] [frame $invF.c6] [frame $invF.c7] [frame $invF.c8] -padx 10 -anchor nw -side left
 
+##export column vars
 set c1 $invF.c1
 set c2 $invF.c2
 set c3 $invF.c3
@@ -215,6 +216,7 @@ set c5 $invF.c5
 set c6 $invF.c6
 set c7 $invF.c7
 set c8 $invF.c8
+lappend invColumnL $c1 $c2 $c3 $c4 $c5 $c6 $c7 $c8
 
 #pack headers into columns
 pack .invNoH -in $c1 -pady 7 -anchor n

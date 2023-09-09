@@ -2,7 +2,7 @@
 # called by tkoffice-gui.tcl
 # Salvaged: 2nov17
 # Updated for use with SQLite: 9sep22
-# Updated 25aug23
+# Updated 8sep23
 
 catch {source $confFile}
 ################################################################################################################
@@ -416,24 +416,23 @@ proc saveInv2DB {} {
 
 } ;#END saveInv2DB
 
-
-
 # clearAdrInvWin
 ##called by fillAdrInvWin & newAddress
 proc clearAdrInvWin {} {
 	global invF c1 c2 c3 c4 c5 c6 c7 c8
-
+  global invColumnL
+  
 #catch {namespace delete invpages}
 catch {namespace delete verbucht}
 	
 	#Empty columns except Headers
-	lappend columnL $c1 $c2 $c3 $c4 $c5 $c6 $c7 $c8
+	#lappend columnL $c1 $c2 $c3 $c4 $c5 $c6 $c7 $c8
   
-  foreach col $columnL {
+  foreach col $invColumnL {
     
-    set itemL [pack slaves $col]
+#    set itemL [pack slaves $col]
     
-      foreach i $itemL {
+      foreach i [pack slaves $col] {
       if { [string index $i end] != "H"} {
         pack forget $i
       }
@@ -515,8 +514,8 @@ puts "running fillAdrInvWin..."
     set ::umsatz [roundDecimal [expr $verbucht + $auslage]]
         
     #set modulo initial vars
-    set wechselfarbe #d9d9d9
-    set normal $wechselfarbe
+#    set wechselfarbe #d9d9d9
+#    set normal $wechselfarbe
         
     #Create row per invoice
     for {set row 0} {$row<$nTuples} {incr row} {
@@ -576,15 +575,15 @@ puts "running fillAdrInvWin..."
         
         catch {label .commentL-$row}
 
-        #Pack all in corresponding columns
-        pack .invNoL-$row -in $c1 -anchor w 
-        pack .invDatL-$row -in $c2 -anchor w
-        pack .invArtL-$row -padx 0 -in $c3 -anchor w
-        pack .invSumL-$row -padx 30 -in $c4 -anchor e
-        pack .payedSumL-$row -padx 26 -in $c5 -anchor e
-        pack .payedDatL-$row -in $c6 -anchor w
-        pack .zahlenE-$row -in $c7 -anchor w
-        pack .commentL-$row -in $c8 -anchor w
+        #Pack all in corresponding columns - padding should level out difference to standard entry height of 20
+        pack .invNoL-$row -in $c1 -anchor w -pady 1 
+        pack .invDatL-$row -in $c2 -anchor w -pady 1
+        pack .invArtL-$row -padx 0 -in $c3 -anchor w -pady 1
+        pack .invSumL-$row -padx 30 -in $c4 -anchor e -pady 1
+        pack .payedSumL-$row -padx 26 -in $c5 -anchor e -pady 1
+        pack .payedDatL-$row -in $c6 -anchor w -pady 1
+        pack .zahlenE-$row -in $c7 -anchor w -pady 0
+        pack .commentL-$row -in $c8 -anchor w -pady 1
 
 			  if {$ts==3} {
 			  
@@ -598,10 +597,14 @@ puts "running fillAdrInvWin..."
 		      .zahlenE-$row conf -fg black 
           .payedSumL-$row conf -fg red
           
- #  TODO lindex stimmt nicht mit Zeilennummer überein!!!!!!!!!!!!!! - Farbe ändert nicht, warum?
+          
+          
+#  TODO lindex stimmt nicht mit Zeilennummer überein!!!!!!!!!!!!!! - Farbe ändert nicht, warum?
           .zahlenE-$row conf -state normal
           .zahlenE-$row conf -background beige
           .zahlenE-$row conf -validate focusout -vcmd "savePaymentEntry %P %W $n"
+
+
 
 	#		    set ::verbucht::eingabe 1
           set restbetrag "Restbetrag eingeben und mit Tab-Taste quittieren"
@@ -617,40 +620,62 @@ puts "running fillAdrInvWin..."
 				  }
 			  }
 
-        #create comment btn
-			  #catch {label $invF.$n.commentL -width 50 -justify left -anchor w -padx 35}
-			  
-        #Modulo: colour lines alternately if more than 5 lines
-        set normal #d9d9d9
-        if [expr $n % 2] {set wechselfarbe silver} {set wechselfarbe $normal}
-        foreach w [winfo children $invF.$n] {$w conf -bg $wechselfarbe}
-        
         #Bind invNo labels to highlighting on hover & command on double-click
 			  bind .invNoL-$row <Enter> "%W conf -bg orange"
-			  bind .invNoL-$row <Leave> "%W conf -bg $wechselfarbe"
+			  bind .invNoL-$row <Leave> "%W conf -bg #d9d9d9"
 			  bind .invNoL-$row <Double-1> "printInvoice $invNo"
  		
   		} ;#END ns $n
 
     } ;#END for loop
 
-    #Recolour lines to normal if only few
-    if {$row < 5} {
-      foreach f [winfo children $invF] {
-        foreach w [winfo children $f] {
-          $w conf -bg $normal
-        }
-        
-      }
-    }
+#level out height of labels with any .zahlenE's
+#if [winfo exists .zahlenE-$row] {
+#  foreach i $invColumnL {
+#    catch {$i conf -height [winfo height .zahlenE...] }
+#  }
+#}    
+
   } ;#END ns verbucht
 
   set ::credit [updateCredit $adrId]
+  
+  recolourInvRows 
   
   #TODO watch umsatzL, which must comprise ALL turnover from customer
   #s.o. set umsatz...
   
 } ;#END fillAdrInvWin
+
+# recolourRows
+## alternates colouring if invoice list is longer than 5
+## called by fillAdrInvWin
+proc recolourInvRows {} {
+
+#TODO change name from $row to rowtot or similar 
+  global verbucht::row
+  global ::invColumnL
+
+  #leave 7th & 8th column alone
+  set mycolL [lrange $invColumnL 0 5]
+  
+  if {$row < 5} {
+    set wechselfarbe "#d9d9d9"
+  } else {
+    set wechselfarbe "silver"
+  }
+  
+  foreach col $mycolL {
+    
+    foreach i [pack slaves $col] {
+      set endchar [string index $i end]
+      if { [string is digit $endchar] && [expr $endchar %2] } {
+        $i conf -bg $wechselfarbe
+      }
+    }
+  }
+  
+} ;#END recolourRows
 
 # invPager
 ## checks if invL has more than 25 entries & writes 1 or several $chunk item vars into ::invpages
@@ -809,13 +834,15 @@ proc savePaymentEntry {newPayedsum curEName ns} {
   set rowNo [namespace tail $curNS]
 
 	#1)get invoice details
-  set invNo [$invF.$rowNo.invNoL cget -text]
+  set invNo [.invNoL-$rowNo cget -text]
   set newPayedsum [$curEName get]
 
   #avoid non-digit amounts
   if [string is false $newPayedsum] {
     $curEName delete 0 end
     $curEName conf -validate focusout -vcmd "savePaymentEntry %P %W $ns"
+  #$curEName conf -validate focusout -vcmd  {puts %P; puts %W}
+  
     NewsHandler::QueryNews "Fehler: Konnte Zahlbetrag nicht speichern." red
     return 1
   }
@@ -869,15 +896,19 @@ proc savePaymentEntry {newPayedsum curEName ns} {
 
   ##delete OR reset zahlen entry
   if {$status == 3} {
+    
+#TODO why does it reappeer?
     pack forget $curEName
- 		.payedSumL conf -text $totalPayedsum -fg green
+ 		
+ 		
+ 		.payedSumL-$rowNo conf -text $totalPayedsum -fg green
     pack forget .commentL
     
   } else {
   
     $curEName delete 0 end
     $curEName conf -validate focusout -vcmd "savePaymentEntry %P %W $ns"
- 		.payedSumL conf -text $totalPayedsum -fg maroon
+ 		.payedSumL-$rowNo conf -text $totalPayedsum -fg maroon
   }
     
   set ::credit [updateCredit $adrNo]
